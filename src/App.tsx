@@ -23,6 +23,12 @@ function LearnerExperience({ experience, onExperienceChange }: {
   const demoModule = education.getDemoModule();
   const demoLessons = education.getDemoLessons();
 
+  // Live completed lesson ids from the Education Progress Context (localStorage backed)
+  // Passed to ModulePlayer so its sidebar + progress bar reflect real persisted state on entry/return
+  const completedLessonIds = demoLessons
+    .filter((l) => education.getLessonStatus(l.id) === 'completed')
+    .map((l) => l.id);
+
   const handleStartJourney = () => {
     setView('player');
   };
@@ -53,6 +59,7 @@ function LearnerExperience({ experience, onExperienceChange }: {
         <ModulePlayer
           module={demoModule}
           lessons={demoLessons}
+          completedLessonIds={completedLessonIds}
           onProgressUpdate={(lessonId: string, status: ProgressStatus) => {
             education.recordLessonProgress(lessonId, status);
           }}
