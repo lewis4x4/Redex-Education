@@ -8,7 +8,7 @@ function Progress({ value, className }: { value: number; className?: string }) {
   return (
     <div className={`bg-[#e5e7eb] rounded-full overflow-hidden ${className}`}>
       <div 
-        className="h-full bg-[#ed1f24] transition-all" 
+        className="h-full bg-redex-red transition-all" 
         style={{ width: `${value}%` }} 
       />
     </div>
@@ -53,7 +53,7 @@ export function LearnerDashboardPage({ learner, onContinue }: LearnerDashboardPa
       </div>
 
       {/* Primary CTA Card - What do I need to do now? */}
-      <Card className="border-[#ed1f24]/20 bg-white shadow-sm">
+      <Card className="border-redex-red/20 bg-white shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Continue where you left off</span>
@@ -72,7 +72,7 @@ export function LearnerDashboardPage({ learner, onContinue }: LearnerDashboardPa
             <div className="flex-1">
               <Progress value={currentAssignment.progress} className="h-2" />
             </div>
-            <div className="text-sm font-medium text-[#ed1f24]">{currentAssignment.progress}%</div>
+            <div className="text-sm font-medium text-redex-red">{currentAssignment.progress}%</div>
           </div>
 
           <div className="flex items-center gap-2 text-sm text-[#6b7280]">
@@ -82,7 +82,7 @@ export function LearnerDashboardPage({ learner, onContinue }: LearnerDashboardPa
 
           <Button 
             size="lg" 
-            className="w-full md:w-auto bg-[#ed1f24] hover:bg-[#c41a1e] mt-2"
+            className="w-full md:w-auto bg-redex-red hover:bg-redex-red-hover mt-2"
             onClick={onContinue}
           >
             Continue Training <ArrowRight className="ml-2 w-4 h-4" />

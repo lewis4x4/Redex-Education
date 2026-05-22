@@ -1390,3 +1390,78 @@ One sub-agent — session `D034DD49…1AB32B` (cleaned up post-verification). Pl
 
 ---
 
+## 2026-05-22 — Phase 5: Brand & Theme Unification
+
+**Status**: ✅ Completed (Phase 5 of 10) — orchestrated as 2 sequential sub-agent items
+
+**Context**:
+Six different hex values were all meaning "Redex red" across the codebase (`#ED1B24`, `#ed1f24`, `#e11d48`, `#c41a1e`, `#a31518`, `#b81419`). Phase 5 consolidates everything to canonical tokens, eliminates the global `h1-h6 { color: white }` rule (white-on-white risk in light cards), defines the missing `--success`/`--warning` CSS vars that `tailwind.config.ts` was already referencing, and brand-corrects the favicon. Lint count is unchanged — this is pure visual fidelity + design-system hygiene.
+
+**Orchestration**:
+Two sub-agents dispatched sequentially against `prompt-exports/phase-5-plan.md`.
+- **Item 1** (`pair`) — token definitions + global CSS cleanup. Session `D9C769DA…E14C091`.
+- **Item 2** (`engineer`) — replacement sweep + favicon. Session `6E1DEDC0…3F54367F1`.
+
+Both sessions cleaned up post-verification.
+
+**Summary**:
+
+### Item 1 — Theme tokens + global CSS cleanup
+- **Canonical Redex tokens** added to `src/index.css` under `:root`:
+  - `--redex-red: 357 85% 52%` (`#ED1B24`)
+  - `--redex-red-hover: 357 81% 43%` (`#C8141B`)
+  - `--redex-red-active: 357 83% 35%` (`#A30F15`)
+  - `--redex-black: 220 14% 4%` (`#08090b`)
+  - `--redex-offwhite: 45 18% 97%` (`#F8F7F4`)
+- **shadcn `--primary` rebased** to Redex red (`357 85% 52%`); `--ring` likewise. The default `Button` variant now reads as canonical brand red.
+- **Status tokens defined** (were referenced by `tailwind.config.ts` but never defined): `--success`, `--success-bg`, `--warning`, `--warning-bg`.
+- **Global `h1, h2, h3, h4, h5, h6 { color: white }` rule REMOVED**. This was the white-on-white risk inside light cards (Quiz, Dashboard).
+- **Stale "ANTIGRAVITY / Ops Hub / Sci-Fi Industrial" comments** renamed to "Redex Education design system".
+- **Legacy `--brand` alias retained** as `var(--redex-red)` to keep AuthGate (`text-brand`, `border-brand/20`) working without a migration step. Item 2 chose to migrate it anyway for consistency.
+- **`tailwind.config.ts`** got a new `theme.extend.colors.redex.*` namespace: `red`, `red-hover`, `red-active`, `black`, `offwhite`. Opacity modifiers (`bg-redex-red/10`) work cleanly.
+
+### Item 2 — Hardcoded color replacement sweep + favicon
+- **28 in-scope brand-hex replacements** across 9 component/page files. Post-sweep grep for the hex set returns only 1 hit: the allowed JSDoc comment in `Quiz.tsx` that documents the canonical brand value.
+- **AuthGate migrated** from `text-brand` / `border-brand/20` (via the legacy alias) to `text-redex-red` / `border-redex-red/20` (consistent with the new namespace).
+- **Inline `style={{ color: ... }}`** for STATUS colors in `Quiz.tsx` (emerald/red score banner) deliberately retained — those are semantic status, not brand red. Phase 6 may revisit.
+- **Legacy `neon-*` components in `index.css`** (`btn-neon-primary`, `gravity-card`, `badge-success/warning/critical/info`) untouched: `file_search` confirmed zero consumers in `src/`. Phase 7 cleanup can prune. Their internal `rgba(239, 68, 68, …)` (tailwind red-500) references are dead code, not brand drift.
+- **`public/favicon.svg`** replaced with a minimal valid 32×32 SVG: rounded square at `#ED1B24`, white "R" path. About 440 bytes. Brand-correct.
+
+**Files touched** (12 total):
+- Modified: `src/index.css`, `tailwind.config.ts`, `src/components/auth/AuthGate.tsx`, `src/components/layout/TopNav.tsx`, `src/components/layout/NotFoundPage.tsx`, `src/components/ui/button.tsx`, `src/features/admin/pages/AdminPlaceholderPage.tsx`, `src/features/learner/components/{ModulePlayer,Quiz}.tsx`, `src/features/learner/pages/{LearnerDashboardPage,LearnerWelcomePage}.tsx`, `public/favicon.svg`, `docs/redex_education_build_bible.md`
+- Created: `prompt-exports/phase-5-plan.md`
+
+**Verification**:
+- ✅ `npm run typecheck` — green under strict + `noUncheckedIndexedAccess`
+- ✅ `npm run build` — green; built CSS contains `--redex-red`, `--redex-red-hover`, `--redex-red-active`, `.bg-redex-red`, `.hover\:bg-redex-red-hover`
+- ✅ `npm run lint` — **5 errors + 0 warnings** (unchanged from Phase 4, as expected — no Phase 5-tagged lint errors existed)
+- ✅ `file_search` for the brand-hex set in `src/` returns 1 allowed hit (JSDoc comment in `Quiz.tsx`)
+
+**Visual regression notes** (intentional, expected):
+- UI accents that were previously `#e11d48` (tailwind rose-600, slightly pink-red) now render as canonical Redex red `#ED1B24` (more saturated, more orange-leaning). Most visible on the TopNav brand mark and the active-experience toggle. This is brand correction, not regression.
+- The Quiz "KNOWLEDGE CHECK" label and submit button were already `#ED1B24` — visually unchanged.
+- The white-on-white risk in light cards is now gone (no global `h1-h6 { color: white }` rule).
+
+**Known gaps** (intentional):
+- Legacy `neon-*` utility classes in `index.css` left intact — Phase 7 will prune if confirmed dead. They use `rgba(239, 68, 68, …)` internally but have no consumers.
+- Inline status colors in `Quiz.tsx` (emerald passed / red retake) are still hex literals — they're not brand colors so they don't need migration. Phase 6 may convert to `bg-success`/`bg-warning` semantic classes alongside a11y work.
+- Default `Button` variant and `brand` variant now look visually identical (both = Redex red). Phase 6 owns the proper differentiation (making `default` a neutral system action).
+
+**Naming guardrails honored**:
+- Redex Education = repo/product ✓ (referenced in `index.css` header)
+- Redex Academy = learner-facing brand ✓ (intact in TopNav, demo course)
+- Redex AI Course Foundry = `/admin/*` ✓
+- Redex Training OS — not surfaced in this phase (correct)
+- No real AI / Supabase / production auth wired ✓
+- No secrets ✓
+
+**Next**: Phase 6 — UI primitives & a11y. Should land:
+- `Card.tsx` `CardTitle` ref type fix (`HTMLHeadingElement`)
+- `Button.tsx` polymorphic typing for `asChild` + proper differentiation of `default` vs `brand` variants
+- `BreadcrumbBar` restructured with `<nav aria-label="Breadcrumb">`, ordered list, `aria-current="page"`
+- Quiz radio buttons converted to native `<input type="radio">` semantics (or `role="radio"` with proper `aria-checked`)
+- `LessonContentRenderer` — sanitized markdown rendering for text lessons (currently escaped plain text)
+- Sidebar lock UX in `ModulePlayer` revisited for `aria-disabled` semantics
+
+---
+

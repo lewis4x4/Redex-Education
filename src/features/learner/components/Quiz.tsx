@@ -111,7 +111,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <div className="uppercase tracking-[2px] text-xs font-semibold text-[#ED1B24]">KNOWLEDGE CHECK</div>
+          <div className="uppercase tracking-[2px] text-xs font-semibold text-redex-red">KNOWLEDGE CHECK</div>
           <h3 className="text-2xl font-semibold tracking-tight mt-1">{lesson.title}</h3>
           <p className="text-sm text-slate-500 mt-0.5">
             {gradeableQuestions.length} questions • {PASSING_THRESHOLD}% to pass
@@ -198,7 +198,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
                       optionClasses += 'bg-slate-50 border-slate-200 text-slate-500';
                     }
                   } else if (isSelected) {
-                    optionClasses += 'border-[#ED1B24] bg-red-50 ring-1 ring-inset ring-[#ED1B24]/25';
+                    optionClasses += 'border-redex-red bg-red-50 ring-1 ring-inset ring-redex-red/25';
                   } else {
                     optionClasses += 'border-slate-200 hover:border-slate-300 hover:bg-slate-50';
                   }
@@ -221,7 +221,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
                                 ? 'border-red-600 bg-red-600'
                                 : 'border-slate-300 bg-white'
                             : isSelected
-                              ? 'border-[#ED1B24] bg-[#ED1B24]'
+                              ? 'border-redex-red bg-redex-red'
                               : 'border-slate-400 bg-white'
                         }`}
                       >
@@ -265,7 +265,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
           <Button
             onClick={handleSubmit}
             disabled={!allAnswered}
-            className="flex-1 h-11 rounded-xl bg-[#ED1B24] hover:bg-[#c41a1e] active:bg-[#a31518] text-base font-semibold tracking-[-0.2px] disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed transition-all"
+            className="flex-1 h-11 rounded-xl bg-redex-red hover:bg-redex-red-hover active:bg-redex-red-active text-base font-semibold tracking-[-0.2px] disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed transition-all"
           >
             Submit Quiz
           </Button>

@@ -21,6 +21,13 @@ export default {
 				mono: ['JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', 'monospace'],
 			},
 			colors: {
+				redex: {
+					red: 'hsl(var(--redex-red))',
+					'red-hover': 'hsl(var(--redex-red-hover))',
+					'red-active': 'hsl(var(--redex-red-active))',
+					black: 'hsl(var(--redex-black))',
+					offwhite: 'hsl(var(--redex-offwhite))',
+				},
 				brand: {
 					DEFAULT: 'hsl(var(--brand))',
 					darker: 'hsl(var(--brand-darker))',

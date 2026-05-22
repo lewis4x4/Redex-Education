@@ -18,9 +18,9 @@ function DefaultFallback() {
 function SignInRequiredPlaceholder() {
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-6">
-      <Card className="max-w-md border-brand/20 bg-card/95 text-center shadow-lg">
+      <Card className="max-w-md border-redex-red/20 bg-card/95 text-center shadow-lg">
         <CardHeader>
-          <CardTitle className="text-2xl text-brand">Sign-in required</CardTitle>
+          <CardTitle className="text-2xl text-redex-red">Sign-in required</CardTitle>
           <CardDescription>
             Redex AI Course Foundry access will require an authenticated session.
           </CardDescription>

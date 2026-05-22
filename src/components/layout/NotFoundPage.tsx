@@ -11,7 +11,7 @@ export function NotFoundPage() {
         </CardHeader>
         <CardContent className="space-y-4 text-sm text-[#6b7280]">
           <p>We couldn&apos;t find that Redex Education page.</p>
-          <Button asChild className="bg-[#ed1f24] hover:bg-[#c41a1e]">
+          <Button asChild className="bg-redex-red hover:bg-redex-red-hover">
             <Link to="/learn">Back to Redex Academy</Link>
           </Button>
         </CardContent>

@@ -54,7 +54,7 @@ export function ModulePlayer({
   if (lessons.length === 0) {
     return (
       <div className="flex h-[calc(100vh-8rem)] bg-white rounded-2xl border overflow-hidden">
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#f8f7f4]">
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-redex-offwhite">
           <div className="max-w-md rounded-2xl border bg-white p-8 shadow-sm">
             <div className="text-xs uppercase tracking-widest text-slate-500 mb-2">MODULE</div>
             <h2 className="text-2xl font-semibold text-slate-900 mb-3">{module.title}</h2>
@@ -73,7 +73,7 @@ export function ModulePlayer({
   if (!currentLesson) {
     return (
       <div className="flex h-[calc(100vh-8rem)] bg-white rounded-2xl border overflow-hidden">
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#f8f7f4]">
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-redex-offwhite">
           <div className="max-w-md rounded-2xl border bg-white p-8 shadow-sm">
             <h2 className="text-2xl font-semibold text-slate-900 mb-3">Lesson unavailable</h2>
             <p className="text-slate-600 mb-6">This lesson could not be found in the current module.</p>
@@ -140,7 +140,7 @@ export function ModulePlayer({
         <div className="mb-3">
           <div className="text-xs text-slate-500 mb-1">Module Progress</div>
           <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-            <div className="h-2 bg-[#ED1B24]" style={{ width: `${progress}%` }} />
+            <div className="h-2 bg-redex-red" style={{ width: `${progress}%` }} />
           </div>
           <div className="text-xs text-right mt-1 text-slate-500">{progress}% complete</div>
         </div>
@@ -158,7 +158,7 @@ export function ModulePlayer({
                 disabled={!canNavigate}
                 title={canNavigate ? undefined : 'Complete required lessons in order to unlock this lesson.'}
                 className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-sm transition-colors
-                  ${isActive ? 'bg-[#ED1B24]/10 text-[#ED1B24] font-medium' : 'hover:bg-slate-100'}
+                  ${isActive ? 'bg-redex-red/10 text-redex-red font-medium' : 'hover:bg-slate-100'}
                   ${isCompleted ? 'text-emerald-700' : ''}
                   ${!canNavigate ? 'opacity-50 cursor-not-allowed hover:bg-transparent' : ''}
                 `}
@@ -192,7 +192,7 @@ export function ModulePlayer({
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-8 bg-[#f8f7f4]">
+        <div className="flex-1 overflow-auto p-8 bg-redex-offwhite">
           <LessonContentRenderer
             lesson={currentLesson}
             onQuizComplete={(score, passed) => {
@@ -235,7 +235,7 @@ export function ModulePlayer({
           <Button 
             onClick={handleMarkComplete} 
             disabled={isQuizLocked}
-            className="bg-[#ED1B24] hover:bg-[#b81419] disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed"
+            className="bg-redex-red hover:bg-redex-red-hover disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed"
           >
             {isQuizLocked 
               ? 'Pass Quiz to Continue' 

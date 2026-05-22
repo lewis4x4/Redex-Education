@@ -11,13 +11,13 @@ export function TopNav() {
   return (
     <nav
       aria-label="Primary navigation"
-      className="bg-[#08090b] text-white h-14 flex items-center px-6 border-b border-white/10"
+      className="bg-redex-black text-white h-14 flex items-center px-6 border-b border-white/10"
     >
       <div className="flex items-center justify-between w-full max-w-[1200px] mx-auto">
         {/* Logo + Brand - matches the mockup header */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-[#e11d48] flex items-center justify-center">
+            <div className="w-6 h-6 rounded bg-redex-red flex items-center justify-center">
               <span className="text-white text-sm font-bold">R</span>
             </div>
             <span className="font-semibold tracking-tight text-[15px]">Redex Academy</span>
@@ -34,7 +34,7 @@ export function TopNav() {
             className={cn(
               'px-5 py-1 rounded-lg transition-all',
               isLearnerActive
-                ? 'bg-[#e11d48] text-white font-medium'
+                ? 'bg-redex-red text-white font-medium'
                 : 'text-white/60 hover:text-white hover:bg-white/10',
             )}
           >
@@ -47,7 +47,7 @@ export function TopNav() {
             className={cn(
               'px-5 py-1 rounded-lg transition-all',
               isAdminActive
-                ? 'bg-[#e11d48] text-white font-medium'
+                ? 'bg-redex-red text-white font-medium'
                 : 'text-white/60 hover:text-white hover:bg-white/10',
             )}
           >

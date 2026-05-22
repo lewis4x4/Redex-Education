@@ -21,7 +21,7 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
         // Redex custom variants for strong brand presence
         brand:
-          "bg-brand text-brand-foreground shadow-sm hover:bg-brand/90",
+          "bg-redex-red text-white shadow-sm hover:bg-redex-red-hover active:bg-redex-red-active",
       },
       size: {
         default: "h-9 px-4 py-2",

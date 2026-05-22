@@ -2,33 +2,40 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 
-  ANTIGRAVITY INDUSTRIAL DESIGN SYSTEM 
-  Client: RedEx Ops Hub
-  Theme: "Sci-Fi Industrial" (Dark Mode First)
+/*
+  Redex Education design system
+  Shared brand tokens and global app foundations
 */
 
 @layer base {
   :root {
-    /* 
-       GRAVITY TOKENS (The Neon Palette)
-       We use specific HEX for the neons as they need to be exact, but wrapped in CSS vars. 
-       We also provide HSL versions for Tailwind opacity modifiers if needed.
-    */
+    /* Supporting accent palette */
     --neon-cyan: #2ec4b6;
     --neon-green: #10b981;
     --neon-amber: #ff9f1c;
     --neon-red: #ef4444;    /* High-vis Red */
     --neon-purple: #8b5cf6;
     --neon-blue: #3b82f6;
-    
-    /* Brand Core (RedEx Identity) */
-    /* We map "Brand" to Neon Red in this theme for visibility against dark backgrounds */
-    --brand: 350 89% 60%; /* Bright Red for Dark Mode */
-    --brand-darker: 350 89% 45%; 
+
+    /* Canonical Redex brand tokens */
+    --redex-red: 357 85% 52%;        /* #ED1B24 */
+    --redex-red-hover: 357 81% 43%;  /* #C8141B */
+    --redex-red-active: 357 83% 35%; /* #A30F15 */
+    --redex-black: 220 14% 4%;       /* #08090b */
+    --redex-offwhite: 45 18% 97%;    /* #F8F7F4 */
+
+    /* Legacy brand namespace retained for existing consumers */
+    --brand: var(--redex-red);
+    --brand-darker: var(--redex-red-hover);
     --brand-foreground: 0 0% 100%;
 
-    /* Canvas / Backgrounds - The "Charcoal" Industrial Void */
+    /* Status tokens */
+    --success: 142 71% 45%;       /* emerald-600-ish */
+    --success-bg: 138 76% 97%;    /* emerald-50 */
+    --warning: 38 92% 50%;        /* amber-500-ish */
+    --warning-bg: 48 100% 96%;    /* amber-50-ish */
+
+    /* Canvas / Backgrounds */
     --bg-canvas: #0a0a0a;          /* Deepest Charcoal/Black */
     --bg-card: rgba(20, 20, 20, 0.6); /* Glass Card Base */
     --bg-glass: rgba(255, 255, 255, 0.03);
@@ -56,7 +63,7 @@
     --popover: 0 0% 4%;
     --popover-foreground: 0 0% 95%;
     
-    --primary: 350 89% 60%; /* Neon Red */
+    --primary: 357 85% 52%; /* Redex Red #ED1B24 */
     --primary-foreground: 0 0% 100%;
     
     --secondary: 217 19% 27%; /* Slate 800ish */
@@ -73,12 +80,12 @@
     
     --border: 0 0% 15%;
     --input: 0 0% 15%;
-    --ring: 350 89% 60%; /* Red Ring */
+    --ring: 357 85% 52%; /* Redex Red */
     
     --radius: 0.5rem;
     
-    /* Chart / Data Viz Colors (Neon Optimized) */
-    --chart-1: 350 89% 60%; /* Red */
+    /* Chart / Data Viz Colors */
+    --chart-1: 357 85% 52%; /* Redex Red */
     --chart-2: 172 66% 50%; /* Cyan */
     --chart-3: 142 71% 45%; /* Green */
     --chart-4: 25 95% 53%;  /* Orange */
@@ -106,11 +113,6 @@
     @apply selection:bg-red-500/30 selection:text-white;
   }
   
-  /* Typography Overrides for Industrial Feel */
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-bold tracking-tight text-white;
-  }
-  
   /* Technical Headers (for labels throughout the app) */
   .tech-header {
     @apply text-[10px] uppercase tracking-[0.2em] text-gray-400 font-bold;
@@ -124,8 +126,8 @@
 
 @layer components {
   /* 
-    THE GRAVITY CARD 
-    Core component of the new design system
+    Legacy glass card utility
+    Core component of the shared Redex Education design system
   */
   .gravity-card {
     background: var(--bg-card);
@@ -189,7 +191,7 @@
     border-color: var(--neon-red);
   }
 
-  /* Scrollbar Customization for Dark Mode */
+  /* Scrollbar customization for dark surfaces */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;

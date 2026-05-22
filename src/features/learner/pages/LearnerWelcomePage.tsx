@@ -22,7 +22,7 @@ export function LearnerWelcomePage({ learner, onStartJourney }: LearnerWelcomePa
       <Card className="bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden">
         <CardContent className="p-10 md:p-12">
           {/* Eyebrow */}
-          <div className="text-[#ed1f24] font-semibold tracking-[3px] text-sm mb-3">
+          <div className="text-redex-red font-semibold tracking-[3px] text-sm mb-3">
             WELCOME TO REDEX ACADEMY
           </div>
 
@@ -39,17 +39,17 @@ export function LearnerWelcomePage({ learner, onStartJourney }: LearnerWelcomePa
           <div className="mb-8">
             <div className="flex items-center justify-between text-sm text-slate-500 mb-1.5">
               <div>
-                <span className="font-semibold text-[#e11d48]">Step 1: Welcome</span>
-                <span className="ml-2 text-[10px] font-medium text-[#e11d48] tracking-[0.5px]">YOU ARE HERE</span>
+                <span className="font-semibold text-redex-red">Step 1: Welcome</span>
+                <span className="ml-2 text-[10px] font-medium text-redex-red tracking-[0.5px]">YOU ARE HERE</span>
               </div>
               <div className="text-slate-400">Step 2: HR basics</div>
               <div className="text-slate-400">Step 3: Systems setup</div>
               <div className="text-slate-400">Step 4: Ready to start</div>
             </div>
             <div className="h-[3px] bg-slate-200 rounded-full relative">
-              <div className="absolute left-0 top-0 h-[3px] w-[22%] bg-[#e11d48] rounded-full" />
+              <div className="absolute left-0 top-0 h-[3px] w-[22%] bg-redex-red rounded-full" />
             </div>
-            <div className="text-[10px] text-[#e11d48] mt-1 font-semibold tracking-[1px]">YOU ARE HERE</div>
+            <div className="text-[10px] text-redex-red mt-1 font-semibold tracking-[1px]">YOU ARE HERE</div>
           </div>
 
           {/* Video + Benefits Row — treatment matched to the mockup */}
@@ -58,7 +58,7 @@ export function LearnerWelcomePage({ learner, onStartJourney }: LearnerWelcomePa
             <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
               <div className="bg-[#1c120e] aspect-video flex items-center justify-center relative">
                 <div className="text-center">
-                  <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-[#e11d48] flex items-center justify-center cursor-pointer hover:bg-[#c41a1e] transition-colors">
+                  <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-redex-red flex items-center justify-center cursor-pointer hover:bg-redex-red-hover transition-colors">
                     <Play className="w-7 h-7 text-white ml-0.5" />
                   </div>
                   <div className="text-white font-semibold tracking-tight">A quick hello from our CEO</div>
@@ -91,7 +91,7 @@ export function LearnerWelcomePage({ learner, onStartJourney }: LearnerWelcomePa
                 </div>
               </div>
               <div className="flex gap-3">
-                <ArrowRight className="w-5 h-5 text-[#e11d48] mt-0.5 flex-shrink-0" />
+                <ArrowRight className="w-5 h-5 text-redex-red mt-0.5 flex-shrink-0" />
                 <div className="leading-tight">
                   <div className="font-semibold tracking-tight">One path. Start to finish.</div>
                   <div className="text-slate-500 text-xs">No passwords. No menus. Just your personalized journey.</div>
@@ -104,7 +104,7 @@ export function LearnerWelcomePage({ learner, onStartJourney }: LearnerWelcomePa
           <div className="mt-8">
             <Button 
               size="lg" 
-              className="bg-[#e11d48] hover:bg-[#be123c] text-white text-[15px] font-semibold px-10 h-12 rounded-xl w-full md:w-auto shadow-sm"
+              className="bg-redex-red hover:bg-redex-red-hover text-white text-[15px] font-semibold px-10 h-12 rounded-xl w-full md:w-auto shadow-sm"
               onClick={onStartJourney}
             >
               Start my journey →

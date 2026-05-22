@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 export function AdminPlaceholderPage() {
   return (
     <div className="max-w-4xl mx-auto py-12">
-      <Card className="border-[#ed1f24]/20 bg-white text-center shadow-sm">
+      <Card className="border-redex-red/20 bg-white text-center shadow-sm">
         <CardHeader>
           <CardTitle className="text-3xl font-semibold">Redex AI Course Foundry</CardTitle>
           <CardDescription>Admin creation tools are coming soon.</CardDescription>
