@@ -242,7 +242,24 @@ This Build Bible records what has been built.
 
 ## Current Work
 
-**Slice 0.1 is complete.** Moving to Slice 0.2 (App Shell + Navigation).
+**Multi-agent orchestration in full swing** (CEO Co-Pilot mode — "do not stop" directive active).
+
+**Progress since last update:**
+- Slice 0.2 App Shell foundation complete:
+  - `TopNav` now contains the exact "Learner experience" / "Admin experience" toggle with red active state (matches v3 mockup pixel-for-pixel).
+  - `AppShell` + `BreadcrumbBar` implemented.
+  - Experience switching is fully functional from the header.
+- Slice 1.1 (First-day Welcome) implemented:
+  - `LearnerWelcomePage` built to closely match the provided UI mockup (Marcus greeting, CEO video placeholder, 4-step progress, benefits, red CTA).
+- Clean cutover from old CEU prototype → official Redex Academy direction.
+- Build passes cleanly.
+
+**Agents still running:**
+- Plan agent (Slice 0.2 detailed execution plan)
+- Explorer agent (codebase audit)
+- Additional implementers and types agent active in background.
+
+**Current Slice**: Slice 0.2 + Slice 1.1 being executed in parallel for maximum velocity.
 
 ---
 
