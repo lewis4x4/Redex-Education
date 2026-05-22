@@ -1,3 +1,22 @@
+import type { Module as EducationModule } from '@/types/training';
+import {
+  DEMO_MODULES as RAW_DEMO_MODULES,
+  DEMO_ORIENTATION_COURSE,
+  DEMO_LESSONS,
+  DEMO_ENROLLMENT,
+  DEMO_VALUES_QUIZ_QUESTIONS,
+} from './demo-data';
+
+function requireDemoModules(modules: EducationModule[]): [EducationModule, ...EducationModule[]] {
+  const [firstModule, ...remainingModules] = modules;
+
+  if (firstModule === undefined) {
+    throw new Error('demo data invariant: at least one module is required');
+  }
+
+  return [firstModule, ...remainingModules];
+}
+
 // ============================================================
 // Redex Education — Public Module Facade
 //
@@ -64,10 +83,11 @@ export type {
 } from '@/types/training';
 
 // Demo / seed data (development-time only)
+export const DEMO_MODULES = requireDemoModules(RAW_DEMO_MODULES);
+
 export {
   DEMO_ORIENTATION_COURSE,
-  DEMO_MODULES,
   DEMO_LESSONS,
   DEMO_ENROLLMENT,
   DEMO_VALUES_QUIZ_QUESTIONS,
-} from './demo-data';
+};

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import type { Module, Lesson, ProgressStatus } from '@/lib/education';
 import { LessonContentRenderer } from './LessonContentRenderer';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,15 @@ interface ModulePlayerProps {
   completedLessonIds?: string[];
 }
 
+function getInitialLessonIndex(lessons: Lesson[], initialLessonId?: string) {
+  if (!initialLessonId) {
+    return 0;
+  }
+
+  const initialIndex = lessons.findIndex((lesson) => lesson.id === initialLessonId);
+  return initialIndex > -1 ? initialIndex : 0;
+}
+
 export function ModulePlayer({
   module,
   lessons,
@@ -25,49 +34,81 @@ export function ModulePlayer({
   onExit,
   completedLessonIds = [],
 }: ModulePlayerProps) {
-  const [currentIndex, setCurrentIndex] = useState(
-    lessons.findIndex(l => l.id === initialLessonId) > -1 
-      ? lessons.findIndex(l => l.id === initialLessonId) 
-      : 0
-  );
-  // Seed from EducationContext persisted progress so that returning to the player (after dashboard)
-  // correctly reflects previously completed lessons. Local Set tracks this-session marks for instant UI.
-  const [completedLessons, setCompletedLessons] = useState<Set<string>>(() => new Set(completedLessonIds));
+  const [currentIndex, setCurrentIndex] = useState(() => getInitialLessonIndex(lessons, initialLessonId));
   // Track quiz outcomes so we can gate "Mark Complete" for quiz lessons and auto-record progress on pass
   const [quizResults, setQuizResults] = useState<Record<string, { score: number; passed: boolean }>>({});
 
-  // Keep local completed state in sync with any updates from the EducationContext (via parent prop).
-  // This ensures the player's sidebar/progress always match the persisted source of truth when it changes.
-  useEffect(() => {
-    if (completedLessonIds.length > 0) {
-      setCompletedLessons((prev) => {
-        const next = new Set(prev);
-        let changed = false;
-        completedLessonIds.forEach((id) => {
-          if (!next.has(id)) {
-            next.add(id);
-            changed = true;
-          }
-        });
-        return changed ? next : prev;
-      });
-    }
-  }, [completedLessonIds]);
+  const lessonIds = useMemo(() => new Set(lessons.map((lesson) => lesson.id)), [lessons]);
+  const completedLessons = useMemo(
+    () => new Set(completedLessonIds.filter((id) => lessonIds.has(id))),
+    [completedLessonIds, lessonIds]
+  );
+
+  const firstIncompleteRequiredIndex = useMemo(
+    () => lessons.findIndex((lesson) => lesson.criticality === 'required' && !completedLessons.has(lesson.id)),
+    [completedLessons, lessons]
+  );
+
+  const progress = lessons.length > 0 ? Math.round((completedLessons.size / lessons.length) * 100) : 0;
+
+  if (lessons.length === 0) {
+    return (
+      <div className="flex h-[calc(100vh-8rem)] bg-white rounded-2xl border overflow-hidden">
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#f8f7f4]">
+          <div className="max-w-md rounded-2xl border bg-white p-8 shadow-sm">
+            <div className="text-xs uppercase tracking-widest text-slate-500 mb-2">MODULE</div>
+            <h2 className="text-2xl font-semibold text-slate-900 mb-3">{module.title}</h2>
+            <p className="text-slate-600 mb-6">No lessons in this module yet.</p>
+            <Button variant="outline" onClick={onExit}>
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back to Dashboard
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const currentLesson = lessons[currentIndex];
+
+  if (!currentLesson) {
+    return (
+      <div className="flex h-[calc(100vh-8rem)] bg-white rounded-2xl border overflow-hidden">
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#f8f7f4]">
+          <div className="max-w-md rounded-2xl border bg-white p-8 shadow-sm">
+            <h2 className="text-2xl font-semibold text-slate-900 mb-3">Lesson unavailable</h2>
+            <p className="text-slate-600 mb-6">This lesson could not be found in the current module.</p>
+            <Button variant="outline" onClick={onExit}>
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back to Dashboard
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const isLastLesson = currentIndex === lessons.length - 1;
 
   // Quiz gating for production-feeling flow: quiz lessons must be passed to unlock "Mark Complete"
-  const isQuizLesson = currentLesson.lesson_type === 'quiz';
+  const isQuizLesson = currentLesson.content.type === 'quiz';
   const currentQuizResult = quizResults[currentLesson.id];
   const quizHasPassed = currentQuizResult?.passed === true;
   const isQuizLocked = isQuizLesson && !quizHasPassed && !completedLessons.has(currentLesson.id);
 
-  const handleMarkComplete = () => {
-    const newCompleted = new Set(completedLessons);
-    newCompleted.add(currentLesson.id);
-    setCompletedLessons(newCompleted);
+  const isLessonNavigable = (index: number) => {
+    const targetLesson = lessons[index];
 
+    if (!targetLesson) {
+      return false;
+    }
+
+    if (index === currentIndex || completedLessons.has(targetLesson.id)) {
+      return true;
+    }
+
+    return firstIncompleteRequiredIndex === -1 || index <= firstIncompleteRequiredIndex;
+  };
+
+  const handleMarkComplete = () => {
     onProgressUpdate?.(currentLesson.id, 'completed');
 
     if (isLastLesson) {
@@ -78,12 +119,10 @@ export function ModulePlayer({
   };
 
   const goToLesson = (index: number) => {
-    if (index >= 0 && index < lessons.length) {
+    if (isLessonNavigable(index)) {
       setCurrentIndex(index);
     }
   };
-
-  const progress = Math.round((completedLessons.size / lessons.length) * 100);
 
   return (
     <div className="flex h-[calc(100vh-8rem)] bg-white rounded-2xl border overflow-hidden">
@@ -110,14 +149,18 @@ export function ModulePlayer({
           {lessons.map((lesson, index) => {
             const isCompleted = completedLessons.has(lesson.id);
             const isActive = index === currentIndex;
+            const canNavigate = isLessonNavigable(index);
 
             return (
               <button
                 key={lesson.id}
                 onClick={() => goToLesson(index)}
+                disabled={!canNavigate}
+                title={canNavigate ? undefined : 'Complete required lessons in order to unlock this lesson.'}
                 className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-sm transition-colors
                   ${isActive ? 'bg-[#ED1B24]/10 text-[#ED1B24] font-medium' : 'hover:bg-slate-100'}
                   ${isCompleted ? 'text-emerald-700' : ''}
+                  ${!canNavigate ? 'opacity-50 cursor-not-allowed hover:bg-transparent' : ''}
                 `}
               >
                 {isCompleted ? (
@@ -165,12 +208,6 @@ export function ModulePlayer({
               // When the learner passes a quiz lesson, auto-mark it complete so progress updates immediately
               // (the quiz itself is the interaction that fulfills the lesson requirement for the vertical slice)
               if (passed) {
-                setCompletedLessons((prevCompleted) => {
-                  if (prevCompleted.has(currentLesson.id)) return prevCompleted;
-                  const next = new Set(prevCompleted);
-                  next.add(currentLesson.id);
-                  return next;
-                });
                 onProgressUpdate?.(currentLesson.id, 'completed');
 
                 // If this was the final lesson and passed via quiz, complete the module flow too

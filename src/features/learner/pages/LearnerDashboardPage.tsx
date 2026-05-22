@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import type { LearnerProfile, Enrollment, Course, Lesson } from '@/lib/education';
-import { useMyProgress } from '@/contexts/EducationContext';
+import { useMyProgress } from '@/hooks/useEducation';
 
 // Temporary inline progress
 function Progress({ value, className }: { value: number; className?: string }) {

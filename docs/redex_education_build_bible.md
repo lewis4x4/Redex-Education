@@ -1258,3 +1258,82 @@ Both sessions cleaned up after verification. Plan file retained for audit trail.
 
 ---
 
+## 2026-05-22 — Phase 3: State & Progress Correctness
+
+**Status**: ✅ Completed (Phase 3 of 10) — orchestrated as 2 sequential sub-agent items
+
+**Context**:
+Fixes the EducationContext state-machine bugs (hydration race, missing memoization, `getProgressSummary(courseId)` arg ignored, hooks-export lint split) and the ModulePlayer correctness gaps (empty lessons crash, progress overflow, wrong quiz-lock discriminant, sidebar bypass). Lands `noUncheckedIndexedAccess`. Replaces the Phase 2 placeholder `LearnerModuleRoute` (which spread mod-001 with passthrough id) with real module lookup + redirect.
+
+**Orchestration**:
+Two `pair` sub-agents dispatched sequentially against `prompt-exports/phase-3-plan.md`.
+- **Item 1** (EducationContext + hooks split) — session `51F3E416…84A5B8`
+- **Item 2** (ModulePlayer + strict indexing + unknown-module) — session `1624BDB5…2D94D9E4`
+
+Both sessions cleaned up post-verification.
+
+**Summary**:
+
+### Item 1 — EducationContext correctness + hooks split
+- **Hook split** (mirrors Phase 2's `useAuth` pattern):
+  - `useEducation`, `useMyProgress`, `useCurrentEnrollment` → `src/hooks/useEducation.ts`
+  - Context + types → `src/contexts/education-context.ts`
+  - `src/contexts/EducationContext.tsx` is now provider-only
+  - Consumers updated: `src/App.tsx`, `src/features/learner/pages/LearnerDashboardPage.tsx`
+- **Hydration race fixed** — moved `localStorage.getItem` from a mount-time `useEffect` into a `useState(() => restoreLessonProgress())` initializer. StrictMode double-mount can no longer wipe persisted progress.
+- **Helper extracted** — `restoreLessonProgress()` plus a one-shot `warnedAboutProgressHydration` flag so a broken localStorage value warns once, not on every restore.
+- **`getProgressSummary(courseId)` actually scopes** — resolves `courseId` → matching `DEMO_MODULES` → matching `DEMO_LESSONS`. Generic enough that a second course just works.
+- **`recordLessonProgress` idempotent** — already-completed lesson + incoming `completed` status is a no-op; doesn't refresh `completed_at`, doesn't bump `time_spent_seconds`, doesn't trigger setState.
+- **Provider value memoized** — `useMemo(value, [deps...])` with all 12 dependencies tracked.
+- **Persistence `useEffect` retained** but now writes only on `lessonProgress` changes (no longer races against hydration).
+
+### Item 2 — ModulePlayer state machine + strict indexing + unknown-module handling
+- **Empty-lessons fallback** — `ModulePlayer` renders a neutral "No lessons in this module yet" card and short-circuits.
+- **`currentLesson` guard** — under `noUncheckedIndexedAccess` it's `Lesson | undefined`; renders a "Lesson unavailable" fallback when undefined. No `!` assertions.
+- **Derived `completedLessons`** — local `useState<Set<string>>` mirror replaced with `useMemo` that filters `completedLessonIds` through the current module's lesson IDs. **Kills the `react-hooks/set-state-in-effect` lint error structurally**, not via suppression. Also fixes the >100% progress bug as a side effect.
+- **`firstIncompleteRequiredIndex`** computed via `useMemo`; `isLessonNavigable(index)` enforces sidebar lock — required lessons must complete in order; current/completed/prior lessons stay navigable.
+- **Sidebar buttons** carry `disabled` + tooltip when locked.
+- **Quiz lock discriminant fixed** — `isQuizLesson = currentLesson.content.type === 'quiz'` (was `lesson_type === 'quiz'`). Canonical Phase 1 discriminant.
+- **`LearnerModuleRoute` rewritten** — `education.getModule(moduleId)` + `education.getLessonsForModule(moduleId)`. Unknown id → `<Navigate to="/learn" replace />`. Friendly redirect instead of the Phase 2 "spread mod-001 with bogus id" hack.
+- **`noUncheckedIndexedAccess: true`** enabled in `tsconfig.app.json`.
+- **Strict-indexing fixes** (no suppressions used anywhere):
+  - 1 compiler error on `DEMO_MODULES[0]` — addressed at the facade boundary (next bullet).
+  - 2 guarded sites in `ModulePlayer` — `lessons[currentIndex]` and `lessons[index]` both narrowed via explicit `if (!target) return` early-returns.
+- **`src/lib/education/index.ts` scope-nibble** — Item 2 agent added a `requireDemoModules()` helper at the facade boundary that returns `[Module, ...Module[]]` (non-empty tuple). This propagates the non-empty guarantee to all consumers of `DEMO_MODULES`, removing the need for repeated null checks downstream. Tasteful invariant; demo-data file itself stayed untouched per phase boundary respect.
+
+**Files touched** (9 total):
+- Modified: `src/contexts/EducationContext.tsx`, `src/App.tsx`, `src/features/learner/components/ModulePlayer.tsx`, `src/features/learner/pages/LearnerDashboardPage.tsx`, `src/lib/education/index.ts`, `tsconfig.app.json`, `docs/redex_education_build_bible.md`
+- Created: `src/contexts/education-context.ts`, `src/hooks/useEducation.ts`, `prompt-exports/phase-3-plan.md`
+
+**Verification**:
+- ✅ `npm run typecheck` — green under `noUncheckedIndexedAccess: true`
+- ✅ `npm run build` — green
+- ✅ `npm run lint` — **6 errors + 0 warnings** (was 13+1 in Phase 2; down 7+1). Cleared this phase:
+  - `EducationContext.tsx` × 6 (set-state-in-effect, unused vars, only-export-components ×3, the eslint-disable warning)
+  - `ModulePlayer.tsx` × 1 (set-state-in-effect)
+- Remaining errors all map to later phases:
+  - `_archive/**` (4) → Phase 7 (ESLint `_archive` ignore)
+  - `Quiz.tsx` (1) → Phase 4 (set-state-in-effect on lesson-switch reset)
+  - `tailwind.config.ts` (1) → Phase 7 (ESM `import animate`)
+
+**Route paths reasoned**:
+- `/learn/player/mod-001` → `education.getModule('mod-001')` returns the demo module, `getLessonsForModule('mod-001')` returns its 3 demo lessons, ModulePlayer renders with progress hydrated from localStorage
+- `/learn/player/garbage` → `getModule` returns undefined → `<Navigate to="/learn" replace />`
+
+**Known gaps** (deferred intentionally):
+- `Quiz.tsx` still has the `set-state-in-effect` lint error from the lesson-switch reset effect. Phase 4 owns it (along with passing-math fix, 0-questions handling, stable option keys, "Re-announce Score" removal).
+- `getDemoCourse/getDemoModule/getDemoLessons` helpers still exist on `EducationContext` for backward compat with the welcome page seed-display. When real Supabase reads land, they go away.
+- Sidebar lock UX uses `disabled` + `title` tooltip — Phase 6 (a11y) may revisit for screen-reader semantics.
+
+**Naming guardrails honored**:
+- Redex Education = repo/product ✓
+- Redex Academy = learner-facing brand ✓ (no admin work this phase)
+- Redex AI Course Foundry = not touched (admin placeholder unchanged) ✓
+- Redex Training OS = not surfaced (correct) ✓
+- No real AI / Supabase / production auth wired ✓
+- No secrets introduced ✓
+
+**Next**: Phase 4 — Quiz correctness. Should land the final learner-flow lint error (Quiz `set-state-in-effect`), fix the passing-math rounding bug, harden against 0-question quizzes and invalid `correct_index`, stable option keys, and remove the "Re-announce Score" debug button.
+
+---
+

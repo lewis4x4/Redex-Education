@@ -6,7 +6,7 @@ import { LearnerWelcomePage } from '@/features/learner/pages/LearnerWelcomePage'
 import { LearnerDashboardPage } from '@/features/learner/pages/LearnerDashboardPage'
 import { ModulePlayer } from '@/features/learner/components/ModulePlayer'
 import { AdminPlaceholderPage } from '@/features/admin/pages/AdminPlaceholderPage'
-import { useEducation } from '@/contexts/EducationContext'
+import { useEducation } from '@/hooks/useEducation'
 import type { ProgressStatus } from '@/lib/education'
 
 // Redex Academy - Active Build
@@ -40,13 +40,17 @@ function LearnerModuleRoute() {
   const navigate = useNavigate()
   const education = useEducation()
 
-  const demoModule = education.getDemoModule()
-  const routeModule = demoModule.id === moduleId ? demoModule : { ...demoModule, id: moduleId }
-  const demoLessons = education.getDemoLessons()
+  const routeModule = education.getModule(moduleId)
+
+  if (!routeModule) {
+    return <Navigate to="/learn" replace />
+  }
+
+  const moduleLessons = education.getLessonsForModule(moduleId)
 
   // Live completed lesson ids from the Education Progress Context (localStorage backed)
   // Passed to ModulePlayer so its sidebar + progress bar reflect real persisted state on entry/return.
-  const completedLessonIds = demoLessons
+  const completedLessonIds = moduleLessons
     .filter((lesson) => education.getLessonStatus(lesson.id) === 'completed')
     .map((lesson) => lesson.id)
 
@@ -54,7 +58,7 @@ function LearnerModuleRoute() {
     <AppShell breadcrumb="Learner flow › Orientation Module Player" playerMode>
       <ModulePlayer
         module={routeModule}
-        lessons={demoLessons}
+        lessons={moduleLessons}
         completedLessonIds={completedLessonIds}
         onProgressUpdate={(lessonId: string, status: ProgressStatus) => {
           education.recordLessonProgress(lessonId, status)
