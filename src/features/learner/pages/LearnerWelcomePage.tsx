@@ -27,11 +27,11 @@ export function LearnerWelcomePage({ learner, onStartJourney }: LearnerWelcomePa
           </div>
 
           {/* Greeting - now uses typed learner profile */}
-          <h1 className="text-4xl font-semibold tracking-tight mb-3">
+          <h1 className="text-4xl font-semibold tracking-[-1.5px] mb-3">
             Great to have you here, {displayName}. <span className="inline-block">👋</span>
           </h1>
 
-          <p className="text-lg text-[#6b7280] max-w-xl mb-8">
+          <p className="text-[15px] text-slate-600 max-w-[42ch] mb-8 leading-snug">
             We're excited to have you on the team. Let's get you set up with the essentials so you can start strong.
           </p>
 

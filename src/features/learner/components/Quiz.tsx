@@ -15,7 +15,7 @@ const PASSING_THRESHOLD = 80;
  * - Renders Lesson with content.type === 'quiz'
  * - Single-select multiple choice + True/False support (via options + correct_index)
  * - Local state management for selections, submit, scoring + per-question feedback
- * - Clean Redex visual language: #ed1f24 red accents, rounded white cards, crisp typography
+ * - Clean Redex visual language: #ED1B24 red accents (brand), rounded white cards, crisp typography
  * - Calls onComplete(scorePercent, passed) when submitted (consumer can persist progress)
  * - Retake supported; fully self-contained and reusable
  */
@@ -94,7 +94,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <div className="uppercase tracking-[2px] text-xs font-semibold text-[#ed1f24]">KNOWLEDGE CHECK</div>
+          <div className="uppercase tracking-[2px] text-xs font-semibold text-[#ED1B24]">KNOWLEDGE CHECK</div>
           <h3 className="text-2xl font-semibold tracking-tight mt-1">{lesson.title}</h3>
           <p className="text-sm text-slate-500 mt-0.5">
             {questions.length} questions • {PASSING_THRESHOLD}% to pass
@@ -176,7 +176,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
                       optionClasses += 'bg-slate-50 border-slate-200 text-slate-500';
                     }
                   } else if (isSelected) {
-                    optionClasses += 'border-[#ed1f24] bg-red-50 ring-1 ring-inset ring-[#ed1f24]/25';
+                    optionClasses += 'border-[#ED1B24] bg-red-50 ring-1 ring-inset ring-[#ED1B24]/25';
                   } else {
                     optionClasses += 'border-slate-200 hover:border-slate-300 hover:bg-slate-50';
                   }
@@ -199,7 +199,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
                                 ? 'border-red-600 bg-red-600'
                                 : 'border-slate-300 bg-white'
                             : isSelected
-                              ? 'border-[#ed1f24] bg-[#ed1f24]'
+                              ? 'border-[#ED1B24] bg-[#ED1B24]'
                               : 'border-slate-400 bg-white'
                         }`}
                       >
@@ -243,7 +243,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
           <Button
             onClick={handleSubmit}
             disabled={!allAnswered}
-            className="flex-1 h-11 rounded-xl bg-[#ed1f24] hover:bg-[#c41a1e] active:bg-[#a31518] text-base font-semibold tracking-[-0.2px] disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed transition-all"
+            className="flex-1 h-11 rounded-xl bg-[#ED1B24] hover:bg-[#c41a1e] active:bg-[#a31518] text-base font-semibold tracking-[-0.2px] disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed transition-all"
           >
             Submit Quiz
           </Button>
@@ -261,7 +261,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
             <Button
               onClick={() => onComplete?.(score, hasPassed)}
               variant="outline"
-              className="flex-1 h-11 rounded-xl text-base font-medium border-[#ed1f24]/70 text-[#ed1f24] hover:bg-red-50/60 hover:border-[#ed1f24]"
+              className="flex-1 h-11 rounded-xl text-base font-medium border-[#ED1B24]/70 text-[#ED1B24] hover:bg-red-50/60 hover:border-[#ED1B24]"
             >
               <Award className="w-4 h-4 mr-2" />
               Re-announce Score

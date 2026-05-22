@@ -27,6 +27,8 @@ export function ModulePlayer({
       : 0
   );
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
+  // Track quiz outcomes so we can gate "Mark Complete" for quiz lessons and auto-record progress on pass
+  const [quizResults, setQuizResults] = useState<Record<string, { score: number; passed: boolean }>>({});
 
   const currentLesson = lessons[currentIndex];
   const isLastLesson = currentIndex === lessons.length - 1;
@@ -69,7 +71,7 @@ export function ModulePlayer({
         <div className="mb-3">
           <div className="text-xs text-slate-500 mb-1">Module Progress</div>
           <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-            <div className="h-2 bg-red-600" style={{ width: `${progress}%` }} />
+            <div className="h-2 bg-[#ED1B24]" style={{ width: `${progress}%` }} />
           </div>
           <div className="text-xs text-right mt-1 text-slate-500">{progress}% complete</div>
         </div>
@@ -84,7 +86,7 @@ export function ModulePlayer({
                 key={lesson.id}
                 onClick={() => goToLesson(index)}
                 className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-sm transition-colors
-                  ${isActive ? 'bg-red-50 text-red-700 font-medium' : 'hover:bg-slate-100'}
+                  ${isActive ? 'bg-[#ED1B24]/10 text-[#ED1B24] font-medium' : 'hover:bg-slate-100'}
                   ${isCompleted ? 'text-emerald-700' : ''}
                 `}
               >
@@ -137,7 +139,7 @@ export function ModulePlayer({
 
           <Button 
             onClick={handleMarkComplete} 
-            className="bg-red-600 hover:bg-red-700"
+            className="bg-[#ED1B24] hover:bg-[#b81419] disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed"
           >
             {isLastLesson ? 'Complete Module' : 'Mark Complete & Continue'}
             <ArrowRight className="w-4 h-4 ml-2" />

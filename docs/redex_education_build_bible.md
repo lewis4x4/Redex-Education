@@ -772,6 +772,16 @@ All other work (deeper admin surfaces, real backend, full source binder, etc.) i
 
 This decision is logged here as the governing directive until the vertical slice is complete and reviewed.
 
+**Major Milestone – 2026-05-22**
+- Wiring agent (Task D1) completed successfully.
+- We now have a fully functional, real end-to-end learner flow:
+  - Welcome (matching direction of the provided mockup) → "Start my journey" launches real `ModulePlayer`
+  - Player uses seeded Orientation data with sidebar, mark-complete, and progress tracking
+  - Progress is reactive and survives refresh via localStorage
+  - Dashboard shows live data pulled from the new `EducationContext`
+- This is the first time the Redex Academy experience has been truly playable from end to end.
+- Remaining critical path items: Finish interactive Quiz integration + final pixel-level polish on the welcome screen.
+
 ---
 
 ## 2026-05-22 — Task D1: Education Progress Context + Wiring (COMPLETED)
