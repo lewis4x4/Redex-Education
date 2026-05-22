@@ -40,3 +40,6 @@ dist-ssr
 **/redex-education-*.json
 docs/*.json
 docs/*key*
+
+# Supabase CLI local state — machine-specific
+supabase/.temp/

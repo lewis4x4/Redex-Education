@@ -1,0 +1,269 @@
+import { act } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+function createStorageMock(): Storage {
+  const store = new Map<string, string>()
+
+  return {
+    get length() {
+      return store.size
+    },
+    clear() {
+      store.clear()
+    },
+    getItem(key: string) {
+      return store.get(key) ?? null
+    },
+    key(index: number) {
+      return [...store.keys()][index] ?? null
+    },
+    removeItem(key: string) {
+      store.delete(key)
+    },
+    setItem(key: string, value: string) {
+      store.set(key, String(value))
+    },
+  }
+}
+
+describe('useFoundryDraftStore', () => {
+  let useFoundryDraftStore: (typeof import('./foundryDraftStore'))['useFoundryDraftStore']
+
+  beforeEach(async () => {
+    vi.resetModules()
+
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: createStorageMock(),
+    })
+
+    ;({ useFoundryDraftStore } = await import('./foundryDraftStore'))
+
+    act(() => {
+      useFoundryDraftStore.getState().clearDraft()
+      useFoundryDraftStore.getState().clearSourceMaterial()
+      useFoundryDraftStore.getState().clearLibrarySelection()
+    })
+  })
+
+  it('starts with no current draft', () => {
+    expect(useFoundryDraftStore.getState().currentDraft).toBeNull()
+  })
+
+  it('setBasics stores form values and sets updated_at timestamp', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setBasics({
+        title: 'Field Safety Refresher',
+        parent_course_id: 'standalone',
+        audience: 'New hires',
+        criticality: 'required',
+        training_type: 'safety',
+        estimated_minutes: 30,
+      })
+    })
+
+    const draft = useFoundryDraftStore.getState().currentDraft
+    expect(draft).toEqual(
+      expect.objectContaining({
+        title: 'Field Safety Refresher',
+        parent_course_id: 'standalone',
+        audience: 'New hires',
+        criticality: 'required',
+        training_type: 'safety',
+        estimated_minutes: 30,
+      }),
+    )
+    expect(typeof draft?.updated_at).toBe('string')
+  })
+
+  it('clearDraft resets current draft to null', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setBasics({
+        title: 'Draft to clear',
+        parent_course_id: 'standalone',
+        audience: 'Field team',
+        criticality: 'optional',
+        training_type: 'operational',
+        estimated_minutes: 20,
+      })
+    })
+
+    act(() => {
+      useFoundryDraftStore.getState().clearDraft()
+    })
+
+    expect(useFoundryDraftStore.getState().currentDraft).toBeNull()
+  })
+
+  it('persists draft state to localStorage', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setBasics({
+        title: 'Persist me',
+        parent_course_id: 'course-001',
+        audience: 'Managers',
+        criticality: 'required',
+        training_type: 'compliance',
+        estimated_minutes: 40,
+      })
+    })
+
+    const persisted = localStorage.getItem('redex-foundry-draft-v1')
+    expect(persisted).not.toBeNull()
+
+    const parsed = JSON.parse(persisted as string) as {
+      state: { currentDraft: { title: string } }
+      version: number
+    }
+
+    expect(parsed.version).toBe(0)
+    expect(parsed.state.currentDraft.title).toBe('Persist me')
+  })
+
+  it('starts with sourceMaterial as null', () => {
+    expect(useFoundryDraftStore.getState().sourceMaterial).toBeNull()
+  })
+
+  it('setSourceMaterial writes source material state', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setSourceMaterial({
+        id: 'source-1',
+        title: 'Source one',
+        type: 'markdown',
+        raw_text: '# Intro',
+        raw_text_preview: '# Intro',
+        processing_status: 'processed',
+        sections: [],
+      })
+    })
+
+    expect(useFoundryDraftStore.getState().sourceMaterial).toEqual(
+      expect.objectContaining({ id: 'source-1', title: 'Source one', type: 'markdown' }),
+    )
+  })
+
+  it('clearSourceMaterial resets source material to null', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setSourceMaterial({
+        id: 'source-2',
+        title: 'Clear me',
+        type: 'markdown',
+        processing_status: 'processed',
+        sections: [],
+      })
+    })
+
+    act(() => {
+      useFoundryDraftStore.getState().clearSourceMaterial()
+    })
+
+    expect(useFoundryDraftStore.getState().sourceMaterial).toBeNull()
+  })
+
+  it('clearDraft does not clear sourceMaterial', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setBasics({
+        title: 'Draft',
+        parent_course_id: 'standalone',
+        audience: 'Ops',
+        criticality: 'required',
+        training_type: 'operational',
+        estimated_minutes: 15,
+      })
+      useFoundryDraftStore.getState().setSourceMaterial({
+        id: 'source-3',
+        title: 'Independent source',
+        type: 'markdown',
+        processing_status: 'processed',
+        sections: [],
+      })
+    })
+
+    act(() => {
+      useFoundryDraftStore.getState().clearDraft()
+    })
+
+    expect(useFoundryDraftStore.getState().currentDraft).toBeNull()
+    expect(useFoundryDraftStore.getState().sourceMaterial).toEqual(
+      expect.objectContaining({ id: 'source-3', title: 'Independent source' }),
+    )
+  })
+
+  it('persists both currentDraft and sourceMaterial in localStorage payload', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setBasics({
+        title: 'Persist draft + source',
+        parent_course_id: 'course-001',
+        audience: 'Managers',
+        criticality: 'required',
+        training_type: 'compliance',
+        estimated_minutes: 40,
+      })
+      useFoundryDraftStore.getState().setSourceMaterial({
+        id: 'source-4',
+        title: 'Persisted source',
+        type: 'markdown',
+        raw_text: '# Persisted source',
+        processing_status: 'processed',
+        sections: [],
+      })
+    })
+
+    const persisted = localStorage.getItem('redex-foundry-draft-v1')
+    expect(persisted).not.toBeNull()
+
+    const parsed = JSON.parse(persisted as string) as {
+      state: {
+        currentDraft: { title: string }
+        sourceMaterial: { title: string; type: string }
+      }
+    }
+
+    expect(parsed.state.currentDraft.title).toBe('Persist draft + source')
+    expect(parsed.state.sourceMaterial).toEqual(
+      expect.objectContaining({ title: 'Persisted source', type: 'markdown' }),
+    )
+  })
+
+  it('starts with selectedLibraryFileIds as an empty array', () => {
+    expect(useFoundryDraftStore.getState().selectedLibraryFileIds).toEqual([])
+  })
+
+  it('toggleLibraryFile adds when absent and removes when present', () => {
+    act(() => {
+      useFoundryDraftStore.getState().toggleLibraryFile('drive-file-1')
+    })
+    expect(useFoundryDraftStore.getState().selectedLibraryFileIds).toEqual(['drive-file-1'])
+
+    act(() => {
+      useFoundryDraftStore.getState().toggleLibraryFile('drive-file-1')
+    })
+    expect(useFoundryDraftStore.getState().selectedLibraryFileIds).toEqual([])
+  })
+
+  it('clearLibrarySelection resets selectedLibraryFileIds and persists the array', () => {
+    act(() => {
+      useFoundryDraftStore.getState().toggleLibraryFile('drive-file-1')
+      useFoundryDraftStore.getState().toggleLibraryFile('drive-file-2')
+    })
+
+    let persisted = localStorage.getItem('redex-foundry-draft-v1')
+    expect(persisted).not.toBeNull()
+    let parsed = JSON.parse(persisted as string) as {
+      state: { selectedLibraryFileIds: string[] }
+    }
+    expect(parsed.state.selectedLibraryFileIds).toEqual(['drive-file-1', 'drive-file-2'])
+
+    act(() => {
+      useFoundryDraftStore.getState().clearLibrarySelection()
+    })
+
+    expect(useFoundryDraftStore.getState().selectedLibraryFileIds).toEqual([])
+
+    persisted = localStorage.getItem('redex-foundry-draft-v1')
+    expect(persisted).not.toBeNull()
+    parsed = JSON.parse(persisted as string) as {
+      state: { selectedLibraryFileIds: string[] }
+    }
+    expect(parsed.state.selectedLibraryFileIds).toEqual([])
+  })
+})

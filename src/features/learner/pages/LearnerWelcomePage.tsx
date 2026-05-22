@@ -57,20 +57,22 @@ export function LearnerWelcomePage({ learner, onStartJourney }: LearnerWelcomePa
             {/* Video card (left) */}
             <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
               <div className="bg-[#1c120e] aspect-video flex items-center justify-center relative">
-                <div className="text-center">
-                  <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-redex-red flex items-center justify-center cursor-pointer hover:bg-redex-red-hover transition-colors">
+                <div
+                  className="text-center"
+                  role="img"
+                  aria-label="Welcome video preview: A quick hello from our CEO. Playback is not available in this demo."
+                >
+                  <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-redex-red flex items-center justify-center" aria-hidden="true">
                     <Play className="w-7 h-7 text-white ml-0.5" />
                   </div>
                   <div className="text-white font-semibold tracking-tight">A quick hello from our CEO</div>
                   <div className="text-white/60 text-xs mt-0.5">Brian Lewis, Chief Executive Officer</div>
+                  <div className="mt-2 text-[10px] font-semibold uppercase tracking-[1.5px] text-white/50">Preview only</div>
                 </div>
               </div>
-              <div className="h-8 bg-black/60 px-4 flex items-center justify-between text-[10px] text-white/60 tracking-wide">
+              <div className="h-8 bg-black/60 px-4 flex items-center justify-between text-[10px] text-white/60 tracking-wide" aria-hidden="true">
                 <span>0:00 / 0:30</span>
-                <div className="flex gap-4">
-                  <span>CC</span>
-                  <span>⛶</span>
-                </div>
+                <span>Video preview</span>
               </div>
             </div>
 

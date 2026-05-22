@@ -106,7 +106,7 @@ Admins should be able to:
 
 ## Pillar 3 — Source Binder
 
-The Source Binder stores and structures the approved source material used to generate training.
+The Source Binder stores and structures the approved source material used to generate training. Source material lives in a Google Drive **Source Library** (`_library/` plus per-module folders); the app ingests it, parses it into sections, and binds each generated lesson to the specific source file and section it came from.
 
 All generated training content must trace back to source material.
 
@@ -174,25 +174,25 @@ Redex Education
 
 ## Phase
 
-**Phase 0 — Foundation and Product Skeleton**
+**Phase 2 — Admin Course Foundry Prototype**
 
 ## Current Slice
 
-**Slice 0.1 — Verify Repo Foundation** — COMPLETED
+**Slice 2.3 — Source Upload / Paste Step** — COMPLETE. Next: **Slice 2.4 — Source Library & Drive Ingestion** (new slice; see roadmap).
 
 ## Current Status
 
-Slice 0.1 completed on 2026-05-22.
+Corrected 2026-05-22 by the CEO Co-Pilot architecture revision. This section had drifted — it still claimed "Phase 0 / Slice 0.1" while the completed-work log below records work through Slice 2.3.
 
-Foundation verified:
-- Vite + React 19 + TypeScript app exists and builds cleanly.
-- Tailwind CSS v3 + shadcn/ui New York + Slate configured via official `components.json`.
-- `@/*` alias working in both TypeScript and Vite.
-- shadcn New York components (button, card, badge) installed with `cva`.
-- `npm run build` passes.
-- Roadmap and Build Bible documents present in `/docs`.
+Honest current state:
 
-Note: The current `src/App.tsx` still contains the earlier CEU & License Portal prototype from the initial repo handoff conversation. This will be realigned during Slice 0.2 (App Shell) and subsequent learner/admin slices per the official roadmap.
+- **Roadmap Phase 0 (Foundation)** — complete.
+- **Roadmap Phase 1 (Learner Experience)** — complete: welcome → dashboard → module player → scored quiz, with localStorage progress persistence.
+- **Roadmap Phase 2 (Admin Course Foundry)** — in progress: Slice 2.1 (Admin Dashboard), Slice 2.2 (Module Basics Start Flow), a pre-2.3 visual-fidelity pass, and Slice 2.3 (Source Binder paste/preview) all complete — 108 passing tests. **Next: the new Slice 2.4 (Source Library & Drive Ingestion).**
+- **Roadmap Phases 3–9** — not started. A new **Slice 2.4 (Source Library & Drive Ingestion)** has been inserted; the old Slice 2.4 (AI Setup Questions Wizard) is now **Slice 2.5**.
+- A Phase 8 Supabase migration (`20260522000100_create_training_schema_and_rls.sql`) was drafted early and covers the learner-side tables.
+
+**Phase-numbering note:** the git commits tagged `phase-0`…`phase-9` were a separate code-hardening/remediation sprint (hygiene, routing/auth, state, quiz math, brand, a11y, build/security, testing, docs) — they are **not** the roadmap's product phases. The roadmap's 10 phases (0–9) are the product plan; the project is at roadmap **Phase 2**.
 
 ---
 
@@ -274,9 +274,15 @@ These decisions are not finalized yet.
 
 ## Backend / Database
 
-Decision pending:
+RESOLVED (2026-05-22) — Supabase is the backend. A first migration (`20260522000100_create_training_schema_and_rls.sql`) is already applied with the learner-side tables and RLS. Remaining schema (Course Foundry + Drive Source Library tables) is specified in roadmap Slice 8.2.
 
-- Supabase is the likely backend, but real integration should not begin until the frontend mock vertical slice is accepted.
+## Source Material Intake
+
+RESOLVED (2026-05-22) — Google Drive is the source-material intake surface. A `_library/` zone holds canonical source files by topic; a `modules/` zone holds one folder per module with a `00-manifest.md`. Source files are referenced by stable Drive file ID and carry an `authority` level (authoritative / supporting / context). See roadmap Slice 2.4 and ADR 010.
+
+## Registry / Project Tracking
+
+RESOLVED (2026-05-22) — **Notion is not used.** The registry of modules, source files, and their relationships lives in Supabase / the app itself. A separate Notion workspace would duplicate the platform and drift. See ADR 010.
 
 ## Auth
 
@@ -313,18 +319,19 @@ RESOLVED (2026-05-22) — Redex Brand Guide v1.0.
 
 # 11. Known Gaps
 
-## After Slice 0.1 (2026-05-22)
+## Current (2026-05-22 — corrected by architecture revision)
 
-- Current application contains the earlier CEU & License Portal prototype. This must be evolved or replaced to match the official Redex Academy (learner) + Redex AI Course Foundry (admin) vision defined in the roadmap.
-- No feature-based folder structure (`features/employee`, `features/foundry`, etc.) yet.
-- No global App Shell or consistent navigation implemented.
-- No learner screens (welcome, dashboard, module player) per Phase 1.
-- No admin Course Foundry flow per Phase 2.
-- Real Supabase schema and data model not yet designed or migrated.
-- No AI generation (even mocked) implemented.
-- No actual Redex source material (HR onboarding markdown, SOPs, etc.) present yet.
+The "After Slice 0.1" gap list was stale — app shell, learner screens, and the admin dashboard now all exist. Real current gaps:
 
-These gaps are expected and will be closed slice-by-slice according to the official roadmap.
+- **Course Foundry loop incomplete** — Slice 2.3 (Source Binder paste path) is complete; setup questions, outline, generation, self-critique, side-by-side review, and publish (Slices 2.5–3.5) are not started. The core loop (raw knowledge → approved training) does not exist end to end yet.
+- **Drive Source Library not built** — no Google Drive integration; the new Slice 2.4 covers it and is the next build target.
+- **Foundry/source-binder data model not migrated** — `source_files`, `source_file_versions`, `source_sections`, `module_source_bindings`, `module_versions`, `source_change_events`, and `profiles` (roles) all still needed (roadmap Slice 8.2).
+- **`src/integrations/supabase/types.ts` is wrong** — it is a generated types file from an unrelated project (devices, panels, bookings). It must be regenerated against the real schema. Treat as a correctness bug.
+- **No `profiles`/role table** — blocks admin-only RLS on every Foundry table.
+- **`LessonContentRenderer` is partial** — only 3 of 6 lesson types implemented (checklist, acknowledgment, scenario are stubs).
+- **Nexa Bold brand font absent** — specified in the brand guide but not in the repo; the typographic identity is unshipped.
+- **No AI integration** — mock AI client/interface not yet built.
+- **No real Redex source material** — only sample/placeholder content until HR provides approved markdown.
 
 ---
 
@@ -332,27 +339,15 @@ These gaps are expected and will be closed slice-by-slice according to the offic
 
 ## Current Database Status
 
-No database schema has been implemented yet.
+One migration applied (2026-05-22): `supabase/migrations/20260522000100_create_training_schema_and_rls.sql` — learner-side schema (training courses, modules, lessons, enrollments, progress) with RLS. This is an early down-payment on roadmap Phase 8.
 
-## Planned Core Tables
+## Remaining Tables To Add
 
-Future schema likely includes:
+Learner/admin core: `profiles` (roles), `assessments`, `assessment_questions`, `assessment_attempts`, `assignments`, `acknowledgments`, `audit_logs`.
 
-- users / profiles
-- courses
-- modules
-- lessons
-- assessments
-- assessment_questions
-- source_binders
-- source_documents
-- source_sections
-- generated_content_reviews
-- assignments
-- progress_records
-- assessment_attempts
-- acknowledgments
-- audit_logs
+Course Foundry + Drive Source Library: `source_files` (keyed by Drive file ID, carries authority level), `source_file_versions`, `source_sections`, `module_source_bindings`, `module_versions`, `source_change_events`, `generated_content_reviews`.
+
+See roadmap Slice 8.2 for the full schema spec.
 
 Codex must update this section whenever migrations or schema changes are created.
 
@@ -1534,6 +1529,964 @@ Both sessions cleaned up post-verification.
 - Possibly initial code-splitting to address the 500 kB bundle warning (or defer to Phase 8)
 
 After Phase 7, lint should be 0 errors. After Phase 8 (testing) + Phase 9 (docs), the remediation plan is complete.
+
+---
+
+## 2026-05-22 — Phase 7: Build, Deploy, Security
+
+**Status**: ✅ Completed (Phase 7 of 10) — single `engineer` sub-agent
+
+**Context**:
+Lands production-posture work: ESLint coverage for plain JS files, Netlify security headers, public-facing meta tags, explicit Vite build target with vendor chunk splitting, and pruning of the legacy dark-theme/atelier CSS utilities that no longer have consumers. No UI or behavior change.
+
+**Scope reduction**: The Phase 6 "Next" section listed 6 work items; in-session reconnaissance confirmed `_archive/**` ignore was already present in `eslint.config.js` (`globalIgnores(['dist', '_archive/**'])`), so lint going in was already **0 errors / 0 warnings**. That item dropped from the plan, leaving 5 mechanical, disjoint-file items.
+
+**Orchestration**:
+One `engineer` sub-agent against `prompt-exports/phase-7-plan.md`. Session `ED104038…66E2957503` — cleaned up post-verification. Split into parallel agents wasn't worth the overhead: 5 independent files, no logical entanglement, fully mechanical.
+
+**Summary**:
+
+### Item 1 — ESLint flat-config JS overrides
+- **`eslint.config.js`** — appended a second config block targeting `**/*.{js,cjs,mjs}` with `js.configs.recommended` and Node globals. Currently only `postcss.config.js` qualifies (already valid ESM `export default {}`), so no code change was needed in any JS file — this just brings them under coverage.
+
+### Item 2 — Netlify security headers
+- **`netlify.toml`** — appended a `[[headers]]` block applying baseline security headers to all routes (`for = "/*"`):
+  - **CSP**: `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'`. Supabase wildcard accommodates both HTTPS REST/Storage and WSS realtime channels without committing to a specific project ref.
+  - **`X-Content-Type-Options: nosniff`**
+  - **`X-Frame-Options: DENY`** (reinforces `frame-ancestors 'none'`)
+  - **`Referrer-Policy: strict-origin-when-cross-origin`**
+  - **`Permissions-Policy`**: deny-everything baseline (camera, microphone, geolocation, payment, usb, accelerometer, gyroscope, magnetometer)
+  - **`Strict-Transport-Security: max-age=31536000; includeSubDomains`** (1-year HSTS)
+
+### Item 3 — `index.html` meta tags
+- **`index.html`** — placeholder `<title>redex-education</title>` → `Redex Academy — Redex Education Platform`. Added `<meta name="description">`, `<meta name="theme-color" content="#ED1B24">`, and full Open Graph (`og:type/site_name/title/description/image`) + Twitter (`summary` card with title/description/image) tag set. Favicon kept as `/favicon.svg`. Naming guardrails honored: learner-facing **Redex Academy** leads, platform **Redex Education** follows in the suffix and description; **Course Foundry** correctly NOT mentioned on public meta.
+
+### Item 4 — Vite build target + manual chunks
+- **`vite.config.ts`** — added explicit `build.target: 'es2023'` (matches the existing `engines.node: "^20.19.0 || >=22.12.0"` requirement; modern evergreen browser targets for internal Redex users).
+- Added `rollupOptions.output.manualChunks` as a function-form predicate. Splits to:
+  - `react-vendor` — `react`, `react-dom`, `scheduler`, `react-router*`
+  - `markdown-vendor` — `react-markdown`, `rehype-*`, `remark-*`, `unified`, `unist-util-*`, `mdast-util-*`, `hast-util-*`, `micromark*`
+  - `supabase-vendor` — `@supabase/supabase-js`
+  - `vendor` — fallthrough for other `node_modules/*`
+- Function form worked on Vite 8 / Rolldown directly; the object-form fallback documented in the plan was not needed.
+
+### Item 5 — Dead CSS pruning
+- **`src/index.css`** — removed all utility classes/components from the pre-Redex era with verified zero `src/` consumers: `.gravity-card` (+ hover), `.neon-badge`, `.badge-success`, `.badge-warning`, `.badge-critical`, `.badge-info`, `.btn-neon`, `.btn-neon-primary` (+ hover), `.tech-header`, `.tech-value`, `.scrollbar-hide`.
+- Removed orphaned tokens consumed only by those rules: `--neon-cyan`, `--neon-green`, `--neon-amber`, `--neon-red`, `--neon-purple`, `--neon-blue`, `--bg-card`, `--bg-glass`, `--bg-input`, `--border-glow`, `--glass-blur`, `--glass-shadow`, `--border-default`.
+- **Kept** (still in active use): `--bg-canvas` (consumed by `body { background-color }`), `--redex-*` brand tokens, `--brand*` legacy aliases, `--success/--warning` status tokens, all shadcn system mapping, `--radius-*` spacing tokens, chart colors, `--font-family`, the global `::-webkit-scrollbar*` rules (only the `.scrollbar-hide` opt-in class was dead).
+- `index.css` went from 244 → 144 lines.
+
+**Files touched** (5 modified + plan + Build Bible):
+- Modified: `eslint.config.js`, `netlify.toml`, `index.html`, `vite.config.ts`, `src/index.css`, `docs/redex_education_build_bible.md`
+- Created: `prompt-exports/phase-7-plan.md` (will be deleted after this Bible entry lands)
+
+**Verification**:
+- ✅ `npm run typecheck` — green under strict + `noUncheckedIndexedAccess`
+- ✅ `npm run lint` — **0 errors / 0 warnings**
+- ✅ `npm run build` — green; the 500 kB chunk-size warning that fired in Phase 6 is **gone**
+- ✅ `dist/index.html` contains the new title + description + theme-color + OG + Twitter meta tags (file grew from 0.46 kB → 1.86 kB, expected)
+
+**Build output (post-Phase 7)**:
+```
+dist/index.html                             1.86 kB │ gzip:  0.66 kB
+dist/assets/index-*.css                    35.73 kB │ gzip:  7.14 kB
+dist/assets/rolldown-runtime-*.js           0.69 kB │ gzip:  0.42 kB
+dist/assets/index-*.js                     38.92 kB │ gzip: 11.29 kB   ← app entry
+dist/assets/vendor-*.js                    65.39 kB │ gzip: 20.01 kB
+dist/assets/markdown-vendor-*.js          127.94 kB │ gzip: 39.34 kB
+dist/assets/supabase-vendor-*.js          199.50 kB │ gzip: 51.10 kB
+dist/assets/react-vendor-*.js             223.10 kB │ gzip: 71.29 kB
+```
+
+Compared to pre-Phase-7 (single 655 kB / 192 kB gzipped chunk): largest chunk is now `react-vendor` at 223 kB (71 kB gzip), and the app entry shrunk to **38.92 kB**. Vendor chunks rarely change → strong cache reuse across deploys. No chunk crosses the 500 kB threshold.
+
+**Known gaps** (intentional, deferred):
+- **Body painted black under a light-themed UI** — `body { background-color: var(--bg-canvas) /* #0a0a0a */ }` remains in `index.css`. Vestigial from the pre-Redex dark prototype. Hidden visually because light page content (`bg-white`, `bg-gray-50`) covers it. Outside Phase 7 scope; flag for Phase 8 visual QA if any flash-of-black surfaces.
+- **CSP doesn't include Google Fonts / analytics / Stripe origins** — none of those are wired today; widen the CSP when they're added.
+- **`Permissions-Policy`** is the deny-everything baseline. Revisit when features (e.g. webcam proctoring) land.
+- **No test infrastructure yet** — Phase 8 owns Vitest + RTL + first test cases.
+- **`Strict-Transport-Security`** is currently a 1-year max-age; once Redex is comfortable with the rollout, consider adding `preload` for HSTS preload list submission.
+
+**Naming guardrails honored**:
+- Redex Education = repo/product ✓ (title suffix, `og:description` flavor, `index.css` header)
+- Redex Academy = learner-facing brand ✓ (leads `<title>`, `og:title`, `og:site_name`, Twitter title)
+- Redex AI Course Foundry — **deliberately NOT surfaced** in public meta ✓
+- Redex Training OS — not surfaced (correct; long-term vision label) ✓
+- No real AI / Supabase data flows / production auth wired ✓
+- No secrets introduced; CSP is public anyway ✓
+
+**Next**: Phase 8 — Testing infrastructure. Should land:
+- Vitest + React Testing Library + jsdom setup
+- First tests covering the threshold-boundary correctness in `Quiz.tsx` (Phase 4 fix), `EducationContext` idempotency + hydration race fix (Phase 3), `ModulePlayer` empty-lessons + lock-state behavior (Phase 3), and the route-redirect for unknown module IDs (Phase 3 `LearnerModuleRoute`).
+- `npm test` + `npm run test:watch` scripts
+- Pre-commit / CI hook hookup is OUT of scope (project doesn't have CI configured yet)
+
+After Phase 8 (testing infra) + Phase 9 (docs / contributor README), the remediation plan is complete and the codebase is back on the official roadmap (Phase 2 of the master roadmap: Admin Course Foundry).
+
+---
+
+## 2026-05-22 — Phase 8: Testing Infrastructure
+
+**Status**: ✅ Completed (Phase 8 of 10) — orchestrated as **1 blocking + 4 parallel sub-agents** in full CEO Co-Pilot mode
+
+**Context**:
+Before Phase 8 the codebase had zero automated tests. Phase 3–4 landed correctness fixes (Quiz threshold math, EducationContext hydration race + idempotency, ModulePlayer empty-lessons / lock-state, LearnerModuleRoute unknown-id redirect) without coverage to lock them in. This phase establishes Vitest + RTL + jsdom and adds focused unit/integration tests for those four highest-value surfaces — locking the fixes against regression and creating the foundation for future testing work.
+
+**Orchestration**:
+Five `engineer` sub-agents driven from a comprehensive plan at `prompt-exports/phase-8-plan.md`. Dependency graph: Item A (infra) blocked items B/C/D/E (test suites). B/C/D/E ran **concurrently** with `detach: true` against disjoint file scopes. The wait loop fielded each completion as it arrived; final verification ran after the last agent returned. All five sessions cleaned up post-verification.
+
+Session IDs (all cleaned up): Item A `7FAC987E…`, Item B `EA1671D0…`, Item C `850B34E3…`, Item D `043C4E7F…`, Item E `45AFCFDC…`.
+
+**Summary**:
+
+### Item A — Test infrastructure setup (`engineer`, blocking)
+- **Installed devDependencies**: `vitest@3.2.4`, `@vitest/coverage-v8@3.2.4`, `@testing-library/react@16.3.2` (required for React 19), `@testing-library/user-event@14.6.1`, `@testing-library/jest-dom@6.9.1`, `@testing-library/dom@10.4.1`, `jsdom@25.0.1`. Skipped `@vitest/ui` to keep deps lean.
+- **`vite.config.ts`** — appended `test` block (`globals: true`, `environment: 'jsdom'`, `setupFiles: ['./src/test/setup.ts']`, `css: false`, V8 coverage with comprehensive `exclude` list). Used `/// <reference types="vitest/config" />` triple-slash directive so `defineConfig` accepts the `test` field without changing the import path. Existing `build.manualChunks` from Phase 7 preserved untouched.
+- **`tsconfig.app.json`** — merged `"vitest/globals"` and `"@testing-library/jest-dom"` into the existing `types` array.
+- **`src/test/setup.ts`** (new) — loads jest-dom matchers via `'@testing-library/jest-dom/vitest'`, runs RTL `cleanup()` after each test, clears `localStorage` + `sessionStorage` before each test. Added a defensive **`createStorageMock()` fallback** because jsdom's native `Storage` API was malformed in the test runner (missing `clear`/`length`); the helper installs a working stub only when needed. Documented as a necessary deviation in the agent's report.
+- **`src/test/smoke.test.ts`** (new) — 4-assertion sanity test: arithmetic, DOM globals, jest-dom matcher works, localStorage is reset.
+- **`package.json` scripts** — `test`, `test:watch`, `test:coverage` (no `test:ui`).
+
+### Item B — `Quiz.tsx` test suite (`engineer`, parallel)
+- **`src/features/learner/components/Quiz.test.tsx`** (new) — 12 tests covering:
+  - Passing threshold boundary (Phase 4 fix): 3/4 (0.75) does NOT pass at 80%; 4/4 passes
+  - 0-question authoring error: "Quiz unavailable" card + `onComplete(0, false)` fires exactly once
+  - Invalid `correct_index` filtering: out-of-bounds indices excluded from gradeable set
+  - Submit/retake state machine: submit disabled until all answered; retake resets cleanly; `allow_retakes: false` disables retake
+  - Lesson switch via parent `key={lesson.id}` remount
+  - Keyboard a11y: Arrow/Home/End move selection + focus; `aria-disabled` after submit
+  - `onComplete` callback invariants: exactly once per submission
+  - Stable option keys regression check
+
+### Item C — `EducationContext` test suite (`engineer`, parallel)
+- **`src/contexts/EducationContext.test.tsx`** (new) — 12 tests covering:
+  - localStorage hydration on first mount (Phase 3 race fix)
+  - Empty + corrupt JSON paths (warns once + falls back to empty state)
+  - StrictMode double-mount safety (hydration survives double-render)
+  - `recordLessonProgress` idempotency: second `completed` call is byref-equal no-op; `time_spent_seconds` doesn't double, `completed_at` unchanged
+  - Non-completed → completed transitions accumulate time correctly
+  - `getProgressSummary(courseId)` scoping (Phase 3 fix): correct totals; unknown courseId returns zeros (no NaN)
+  - Persistence writes fire on change; reactive `currentEnrollment.progress_percentage` updates
+
+### Item D — `ModulePlayer.tsx` test suite (`engineer`, parallel)
+- **`src/features/learner/components/ModulePlayer.test.tsx`** (new) — **12 tests** covering (the plan flagged test #2 as potentially un-triggerable; the agent **did** trigger it via re-render with a shorter lessons array, so all 12 landed):
+  - Empty lessons array → "No lessons in this module yet" fallback
+  - `currentLesson === undefined` → "Lesson unavailable" fallback (triggered via lessons-shrink re-render)
+  - Quiz lock state: quiz lesson without pass + completion → disabled button + lock banner; passed/completed → unlocked; non-quiz lessons never quiz-locked
+  - Sidebar lock logic: first incomplete required lesson is navigable; later locked; completion unlocks subsequent lessons; current always navigable; completed always navigable
+  - Progress bar percentage tracking (33% for 1-of-3, 100% for 3-of-3)
+  - Mark Complete fires `onProgressUpdate(lessonId, 'completed')`; Complete Module fires `onCompleteModule` on single-lesson modules
+  - A11y: locked sidebar buttons carry `aria-disabled="true"` + `aria-describedby` matching an sr-only lock message `<span>`
+- Validated the canonical Phase 1/3 discriminant `currentLesson.content.type === 'quiz'` (not `lesson_type`).
+
+### Item E — Routing + AuthGate test suite (`engineer`, parallel)
+- **`src/App.routes.test.tsx`** (new) — 5 tests covering routes via `<MemoryRouter>` with `vi.mock('@/hooks/useEducation')` seam:
+  - `/` redirects to `/learn`
+  - `/learn/player/unknown-module-id` → redirects to `/learn` via `LearnerModuleRoute` `<Navigate>` (Phase 3 fix)
+  - `/learn/player/mod-001` → renders ModulePlayer (empty-lessons fallback as confirmation)
+  - Unknown path `/garbage` → NotFoundPage
+  - `/admin` → AdminPlaceholderPage wrapped in AuthGate
+- **`src/components/auth/AuthGate.test.tsx`** (new) — 5 tests covering all branches via `vi.mock('@/hooks/useAuth')` + `vi.stubEnv('VITE_MOCK_AUTH', ...)`:
+  - `VITE_MOCK_AUTH='true'` → children always render (mock bypass wins over loading/no-session)
+  - `loading: true` + no mock → default "Authenticating…" fallback
+  - Custom `fallback` prop respected during loading
+  - `loading: false` + no session → "Sign-in required" placeholder
+  - `loading: false` + valid session → children render
+
+**Files touched** (12 total):
+- Modified: `package.json`, `package-lock.json`, `vite.config.ts`, `tsconfig.app.json`, `docs/redex_education_build_bible.md`
+- Created: `src/test/setup.ts`, `src/test/smoke.test.ts`, `src/features/learner/components/Quiz.test.tsx`, `src/contexts/EducationContext.test.tsx`, `src/features/learner/components/ModulePlayer.test.tsx`, `src/App.routes.test.tsx`, `src/components/auth/AuthGate.test.tsx`
+- Plan: `prompt-exports/phase-8-plan.md` (deleted after this Bible entry lands)
+
+**Verification (final orchestrator run)**:
+- ✅ `npm run typecheck` — green under strict + `noUncheckedIndexedAccess`
+- ✅ `npm run lint` — **0 errors / 0 warnings**
+- ✅ `npm test` — **50 / 50 passing** across 6 files
+  - `smoke.test.ts`: 4
+  - `AuthGate.test.tsx`: 5
+  - `EducationContext.test.tsx`: 12
+  - `App.routes.test.tsx`: 5
+  - `ModulePlayer.test.tsx`: 12
+  - `Quiz.test.tsx`: 12
+- ✅ `npm run test:coverage` — V8 coverage baseline established (excludes `_archive`, types, `db-rows.ts`, `demo-data.ts`, `main.tsx`, `env.d.ts`):
+  - **Statements: 81.02%**
+  - **Branches: 89.96%**
+  - **Functions: 67.92%**
+  - **Lines: 81.02%**
+  - Per-surface highlights: `AuthGate.tsx` 100%, `EducationContext.tsx` 96.12%, `Quiz.tsx` 98.86%, `ModulePlayer.tsx` 92.03%, `App.tsx` 88.75%, all `layout/*` components 100%
+- ✅ `npm run build` — green; chunk sizes unchanged from Phase 7 (test deps are dev-only, do not affect production bundle)
+
+**Coverage gaps (intentional, documented)**:
+- `LessonContentRenderer.tsx` (12.12%) — covered transitively by ModulePlayer + Quiz tests but no direct suite. Future phase if explicit text/checklist/acknowledgment renderers are added.
+- `LearnerWelcomePage.tsx` (4.44%) — primarily presentational/static markup; covered transitively by route tests. Direct snapshot/visual tests deferred.
+- `use-auth.tsx`, `useAuth.ts`, `auth-context.ts` (0%) — covered transitively via AuthGate's `vi.mock('@/hooks/useAuth')` seam. Direct provider lifecycle tests (subscription cleanup, error from `getSession`) deferred to later phase.
+- `integrations/supabase/client.ts` (0%) — env-driven module; testing requires complex env stubbing. Defer until Supabase reads land (post-Phase 2 of master roadmap).
+- `types/training.ts` (0%) — pure type declarations; zero runtime to cover. Coverage tool counts the file but no runtime executes.
+
+**Known gaps (out of scope this phase, deferred)**:
+- **No CI hookup** — user will configure GitHub Actions later.
+- **No coverage threshold gating** — measurement only this phase; thresholds can land once a stable baseline is established (suggested starting point: 80% statements / 85% branches given today's numbers).
+- **No E2E / Playwright** — out of scope.
+- **No snapshot tests** — intentionally avoided; brittle.
+- **No pre-commit hooks** — deferred.
+- **Runtime stderr warning** "`--localstorage-file` was provided without a valid path" — harmless Node deprecation warning from vitest/jsdom interaction in this environment; does not affect test results. Can be suppressed in a follow-up phase if it becomes noisy in CI.
+
+**Naming guardrails honored**:
+- Redex Education = repo/product ✓ (used in test file-header comments and AuthGate test descriptions)
+- Redex Academy = learner-facing brand ✓ (used in Quiz, ModulePlayer, route test descriptions)
+- Redex AI Course Foundry = admin engine ✓ (referenced in AuthGate "Sign-in required" assertion text — admin gate)
+- Redex Training OS = not surfaced (correct; long-term vision label) ✓
+- No real AI, no real Supabase data flows, no production auth wired ✓ (all mocked via `vi.mock` seams)
+- No secrets introduced ✓ (CSP / env / package files untouched except devDeps)
+
+**Coordination notes**:
+- The 4 parallel agents (B/C/D/E) had **zero file conflicts** — each wrote tests next to a different source file with disjoint imports.
+- Each parallel brief mentioned the three siblings and the file boundary. No agent reported a coordination issue. No agent modified source code outside its test file (verified post-completion).
+- The `wait_for_session_ids` pattern with `detach: true` worked cleanly: Item E finished first, then D, then C, then B — handled each as it arrived without idle blocking.
+- Mid-flight sibling reports correctly identified other agents' WIP type errors (sibling test files) without misattributing them. Final verification after all four returned shows all suites green.
+
+**Next**: Phase 9 — Documentation. Should land:
+- Top-level `README.md` (replace the bare default if any) with quick-start instructions, env setup pointer to `.env.example`, the four npm scripts (`dev`, `build`, `test`, `lint`), and naming conventions reminder.
+- `CONTRIBUTING.md` with branch/commit conventions, Build Bible update requirement, and test-writing expectations.
+- `docs/architecture.md` or similar — short codebase tour: route table, context providers, education facade, auth scaffolding, where Supabase will plug in.
+- Possibly a `docs/testing.md` with the Vitest/RTL conventions established this phase (fixture helpers, mock seams for auth/education).
+
+After Phase 9, the **remediation plan is complete** and the codebase is fully ready to resume the official master roadmap at **Phase 2: Admin Course Foundry** (Slice 2.1 — Admin Dashboard Shell).
+
+---
+
+## 2026-05-22 — Phase 9: Documentation
+
+**Status**: ✅ Completed (Phase 9 of 10 — **final phase of the post-review remediation plan**) — orchestrated as **5 parallel sub-agents** in full CEO Co-Pilot mode
+
+**Context**:
+Phases 0–8 hardened the codebase (clean lint, strict TS, brand tokens, security headers, 50 tests, 81% statement coverage) but contributor-facing documentation was still bare: a 56-line README, no CONTRIBUTING, no architecture brief, no testing guide, no glossary, no decision records. Phase 9 lands the entire developer documentation surface so the codebase is ready to onboard a new contributor in ~30 minutes and resume the master roadmap at **Phase 2 / Slice 2.1 — Admin Dashboard Shell**.
+
+**Orchestration**:
+Five `engineer` sub-agents writing documentation concurrently against a single 818-line plan at `prompt-exports/phase-9-plan.md` that prescribed section-by-section content + a **fixed link-target map** ensuring cross-references resolve cleanly across the doc set without any sibling-output dependencies. Dispatched all five with `detach: true`; the wait loop fielded each completion (A → B → D → C → E order) without idle-blocking.
+
+Session IDs (all cleaned up): Item A `40B3D717…`, Item B `5C404E08…`, Item C `4FEB0413…`, Item D `1AD93DBF…`, Item E `B61AC3C1…`.
+
+**Summary**:
+
+### Item A — `README.md` rewrite (`engineer`, parallel)
+Replaced the 56-line bare README with a 102-line premium top-level entry point: hero + status badges (Phase 8 numbers — 50/50 tests, 81% coverage, lint 0/0, build green), naming primer table (the 4 Redex names), quick start, scripts table (8 commands), env vars table (`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` / `VITE_MOCK_AUTH`), project structure tree (verified against actual top-level via `get_file_tree`), routing overview (verified against `src/App.tsx`), and a "Where to go next" navigation hub. **9 outbound links** to all reference doc surfaces.
+
+### Item B — `CONTRIBUTING.md` (`engineer`, parallel)
+New 88-line contributor protocol covering Welcome + "Read these first" pointers, dev setup, slice discipline, Conventional Commits (with 5 realistic examples from recent Phase 6/7/8 work), branch conventions (`slice/<phase>-<slice>-<name>`, `fix/...`, `docs/...`), PR expectations (mandatory Build Bible diff), test expectations, code style (`strict` + `noUncheckedIndexedAccess`, no `any`/`!`/bypass `as`), naming guardrails table, sub-agent coordination workflow, and "Getting help" via Build Bible "Open Decisions". **6 outbound links**.
+
+### Item C — `docs/architecture.md` (`engineer`, parallel)
+New 148-line architecture brief with all 12 prescribed sections. The centerpiece is a **Mermaid `flowchart TD` diagram** of the runtime stack (Browser → Vite/React 19 → StrictMode → BrowserRouter → AuthProvider → EducationProvider → App → AppShell → Pages → Hooks → Facade → Domain/Demo; with Supabase env-gated; AuthGate on admin only) — **validated locally** via `npx @mermaid-js/mermaid-cli` (rendered to SVG successfully). Other sections: route table grounded in `src/App.tsx`, provider stack rationale, education facade pattern, hook/provider split convention, AuthGate three-branch logic, education progress state (localStorage-backed under `redex-education-progress-v1`), brand tokens pointer to Phase 5 + Brand Guide PDF, build pipeline (Vite 8 + Rolldown, ES2023, vendor chunk splits, V8 coverage), security posture (env-driven secrets, Netlify CSP/headers, react-markdown + rehype-sanitize), and known architecture gaps.
+
+### Item D — `docs/testing.md` (`engineer`, parallel)
+New 174-line testing guide covering: what's installed (with version-reason table — RTL 16 required for React 19, etc.), running tests (3 scripts), file conventions (co-located `*.test.tsx`, `src/test/` shared infra), the setup file walkthrough (jest-dom matchers + RTL cleanup + storage reset + jsdom Storage shim), coverage configuration with per-exclude rationale, component test pattern (with `Quiz.test.tsx` example), hook test pattern (with `EducationContext.test.tsx` example), **mock seams catalog** (`vi.mock('@/hooks/useAuth')`, `vi.mock('@/hooks/useEducation')`, `vi.stubEnv`, localStorage pre-population, StrictMode wrapper), "What's tested today" table (all 6 test files + 50 tests), coverage baseline (Phase 8 numbers + per-surface highlights), "What's NOT tested (and why)", and 3 rules for when to write a new test.
+
+**Tiny deviation**: agent added the `App.tsx — 88.75%` coverage highlight beyond the plan's listed surfaces; verified against the Bible's Phase 8 table, accepted.
+
+### Item E — `docs/glossary.md` + `docs/decisions/` ADRs (`engineer`, parallel)
+**12 new files** (largest item by file count, but each ADR sized 200-400 words).
+
+**`docs/glossary.md`** (142 lines) — Three parts:
+1. Brand & product naming primer (the 4 Redex names with use/don't-use rules)
+2. Domain glossary (alphabetical) — **24 terms** pulled from master roadmap: Acknowledgment lesson, Assessment/Quiz, Assignment, Audit log, Build Bible, Course, Course Foundry, Criticality (with full options), Lesson, LessonType (all 9 variants), Manager visibility, Mock auth, Module, Outline review, Phase X.Y / Slice, Placeholder source policy, Progress record, Published module, Self-critique, Side-by-side review, Source Binder, Source material, Vertical slice, Versioning
+3. Technical glossary (alphabetical) — **17 terms**: ADR, AuthGate, BrowserRouter, Education facade, Hook/provider split, Hydration, jest-dom matchers, manualChunks, noUncheckedIndexedAccess, Permissions-Policy, Provider stack, Row type / Domain type, shadcn/ui, StrictMode, Token (CSS), userEvent, Vendor chunk, Vitest
+
+**`docs/decisions/README.md`** (26 lines) — ADR index linking all 9 ADRs + template with "How to add a new ADR" steps.
+
+**`docs/decisions/000-template.md`** — Template skeleton (Status / Date / Phase / Context / Decision / Consequences / References).
+
+**ADRs 001–009** — Word counts (target 200-400 hit):
+- 001 Env-driven Supabase client (Phase 1): 338
+- 002 Domain types single source of truth (Phase 1): 336
+- 003 TypeScript strict + `noUncheckedIndexedAccess` (Phase 1+3): 338
+- 004 React Router with mock-auth gate (Phase 2): 293
+- 005 Hook/provider split pattern (Phase 2+3): 294 — cross-references ADR 009
+- 006 Redex brand token system (Phase 5): 292
+- 007 ARIA layered on custom buttons (Phase 6): 280
+- 008 Netlify security headers and vendor chunks (Phase 7): 268
+- 009 Vitest + RTL + jsdom + mock seam patterns (Phase 8): 285 — cross-references ADR 005
+
+Each ADR follows the template: Status: Accepted / Date: 2026-05-22 / Phase / Context / Decision / Consequences / References (Build Bible, code paths, related ADRs).
+
+**Glossary grounding**: agent confirmed no ungrounded definitions — every domain term traces to the master roadmap; every technical term traces to the codebase or established convention.
+
+**Files touched** (19 total — all markdown, no code):
+- Rewritten: `README.md`
+- Created top-level: `CONTRIBUTING.md`
+- Created `docs/`: `architecture.md`, `testing.md`, `glossary.md`
+- Created `docs/decisions/`: `README.md`, `000-template.md`, `001`–`009-*.md` (11 files)
+- Modified: `docs/redex_education_build_bible.md` (this entry)
+- Plan: `prompt-exports/phase-9-plan.md` (deleted after this Bible entry lands)
+
+**Verification (orchestrator final run)**:
+- ✅ `npm run typecheck` — green (no code touched)
+- ✅ `npm run lint` — **0 errors / 0 warnings**
+- ✅ `npm test` — **50/50 passing** (unchanged from Phase 8)
+- ✅ `npm run build` — green; bundle unchanged
+- ✅ Mermaid architecture diagram validated via `@mermaid-js/mermaid-cli` (rendered to SVG cleanly)
+- ✅ Cross-reference link spot-check: all relative paths resolve to real files
+- ✅ Naming guardrails: every doc honors Redex Education / Redex Academy / Redex AI Course Foundry / Redex Training OS conventions
+
+**Doc surface breakdown**:
+
+| Surface | Lines | Purpose |
+|---------|-------|---------|
+| `README.md` | 102 | Top-level entry point + navigation hub |
+| `CONTRIBUTING.md` | 88 | Contributor protocol |
+| `docs/architecture.md` | 148 | Codebase tour + Mermaid diagram |
+| `docs/testing.md` | 174 | Vitest/RTL conventions + mock seams |
+| `docs/glossary.md` | 142 | Naming + domain + technical vocabulary |
+| `docs/decisions/README.md` | 26 | ADR index |
+| `docs/decisions/000–009` | 10 files | Template + 9 ADRs (200-400 words each) |
+
+**Total new lines: ~1500 across markdown only.**
+
+**Coordination notes**:
+- The 5 parallel agents had **zero file conflicts** (each wrote to its own file/directory with predetermined link targets).
+- Each brief included the predetermined link map so siblings could be linked-to before they existed.
+- Every agent reported either "no deviation" or only the tiniest, defensible deviation (Item D added one coverage figure; Item C used 2 of ~6 suggested outbound links because architecture is mostly self-contained code-citation).
+- No agent crossed its file boundary; no source code was modified during Phase 9.
+
+**Known gaps** (intentional, out of scope):
+- No screenshots / annotated visual docs (text-first).
+- No video walkthroughs.
+- No published GitHub Pages docs site.
+- No automated link checker in CI (no CI exists yet).
+- `docs/SLICE_0.2_APP_SHELL_SPEC.md` exists and Build Bible references to it remain accurate (my earlier suspicion that it was missing was wrong — present at 9.8KB).
+
+**Naming guardrails honored**:
+- **Redex Education** = repo/platform ✓
+- **Redex Academy** = learner-facing ✓
+- **Redex AI Course Foundry** = admin engine ✓
+- **Redex Training OS** = long-term vision ✓
+- No real AI / production auth / Supabase data flows implied as functional ✓
+- No secrets introduced ✓
+
+**Next**: **The remediation plan is COMPLETE.** All 10 phases (0–9) are finished. The codebase is:
+- Strict TypeScript, 0 lint, 50/50 tests, 81% coverage
+- Production-secure (env-driven secrets, CSP, security headers, no chunk warnings)
+- Premium-branded (locked Redex tokens, ARIA-correct, light-theme corrected)
+- Routes wired with real React Router + AuthGate scaffold
+- Fully documented (README, CONTRIBUTING, architecture, testing, glossary, 9 ADRs)
+
+**We now resume the official Redex Education master roadmap** at:
+- **Phase 2 — Admin Course Foundry Prototype**
+- **Slice 2.1 — Admin Dashboard Shell**
+- Linear ticket: `Admin: build admin dashboard shell`
+
+The next work session opens at Slice 2.1 with the Admin Dashboard Shell — entry point to the Redex AI Course Foundry.
+
+---
+
+## 2026-05-22 — Slice 2.1: Admin Dashboard Shell
+
+**Status**: ✅ Completed — **first slice of the official master roadmap to ship post-remediation**.
+
+**Master roadmap reference**: Phase 2 (Admin Course Foundry Prototype) / Slice 2.1.
+**Linear ticket**: `Admin: build admin dashboard shell`.
+
+**Context**:
+With Phases 0–9 of the post-review remediation plan complete, the codebase shifted out of "harden + document" mode and into "ship product features per roadmap" mode. Slice 2.1 is the first surface of the Redex AI Course Foundry — a real admin dashboard replacing the `AdminPlaceholderPage` ("Admin creation tools are coming soon"). The dashboard sets the entry pattern that subsequent foundry slices (2.2 start flow, 2.3 source binder, 2.4 setup questions, 3.x review loops) will build on.
+
+**Orchestration**:
+**Four `engineer` sub-agents** driven from a 516-line plan at `prompt-exports/slice-2-1-plan.md` that prescribed exact component prop interfaces (so A and B could run in parallel without contract drift), the layout spec for the page, and the mock-data shape with believable numbers. Dispatch sequence:
+- **A + B parallel** (data/types + 3 atomic components, disjoint directories)
+- **C sequential** (page composition + route wire + cleanup, after A+B)
+- **D sequential** (tests, after C)
+- **Orchestrator** owns final verification + Bible update
+
+One mid-flight steer was applied to Item C: agent introduced a `withoutAcademyLabel` helper that rewrote "Redex Academy Orientation" → "Redex AI Course Foundry Orientation" in the published-modules list display, mis-applying the naming guardrail. Steered the agent to delete the helper — the *published module's actual title* is "Redex Academy Orientation" (that IS the learner-facing course at `mod-001`), and admin should see real module names. The guardrail says don't use "Academy" as the *admin UI's own brand voice*, not don't show content named "Academy". Fix landed cleanly in the same session.
+
+Session IDs (all cleaned up): Item A `D46A39E7…`, Item B `F2F6D905…`, Item C `60D74B68…` (steered once), Item D `DB88FD47…`.
+
+**Summary**:
+
+### Item A — Mock admin data + canonical types (`engineer`, parallel with B)
+- **Extended `src/types/training.ts`** with three new canonical interfaces near the existing `LearnerDashboardSummary`:
+  - `AdminModuleListItem` (id, title, status, meta)
+  - `AdminDashboardMetrics` (drafts, needs_review, published, learners_in_progress)
+  - `AdminDashboardSummary` (metrics + 3 module arrays + assignment_summary)
+- **Re-exported all three from `src/lib/education/index.ts`** facade
+- **Created `src/features/admin/data/mockAdmin.ts`** (75 lines) with `MOCK_ADMIN_SUMMARY` — believable small-but-active operation story: 3 drafts (active authoring), 1 needs review (gate working), 5 published modules (small mature library), 14 learners in progress, 78% completion rate, 2 overdue. No "Lorem ipsum" smell.
+- All other agents consume from the facade: `import type { AdminDashboardSummary } from '@/lib/education'`.
+
+### Item B — Three atomic components (`engineer`, parallel with A)
+Three new files in `src/features/admin/components/`:
+- **`AdminMetricCard.tsx`** (52 lines) — Label/value/optional-delta/optional-icon/`variant: 'default' | 'accent'`. Accent variant uses `text-redex-red`. Delta tone (positive/negative/neutral) maps to emerald/red/slate.
+- **`FoundryEntryCard.tsx`** (46 lines) — Large CTA card with Redex red tint (`bg-redex-red/[0.04]`), headline "Create a new module", 3 bullets explaining the Course Foundry, primary button with `disabled`/tooltip support for the Slice-2.2-deferred state. Visible "Coming next slice" pill when `isDisabled`.
+- **`CourseStatusList.tsx`** (80 lines) — Titled list of modules with status badges (Draft/Needs review/Published/Archived → slate/amber/emerald/slate pills). Tasteful empty state with `CheckCircle2` icon and accessible "All caught up" affordance. Item count in header.
+
+Brand fidelity: zero raw hex outside JSDoc, all tokens via `bg-redex-red`/`text-redex-red`/etc. ARIA-correct (semantic headings, accessible button names, focus-visible rings). All three match the prescribed prop interfaces from the plan exactly.
+
+### Item C — Page composition + route wire + cleanup (`engineer`, after A+B)
+- **Created `src/features/admin/pages/AdminDashboardPage.tsx`** (50 lines post-steer). Layout: eyebrow "REDEX AI COURSE FOUNDRY" → H1 "Welcome back, Admin" → subhead → full-width `FoundryEntryCard` (`isDisabled={true}`) → 4-col responsive metric row (FileText/Eye/CheckCircle2/Users icons; "Needs review" uses `variant='accent'`) → 2-col Drafts + Needs review section → full-width Published section → footer assignment summary line ("14 active assignments · 2 overdue · 78% completion rate").
+- **Updated `src/App.tsx`** — `AdminRoute()` inline function now renders `<AdminDashboardPage />` instead of `<AdminPlaceholderPage />`. AuthGate wrapping preserved.
+- **Deleted `src/features/admin/pages/AdminRoute.tsx`** (stale; wrapped a duplicate `AuthProvider` that conflicted with `main.tsx`'s; verified zero references before delete)
+- **Deleted `src/features/admin/pages/AdminPlaceholderPage.tsx`** (superseded; verified zero references after App.tsx swap)
+- **Updated `docs/architecture.md`** route table — `/admin` row now shows `AdminDashboardPage` (was `AdminPlaceholderPage`)
+- **Steered correction**: removed the `withoutAcademyLabel` helper that the agent initially added to rewrite published-module titles. Real titles preserved.
+
+### Item D — Tests (`engineer`, after C)
+Five test files (4 new + 1 modified), **15 new tests**, total grew from 50 → **65 passing**:
+- `AdminMetricCard.test.tsx` — 4 tests (label+value, positive/negative delta tones, accent variant applies `text-redex-red`)
+- `FoundryEntryCard.test.tsx` — 3 tests (headline+bullets render, disabled state has accessible tooltip, enabled `onStart` invoked exactly once via `userEvent.click`)
+- `CourseStatusList.test.tsx` — 4 tests (title+items+badges render, all 4 status labels recognized, empty state shows custom message + default icon, item count in header)
+- `AdminDashboardPage.test.tsx` — 4 tests (eyebrow/H1/subhead present, FoundryEntryCard rendered with disabled CTA, all 4 metric labels present, all 3 CourseStatusList sections)
+- `src/App.routes.test.tsx` — modified the one `/admin` assertion from `AdminPlaceholderPage` content to AdminDashboardPage content (H1 "Welcome back, Admin")
+
+All tests follow Phase 8 conventions: `userEvent` not `fireEvent`, queries by accessible role/name, jest-dom matchers, no snapshots, co-located.
+
+**Files touched** (15 total):
+- **New (9)**: `src/features/admin/data/mockAdmin.ts`, `src/features/admin/components/{AdminMetricCard,FoundryEntryCard,CourseStatusList}.tsx`, `src/features/admin/pages/AdminDashboardPage.tsx`, `src/features/admin/components/{AdminMetricCard,FoundryEntryCard,CourseStatusList}.test.tsx`, `src/features/admin/pages/AdminDashboardPage.test.tsx`
+- **Modified (5)**: `src/types/training.ts` (3 new interfaces), `src/lib/education/index.ts` (3 new re-exports), `src/App.tsx` (AdminRoute swap), `src/App.routes.test.tsx` (assertion update), `docs/architecture.md` (route table row), `docs/redex_education_build_bible.md` (this entry)
+- **Deleted (2)**: `src/features/admin/pages/AdminRoute.tsx`, `src/features/admin/pages/AdminPlaceholderPage.tsx`
+- **Plan export** `prompt-exports/slice-2-1-plan.md` deleted after this Bible entry lands
+
+**Verification (orchestrator final run)**:
+- ✅ `npm run typecheck` — green
+- ✅ `npm run lint` — **0 errors / 0 warnings**
+- ✅ `npm test` — **65/65 passing** across 10 test files (was 50/50 across 6 files in Phase 8; +15 tests / +4 files)
+- ✅ `npm run build` — green; app entry grew from 38.92 KB → 45.27 KB (expected — new admin code); vendor chunks unchanged
+- ✅ `npm run test:coverage` — **Statements 83.34%** (was 81.02% — **+2.32 pts**), **Branches 89.96%** (unchanged), **Functions 68.42%** (was 67.92% — +0.50 pts), **Lines 83.34%** (was 81.02% — +2.32 pts)
+
+**Acceptance criteria** (from the master roadmap Slice 2.1 section):
+- [x] **Admin dashboard route works** — `/admin` renders `AdminDashboardPage` wrapped in `AuthGate`; verified via App.routes test
+- [⏳] **Primary CTA leads to Course Foundry start** — CTA is wired and accessible but disabled with "Coming next slice" tooltip per plan (Course Foundry start flow is Slice 2.2)
+- [x] **Draft/review/published states visible** — three `CourseStatusList` sections render with realistic module entries
+- [x] **Build Bible updated** — this entry
+
+The "primary CTA leads to Course Foundry start" criterion is intentionally deferred to Slice 2.2 per the plan's explicit disabled-affordance design — when Slice 2.2 lands, the `FoundryEntryCard` flips to `isDisabled={false}` and gets an `onStart` callback wired to navigate to `/admin/foundry/start`.
+
+**Known gaps / out of scope (deferred to later slices)**:
+- Real Course Foundry start flow (Slice 2.2)
+- Source binder + paste/preview (Slice 2.3)
+- AI setup questions wizard (Slice 2.4)
+- Generated outline review + module generation preview + self-critique + side-by-side review (Phase 3 slices)
+- Real Supabase reads for admin data (Phase 8 of master roadmap)
+- Analytics charts (Recharts dep already present; chart vendor chunk pre-allocated)
+- Manager/team views (Slice 6.3)
+- AdminDashboardPage takes no props today; when assignment data lands in Slice 6.x, the footer summary line becomes a real card driven by props from a hook
+- The architecture.md route table reflects `AdminDashboardPage`; testing.md and other docs still list `AdminPlaceholderPage` in code references in some places — those will be cleaned up as part of the next Bible update or a focused doc pass when the next slice lands
+
+**Coordination notes**:
+- A and B running in parallel had **zero file conflicts** (disjoint directories: `data/` vs `components/`)
+- The "predetermined component interfaces" pattern from Phase 9 (where each agent gets exact prop shapes upfront) worked again here — C could compose B's output without negotiation
+- The mid-flight Item C steer (removing `withoutAcademyLabel`) cost one cycle but caught a real naming-guardrail misunderstanding before it shipped. The agent self-corrected cleanly when steered.
+- Total time from plan to verified ship: efficient. The 4-item structure with A+B parallel + C+D sequential held its design well.
+
+**Naming guardrails honored**:
+- Redex Education = repo/platform ✓ (Build Bible, type files)
+- Redex Academy = learner-facing brand ✓ (NOT in any admin UI copy; "Redex Academy Orientation" appears only as a real module title in the published list, which is correct)
+- Redex AI Course Foundry = admin engine ✓ (page eyebrow, FoundryEntryCard headline, breadcrumb "Admin flow › Course Foundry", `architecture.md`)
+- Redex Training OS = not surfaced (correct; long-term vision label) ✓
+- No real AI / Supabase / production auth wired ✓
+- No secrets introduced ✓
+
+**Next**: **Slice 2.2 — Course Foundry Start Flow** (master roadmap Phase 2). Should land:
+- New route(s): `/admin/foundry/start` (or similar pattern)
+- `src/features/foundry/pages/FoundryStartPage.tsx`
+- `src/features/foundry/components/ModuleBasicsForm.tsx`
+- `src/features/foundry/schemas/foundrySchemas.ts` (Zod validation)
+- `src/features/foundry/types.ts` (or extend canonical training types)
+- Wire `FoundryEntryCard.isDisabled = false` + `onStart` → navigate to the new route
+- Flip the App.routes test's existing assertion (currently confirms CTA is disabled) once 2.2 ships
+- Linear ticket title: `Foundry: build module basics start flow`
+
+The form will collect: module title, parent course selection, audience, required/optional, training type (HR/Operational/Safety/Compliance/Customer-specific/Role-specific/General informational), and estimated duration target. State persistence via Zustand or React Router state (no Supabase yet). Continue button leads to the Source Binder paste/preview screen (Slice 2.3).
+
+---
+
+## 2026-05-22 — Slice 2.2: Course Foundry Start Flow
+
+**Status**: ✅ Completed — **second slice of the official master roadmap to ship**.
+
+**Master roadmap reference**: Phase 2 (Admin Course Foundry Prototype) / Slice 2.2.
+**Linear ticket**: `Foundry: build module basics start flow`.
+
+**Context**:
+Slice 2.1 left the `FoundryEntryCard` CTA in a `disabled` "Coming next slice" state. Slice 2.2 flips that switch and lands the first interactive admin surface — a Zod-validated, React-Hook-Form-driven module basics form persisted to a Zustand store with localStorage middleware. The companion `/admin/foundry/source` stub page proves the persistence by rendering the saved draft fields verbatim; admin can navigate Start → Source and back, and the draft survives a hard refresh.
+
+Roadmap acceptance criteria all satisfied including the literal "Admin can proceed to source upload step" (the source stub page IS that step's surface for now, ready to be replaced by Slice 2.3's real source binder).
+
+**Orchestration**:
+**Four `engineer` sub-agents** driven from a 650-line plan at `prompt-exports/slice-2-2-plan.md` that prescribed exact Zod schema, Zustand store shape, and `ModuleBasicsForm` prop interface upfront — enabling B and C to run in parallel after A (the proven Slice 2.1 pattern). Dispatch sequence:
+- **A blocking** — install 4 missing runtime deps + canonical `TrainingType` + foundry foundation files
+- **B + C parallel** — form component (B) and pages + routes + dashboard flip (C), against the prescribed contracts
+- **D sequential** — tests (with one mid-flight steer to widen scope to fix a cross-item test breakage)
+
+One coordination escalation handled: Item C added `useNavigate()` to `AdminDashboardPage`, which broke the existing Slice 2.1 `AdminDashboardPage.test.tsx` (rendered without a Router). Item D's agent correctly stayed in its boundary and surfaced the issue rather than silently expanding scope. Orchestrator widened D's scope to include the boundary-adjacent test fix; agent landed it cleanly in the same session with a single steer.
+
+Session IDs (all cleaned up): Item A `98431294…`, Item B `E9F91600…`, Item C `F280FE94…`, Item D `BF621A9A…`.
+
+**Summary**:
+
+### Item A — Foundation (`engineer`, blocking)
+- **Installed 4 runtime deps** (the roadmap-assumed set that was never installed pre-remediation):
+  - `zod@3.25.76` — schema validation
+  - `react-hook-form@7.76.0` — form state management
+  - `@hookform/resolvers@3.10.0` — zod ↔ RHF bridge
+  - `zustand@5.0.13` — global state with persist middleware
+- **`src/types/training.ts`** — added canonical `TrainingType` union (`'hr' | 'operational' | 'safety' | 'compliance' | 'customer_specific' | 'role_specific' | 'general_informational'`) + `TRAINING_TYPE_LABELS` const record for display
+- **`src/lib/education/index.ts`** — re-exported both alphabetically (`TrainingType` in the type block; `TRAINING_TYPE_LABELS` in the value re-exports)
+- **`src/features/foundry/types.ts`** (new, 29 lines) — `ModuleBasicsDraft` (with `updated_at`) + `ModuleBasicsFormValues` (`Omit<Draft, 'updated_at'>`), using `Extract<Criticality, 'required' | 'optional'>` to narrow the existing canonical enum
+- **`src/features/foundry/schemas/foundrySchemas.ts`** (new, 35 lines) — `moduleBasicsSchema` with `TRAINING_TYPE_VALUES` tuple, `satisfies z.ZodType<ModuleBasicsFormValues>` constraint enforcing parity
+- **`src/features/foundry/store/foundryDraftStore.ts`** (new, 32 lines) — Zustand v5 store using the `create<State>()(persist(...))` curry pattern; localStorage key `redex-foundry-draft-v1`; methods `setBasics` (sets `updated_at` on write) and `clearDraft`
+
+Verification: typecheck/lint/test/build all green; 65/65 tests preserved; bundle unchanged at this stage (deps installed but not yet imported by runtime code paths).
+
+### Item B — ModuleBasicsForm (`engineer`, parallel with C)
+**`src/features/foundry/components/ModuleBasicsForm.tsx`** (224 lines) implementing the prescribed prop interface exactly (`initialValues?`, `onSubmit`, `parentCourseOptions`, `onCancel?`):
+
+- `useForm<ModuleBasicsFormValues>` with `zodResolver(moduleBasicsSchema)`
+- Sensible defaults merged with `initialValues`: title='', parent_course_id='standalone', audience='', criticality='required', training_type='general_informational', estimated_minutes=20
+- **6 fields** each with label + required marker + accessible error slot:
+  1. Title — text input
+  2. Parent course — native `<select>` from `parentCourseOptions`
+  3. Audience — text input + suggestion helper line ("Examples: New hires · All employees · Field team · Managers")
+  4. Criticality — `<fieldset>`/`<legend>` radio group (`required`/`optional`)
+  5. Training type — native `<select>` with 7 options using `TRAINING_TYPE_LABELS` for display
+  6. Estimated minutes — number input with `min=5 max=300 step=5` and "min" suffix
+- ARIA: `aria-label="Module basics"` on form, `aria-invalid` + `aria-describedby` + `aria-live="polite"` on errors
+- Submit button: Redex red primary, label "Continue → Add source material", `disabled` when `!formState.isValid`
+- Cancel button: conditional, `variant="outline"`
+- Layout: white `rounded-2xl` card, `max-w-2xl mx-auto`, `p-6`-`p-8`
+
+No raw hex; brand tokens only.
+
+### Item C — Pages + route wire + dashboard flip (`engineer`, parallel with B)
+- **`src/features/foundry/pages/FoundryStartPage.tsx`** (38 lines) — eyebrow "REDEX AI COURSE FOUNDRY", H1 "New module — basics", subhead, then composes `<ModuleBasicsForm>` with `initialValues={currentDraft ?? undefined}`, `parentCourseOptions=[Standalone, Redex Academy Orientation]`, `onSubmit` saves to store + navigates to `/admin/foundry/source`, `onCancel` navigates to `/admin`.
+- **`src/features/foundry/pages/FoundrySourceStubPage.tsx`** (98 lines) — eyebrow "REDEX AI COURSE FOUNDRY · STEP 2", H1 "Add source material", visible "Coming in Slice 2.3" pill. When draft present: renders the "Working draft" card with all 6 fields humanized (uses `TRAINING_TYPE_LABELS` + Required/Optional display). Action row: "← Edit basics" link → start page; "Clear draft" outlined button → calls `clearDraft()` + navigates to `/admin`. Empty state: clear "No working draft" copy + dashboard CTA.
+- **`src/App.tsx`** — added two new route helpers (`FoundryStartRoute`, `FoundrySourceRoute`) following the established `AdminRoute` AppShell+AuthGate pattern. Breadcrumbs: "Admin flow › Course Foundry › New module" and "Admin flow › Course Foundry › Source material". Routes placed BEFORE `/admin/*` wildcard so specific paths match first.
+- **`src/features/admin/pages/AdminDashboardPage.tsx`** — single-import + single-prop change: added `useNavigate` import, flipped `<FoundryEntryCard isDisabled={true} />` → `<FoundryEntryCard onStart={() => navigate('/admin/foundry/start')} isDisabled={false} />`.
+- **`docs/architecture.md`** — added two new rows to the route table for the foundry routes.
+
+### Item D — Tests (`engineer`, after B+C, one mid-flight steer)
+**5 test files** (4 new + 1 modified + 1 cross-item fix):
+
+- `src/features/foundry/components/ModuleBasicsForm.test.tsx` (6 tests) — renders 6 fields, title min-length validation, estimated_minutes bounds, submit disabled until valid, valid submit invokes `onSubmit` with parsed shape, `initialValues` hydrate the form
+- `src/features/foundry/store/foundryDraftStore.test.ts` (4 tests) — initial null state, `setBasics` writes draft + sets `updated_at`, `clearDraft` resets, persistence writes Zustand-wrapped JSON to `localStorage['redex-foundry-draft-v1']`
+- `src/features/foundry/pages/FoundryStartPage.test.tsx` (3 tests) — eyebrow/H1/subhead/form render, submit navigates to source page (via MemoryRouter sentinel), pre-populated draft hydrates form
+- `src/features/foundry/pages/FoundrySourceStubPage.test.tsx` (3 tests) — empty state with no draft, working-draft card with draft populated, clear-draft button clears store + navigates
+- `src/App.routes.test.tsx` — modified `/admin` assertion (CTA now enabled, not disabled) + added 2 new tests for `/admin/foundry/start` and `/admin/foundry/source` routes
+- **Cross-item fix** (post-steer): updated `src/features/admin/pages/AdminDashboardPage.test.tsx` to wrap each render in `<MemoryRouter>` so the page's new `useNavigate()` consumer works. 4 existing tests now pass; CTA-enabled assertion updated.
+
+Zustand singleton handling: tests reset state via `beforeEach(() => { act(() => useFoundryDraftStore.getState().clearDraft()) })`. The agent also identified a real Zustand-persist hydration edge case (store reads `localStorage` at module load) and adjusted test setup accordingly.
+
+**Files touched** (18 total):
+- **New (10)**: 3 foundation files (types/schemas/store), 1 component, 2 pages, 4 test files
+- **Modified (7)**: `package.json` + `package-lock.json` (4 new deps), `src/types/training.ts`, `src/lib/education/index.ts`, `src/App.tsx` (2 routes), `src/features/admin/pages/AdminDashboardPage.tsx` (CTA flip), `src/App.routes.test.tsx` (1 modified + 2 new tests), `src/features/admin/pages/AdminDashboardPage.test.tsx` (Router wrap fix), `docs/architecture.md` (2 new route rows), `docs/redex_education_build_bible.md` (this entry)
+- **Deleted**: none
+- **Plan export** `prompt-exports/slice-2-2-plan.md` deleted after this Bible entry lands
+
+**Verification (orchestrator final run)**:
+- ✅ `npm run typecheck` — green
+- ✅ `npm run lint` — **0 errors / 0 warnings**
+- ✅ `npm test` — **83/83 passing** across **14 test files** (was 65/10 in Slice 2.1; **+18 tests / +4 files**)
+- ✅ `npm run test:coverage`:
+  - **Statements 86.54%** (was 83.34% — **+3.20 pts**)
+  - **Branches 88.13%** (was 89.96% — **-1.83 pts**; expected — new error-branch surface in ModuleBasicsForm isn't fully exercised yet)
+  - **Functions 69.01%** (was 68.42% — +0.59 pts)
+  - **Lines 86.54%** (was 83.34% — +3.20 pts)
+  - Per-foundry-file: ModuleBasicsForm 100% statements, FoundryStartPage 100%, FoundrySourceStubPage 100%, foundryDraftStore 100%, foundrySchemas 100% — every new file at 100% statement coverage
+- ✅ `npm run build` — green; bundle delta:
+  - App entry: 45.27 KB → 57.33 KB (+12 KB raw / +2.16 KB gzip — new pages/components)
+  - Vendor chunk: 66.30 KB → 152.41 KB (+86 KB raw / +23.27 KB gzip — zod + react-hook-form + zustand)
+  - Other chunks unchanged
+  - No new chunk-size warnings
+
+**Acceptance criteria** (from master roadmap Slice 2.2):
+- [x] **Form validates with Zod** — `moduleBasicsSchema` enforces all field constraints; RHF + `zodResolver` integration verified by 6 form tests
+- [x] **Admin can proceed to source upload step** — submit navigates `/admin/foundry/start` → `/admin/foundry/source`; the stub page proves the data flow by rendering the saved draft verbatim
+- [x] **Data persists locally in Zustand** — `useFoundryDraftStore` with `persist` middleware writes to localStorage key `redex-foundry-draft-v1`; verified by store tests + observable behavior (refresh-survives)
+- [x] **Build Bible updated** — this entry
+
+**Known gaps / out of scope (deferred to later slices)**:
+- Real source binder paste/upload + section parsing (Slice 2.3)
+- AI setup questions wizard (Slice 2.4)
+- AI outline generation + self-critique + side-by-side review (Phase 3 slices)
+- Supabase persistence (Phase 8 of master roadmap)
+- Form's branch coverage at 65.71% — some validation branches not yet exercised (out-of-bounds estimated_minutes via direct schema testing rather than form interaction). Acceptable for first pass; later slices can deepen.
+- `useFoundryDraftStore` could later expose `setSourceMaterial`, `setOutline`, etc. as more foundry steps land. Today it only handles basics.
+- `parent_course_id` currently shows just "Standalone module" + "Redex Academy Orientation" (the only existing course). When real course creation lands, this list grows.
+
+**Coordination notes**:
+- A blocked everything; B+C ran in parallel against prescribed contracts (Zod schema for A, prop interface for the form B→C consumes) — **zero file conflicts** held
+- The mid-flight Item D steer was correct orchestrator behavior: agent surfaced the cross-item test breakage rather than silently extending scope; widening the boundary in a steer is cleaner than letting the agent guess
+- Total time from plan to verified ship: 1 sequential A → 2 parallel (B||C) → 1 sequential D + 1 steer. Same efficiency profile as Slice 2.1
+- Predetermined-interface pattern (Slice 2.1 introduced; Slice 2.2 reinforced) — when the plan locks the cross-item contracts upfront, parallel agents need no negotiation
+
+**Naming guardrails honored**:
+- Redex Education = repo/platform ✓
+- Redex Academy = NOT in any new admin/foundry surface ✓ (appears only as a real published module title in the parent-course options, which is correct content)
+- Redex AI Course Foundry = page eyebrows, breadcrumb crumbs, all new surfaces ✓
+- Redex Training OS = not surfaced ✓
+- No real AI / Supabase / production auth wired ✓
+- No secrets introduced ✓
+
+**Next**: **Slice 2.3 — Source Binder paste/preview**. Linear ticket: `Source Binder: build markdown paste and preview step`. Should land:
+- `/admin/foundry/source` route — replace the stub page with the real source binder UI
+- `src/features/source-binder/pages/SourceBinderInputPage.tsx`
+- `src/features/source-binder/components/{SourcePastePanel,SourceUploadDropzone,SourcePreviewPanel}.tsx`
+- `src/features/source-binder/utils/markdownSections.ts` (parse markdown headings into source sections)
+- Extend `useFoundryDraftStore` with `sourceMaterial: SourceMaterial | null` + setters
+- Wire "Continue" from source page to Slice 2.4 stub OR similar disabled-with-tooltip pattern until 2.4 lands
+
+The stub page becomes the real surface; the data flow patterns established in Slice 2.2 (Zustand-backed draft persistence; predetermined contracts; parallel dispatch) carry forward unchanged.
+
+---
+
+## 2026-05-22 — Visual Fidelity Pass V1 (pre-Slice 2.3)
+
+**Status**: ✅ Completed — **first quality pass to ship in this codebase's history**. Inserted between Slice 2.2 and Slice 2.3 to lock the visual bar before more pages exist.
+
+**Type**: Quality pass, NOT a roadmap slice. No new features, no new state, no new dependencies. Polish only.
+
+**Context — why this happened now**:
+The user surfaced a strategic concern after reviewing `/learn/welcome` (premium hero quality, the bar) against `/learn` (functional but flat). With 5+ pages shipped (welcome, learner dashboard, module player, admin dashboard, foundry start, foundry source stub), lifting now meant **2-3 pages of work**; deferred until after Slices 2.3-2.6 it would have been **8+ pages**. The CEO Co-Pilot call: fix the foundation before scaling. The principle that emerges: **visual fidelity is its own concern with its own dispatch pattern, separate from feature work.**
+
+**Orchestration**:
+**Four sub-agents** driven from a 321-line plan at `prompt-exports/visual-fidelity-v1-plan.md`. Dispatch sequence:
+- **A (`design`, blocking)** — visual audit + write `docs/design-bar.md` codifying the standards
+- **B + C (`pair` × 2, parallel)** — apply the per-page delta checklists to disjoint files
+- **D (`engineer`)** — test sweep verifying the lifts didn't break behavioral assertions
+
+Session IDs (all cleaned up): Item A `E303A716…` (Gemini 3.1 Pro Preview — the `design` agent), Item B `6E52C9D8…`, Item C `1CB77A2B…`, Item D `D058BFC4…`.
+
+**Summary**:
+
+### Item A — `docs/design-bar.md` (`design`, blocking)
+The audit agent (Gemini 3.1 Pro Preview backing the `design` role) read the brand guide PDF, the welcome page code (the bar in TypeScript), and every current page, then produced a 111-line `docs/design-bar.md` with all 12 prescribed sections:
+
+1. **The bar** — `LearnerWelcomePage` is the visual reference
+2. **Typography scale** — extracted directly from welcome page code (e.g., hero headline `text-[34px] leading-[1.1] font-semibold tracking-[-1.75px]`; eyebrow `text-sm font-semibold uppercase tracking-[3px] text-redex-red`)
+3. **Spacing scale** — `space-y-6 md:space-y-8` between sections; card padding tiers `p-5`/`p-6`/`p-10 md:p-12`
+4. **Card depth tiers** — Tier 1 default, Tier 2 featured, Tier 3 hero — each with concrete Tailwind classes
+5. **Color usage** — reaffirms Phase 5's 60/30/10
+6. **Page anatomy archetypes** — Hero / Operational / Form / Detail / Immersive
+7. **Personalization standards** — first-name greeting, time-based "Good morning/afternoon", purposeful emoji only
+8. **Journey / progress viz patterns** — hero journey, compact journey, progress bar, metric tile
+9. **Footer reassurance pattern** — "Progress saves automatically" / "Your draft is saved automatically" / "🔒 Secure. Private. Built for your success."
+10. **Empty + loading states** — friendly empty patterns, animate-pulse skeletons
+11. **Anti-patterns** — including the critical catch: "red 0% on empty progress bar looks like an error state"
+12. **Per-page delta lists** — **15 deltas tagged CRITICAL/RECOMMENDED/OPTIONAL** across 4 pages; 2 pages explicitly noted as already meeting the bar
+
+This doc becomes the permanent design standard. Every future slice agent reads it; this prevents drift the way the Build Bible prevents architectural drift.
+
+### Item B — `LearnerDashboardPage` lift (`pair`, parallel with C)
+The biggest visible delta of the whole pass. Single file modified: `src/features/learner/pages/LearnerDashboardPage.tsx`. Changes:
+
+- **Eyebrow added**: "YOUR LEARNING DASHBOARD" in `text-sm font-semibold uppercase tracking-[3px] text-redex-red`
+- **Headline lifted** to `text-2xl md:text-3xl font-semibold tracking-tight` with `mt-2` from the eyebrow
+- **👋 wave emoji** appended to greeting ("Good morning, Marcus. 👋")
+- **"Continue where you left off" card promoted** from Tier 1 to Tier 2 (`shadow-md`, `p-6 md:p-8`, removed the `border-redex-red/20` accent)
+- **Progress bar thickened** from `h-2` to `h-3`
+- **CRITICAL anti-pattern fixed**: 0% label now muted gray; red color only applied when progress > 0 (via `progressValueClass = currentAssignment.progress > 0 ? 'text-redex-red' : 'text-slate-500'`)
+- **"Your Onboarding Progress" list upgraded**: text-only colored labels replaced with icon-driven rows — `CheckCircle2` emerald for Complete, animated amber dot (`bg-amber-500 animate-pulse`) for In Progress, `Circle` slate-400 for Not started; all icons marked `aria-hidden="true"` since the text labels provide the accessible name
+- **"Need Help?" card depth lifted** to `shadow-md`; "Message Sarah" button now uses the brand `Button variant='outline'` with `border-redex-red/20` accent
+- **OPTIONAL landed**: "Progress saves automatically" footer with `Lock` icon under the Continue Training button
+
+All preservation rules honored: `useMyProgress` hook unchanged, prop shapes unchanged, accessible names for "Continue Training" and "Message Sarah" preserved (so existing tests didn't break).
+
+### Item C — Admin + foundry lift (`pair`, parallel with B)
+Three files modified:
+
+**`AdminDashboardPage.tsx`**:
+- Eyebrow color/weight updated to the brand red style (`text-sm font-semibold uppercase tracking-[3px] text-redex-red`) — previously rendered in `text-slate-500`
+- Assignment summary promoted from a plain text line to a Tier 1 card with `<dl>` structure — three stats (active assignments / overdue / completion rate) rendered as labeled definition list with status icons
+
+**`FoundryStartPage.tsx`**:
+- Eyebrow color/weight matched to brand red style
+- Footer reassurance landed: "Your draft is saved automatically" with `Save` icon below the form
+
+**`FoundrySourceStubPage.tsx`**:
+- Eyebrow style updated (preserves the "· STEP 2" suffix)
+- "Working draft" card promoted from Tier 1 to Tier 2 (`shadow-md`, `p-6 md:p-8`)
+
+**`AdminMetricCard.tsx` and `CourseStatusList.tsx`** — verified by the agent as already Tier 1 compliant; no changes needed.
+
+**`FoundryEntryCard.tsx`** — design-bar declared "no changes needed (already meets hero tier)" — untouched.
+
+### Item D — Test sweep (`engineer`, after B+C)
+The agent ran the full test suite expecting some copy-mismatch assertions to need updates. **Zero failures.** Both `pair` agents respected the preservation rules (accessible names, structural composition, prop shapes) cleanly enough that all 83 existing assertions still resolved.
+
+- `npm test` → 83/83 passing, no test file edits required
+- `npm run typecheck` → green
+- `npm run lint` → 0/0
+- `npm run build` → green
+- `npm run test:coverage` → Statements 86.95% (+0.41), Branches 87.86% (-0.27), Functions 69.01% (even), Lines 86.95% (+0.41)
+
+The slight branch coverage drop (-0.27) traces to the new conditional render of the 0% progress label color in the dashboard — that ternary's "true" branch isn't exercised when the test scenario has progress > 0. Acceptable; could be tightened later with an explicit "renders muted at 0%" test.
+
+**Files touched** (7 total):
+- **New (1)**: `docs/design-bar.md`
+- **Modified (5)**: `src/features/learner/pages/LearnerDashboardPage.tsx`, `src/features/admin/pages/AdminDashboardPage.tsx`, `src/features/foundry/pages/FoundryStartPage.tsx`, `src/features/foundry/pages/FoundrySourceStubPage.tsx`, `docs/redex_education_build_bible.md` (this entry)
+- **Deleted**: none
+- **Plan export** `prompt-exports/visual-fidelity-v1-plan.md` deleted after this Bible entry
+
+**Verification (orchestrator final run)**:
+- ✅ `npm run typecheck` — green
+- ✅ `npm run lint` — **0 errors / 0 warnings**
+- ✅ `npm test` — **83/83 passing** (preserved exactly from Slice 2.2)
+- ✅ `npm run build` — green; bundle unchanged (CSS may have grown by ~50-200 bytes from new Tailwind class combinations, but no chunk-size warnings)
+- ✅ Coverage: 86.95% / 87.86% / 69.01% / 86.95% — preserved within tolerance
+- ✅ Visual spot-check confirmed via direct file read: the dashboard now has eyebrow + emoji + Tier 2 card depths + icon-driven progress + footer reassurance + the red-0% anti-pattern killed
+
+**Coordination notes**:
+- The design-bar.md doc was the orchestrating contract — B and C never collided because the per-page delta checklists were explicit and disjoint
+- Severity tagging (CRITICAL/RECOMMENDED/OPTIONAL) gave both agents clean priority signal without over-prescribing
+- B landed all 5 CRITICALs, both RECOMMENDEDs, and the OPTIONAL footer reassurance
+- C landed all 3 CRITICALs on the admin page, both CRITICALs on FoundryStartPage + the OPTIONAL, both CRITICALs on FoundrySourceStubPage + the RECOMMENDED
+- D had zero work because B and C strictly preserved accessible names — the test suite's `getByRole`/`getByText` queries continued resolving
+- The whole pass executed in **4 sub-agent dispatches** (one design + two pair parallel + one engineer)
+
+**Known gaps / out of scope (deferred)**:
+- No regression test added for the red-0%-vs-muted-0% behavior — branch coverage dropped 0.27 because of this; could be tightened in Slice 2.3's Item D if convenient
+- No visual regression tests / screenshot diffs — text-based test sweep was sufficient for this pass; Playwright deferred
+- `LearnerDashboardPage.tsx` still uses static fallback names ("Marcus" if no learner prop); when real auth lands, that disappears
+- `AdminDashboardPage.tsx` still uses "Welcome back, Admin" (static); same plug-in point for real auth
+- Time-of-day greeting (mentioned as optional in the bar doc): not implemented this pass; could land later as a tiny polish PR. Static "Good morning" preserved for now.
+
+**Naming guardrails honored**:
+- Redex Education = repo/platform ✓ (Bible header, design-bar.md header)
+- Redex Academy = learner-facing ✓ (dashboard surfaces)
+- Redex AI Course Foundry = admin engine ✓ (admin + foundry surfaces)
+- Redex Training OS = not surfaced ✓
+- No real AI / Supabase / production auth wired ✓
+- No secrets introduced ✓
+
+**The new orchestration pattern this pass established**:
+Visual fidelity work is a category of its own. The `design` agent's natural medium (markdown reports under `docs/`) becomes the **shared contract** the `pair` lift agents execute against. This is the same pattern as Slice 2.1/2.2's "predetermined contracts" — but the contract is a markdown design spec rather than a TypeScript prop interface. **For any future visual concern, repeat this pattern**: design agent writes the spec, multiple pair agents apply it in parallel to disjoint files, an engineer agent verifies tests survive.
+
+**Next**: Resume the master roadmap at **Slice 2.3 — Source Binder paste/preview**. Linear ticket: `Source Binder: build markdown paste and preview step`. Every Slice-2.3 agent must consult `docs/design-bar.md` for visual standards. The stub page at `/admin/foundry/source` becomes the real surface with markdown paste + section parsing + preview panel.
+
+---
+
+## 2026-05-22 — Slice 2.3: Source Binder paste/preview
+
+**Status**: ✅ Completed — third slice of the master roadmap shipped post-remediation.
+
+**Master roadmap reference**: Phase 2 (Admin Course Foundry Prototype) / Slice 2.3.
+**Linear ticket**: `Source Binder: build markdown paste and preview step`.
+
+**Context**:
+Slice 2.2 left `/admin/foundry/source` rendering `FoundrySourceStubPage` (a placeholder that proved Zustand draft persistence). Slice 2.3 replaces that stub with a real Source Binder workspace: paste-markdown textarea + mocked file upload + live preview of parsed sections, with placeholder-content warnings. The new surface lives under a new `src/features/source-binder/` directory (per roadmap structure) and consumes the existing `useFoundryDraftStore` via a new `sourceMaterial` slice.
+
+**Orchestration**:
+**Four `engineer` sub-agents** driven from a 579-line plan at `prompt-exports/slice-2-3-plan.md`. Dispatch sequence followed the Slice 2.1/2.2 pattern: A blocking → B||C parallel → D sequential. One mid-flight steer on Item C (agent correctly stopped before deleting stub files to surface remaining references; orchestrator classified them as test-handled-by-D or historical-preserved and approved the deletion).
+
+Session IDs (all cleaned up): Item A `64CEC1BB…`, Item B `34DCB7CC…`, Item C `2B8BFF2D…`, Item D `0CC048F1…`.
+
+**Summary**:
+
+### Item A — Foundation (`engineer`, blocking)
+- **`src/types/training.ts`** — new `SourceSection` interface (id, level 0-6, heading, body, position_index, has_placeholders); extended existing `SourceMaterial` with `raw_text?: string` and `sections: SourceSection[]`
+- **`src/lib/education/index.ts`** — re-exported `SourceSection` alphabetically in the facade
+- **`src/features/foundry/store/foundryDraftStore.ts`** — extended with `sourceMaterial: SourceMaterial | null`, `setSourceMaterial(material)`, `clearSourceMaterial()`. Existing `currentDraft` slice unchanged. `clearDraft` does NOT clear `sourceMaterial` (independent slices). Persist key stays `redex-foundry-draft-v1` (Zustand handles additive shape).
+- **`src/features/source-binder/utils/markdownSections.ts`** (new, 92 lines) — pure utility, no React. `parseMarkdownSections(rawText: string): SourceSection[]` plus exported `PLACEHOLDER_TOKENS` const. Line-walk parser handling: empty input, headings 1-6, code-fence safety (`#` inside ` ``` ` blocks is not a heading), preamble for content before first heading, stable IDs (`section-${index}-${slug}`), placeholder detection (`[PLACEHOLDER]`, `[TODO]`, `[FIXME]`, `[PLACEHOLDER —` em-dash variant), body whitespace trimming with internal blank lines preserved.
+
+### Item B — Three atomic components (`engineer`, parallel with C)
+All three under `src/features/source-binder/components/`, all matching the plan's prescribed prop interfaces exactly:
+- **`SourcePastePanel.tsx`** (104 lines) — Tier 1 card with `<h2>` "Paste source material"; three controlled fields (title text input, type native select with 5 options, markdown textarea `rows={12}` `font-mono`); helper text appears when non-markdown type selected. ARIA-correct: labels with `htmlFor`, `aria-required="true"`.
+- **`SourceUploadDropzone.tsx`** (74 lines) — dashed Tier 1 card; `<label>` wrapping a visually hidden `<input type="file" accept=".md,.markdown,text/markdown,text/plain">`; `FileReader.readAsText` → `onFileLoaded({ filename, rawText })`. `hasUpload` success state with `CheckCircle2` emerald icon. **Drag-and-drop landed as bonus** (the agent included it because it composed cleanly).
+- **`SourcePreviewPanel.tsx`** (73 lines) — Tier 1 card with `<h2>` "Preview"; section count summary with placeholder count when > 0; scrollable list (`max-h-[60vh] overflow-y-auto`); each section as `<article>` with heading sized by level, body preview (200 chars + ellipsis), amber "Needs source" pill with `AlertTriangle` icon when `has_placeholders === true`. Tasteful empty state.
+
+### Item C — Page composition + route wire + stub deletion (`engineer`, parallel with B)
+- **`src/features/source-binder/pages/SourceBinderInputPage.tsx`** (131 lines) — eyebrow "REDEX AI COURSE FOUNDRY · STEP 2" (red brand style per `docs/design-bar.md`), H1 "Add source material", subhead, then a two-column workspace (`lg:grid-cols-12 gap-6`): left column (`lg:col-span-7`) holds `SourcePastePanel` stacked above `SourceUploadDropzone`; right column (`lg:col-span-5`) holds `SourcePreviewPanel`. Action footer: "← Back to basics" left; "Clear source" outline + "Continue → Setup questions" primary-disabled (with tooltip "Coming in Slice 2.4 — AI setup questions wizard") right. Local state for the controlled fields hydrated from `useFoundryDraftStore.getState().sourceMaterial`; every `rawText` change re-parses via `parseMarkdownSections` and writes back to the store. Stable `id` per page mount via `useRef`. No-draft fallback: when both `currentDraft` and `sourceMaterial` are null, the page renders an info card directing the admin back to `/admin`.
+- **`src/App.tsx`** — replaced `FoundrySourceStubPage` import with `SourceBinderInputPage`; `FoundrySourceRoute` renders the new page; breadcrumb unchanged.
+- **Deleted**: `src/features/foundry/pages/FoundrySourceStubPage.tsx` and `src/features/foundry/pages/FoundrySourceStubPage.test.tsx` (verified zero non-test/non-historical references via `file_search` before deletion).
+- **`docs/architecture.md`** — `/admin/foundry/source` row updated: component column → `FoundrySourceRoute → SourceBinderInputPage`; notes → "Course Foundry source binder — paste markdown, parse headings into sections, preview".
+
+### Item D — Tests (`engineer`, after B+C)
+**+28 net new tests** across 6 new files and 2 modified:
+- `src/features/source-binder/utils/markdownSections.test.ts` — **10 tests** (empty / no-headings / single H1 / H1+H2 / mixed levels / leading paragraph / code-fence safety / placeholder detection / stable IDs / body trimming)
+- `src/features/source-binder/components/SourcePastePanel.test.tsx` — 3 tests
+- `src/features/source-binder/components/SourceUploadDropzone.test.tsx` — 3 tests (including a real `new File(['# Test'], 'test.md')` + `FileReader` integration)
+- `src/features/source-binder/components/SourcePreviewPanel.test.tsx` — 3 tests
+- `src/features/source-binder/pages/SourceBinderInputPage.test.tsx` — 4 tests (composition, parse-on-type behavior, file upload populates preview, disabled-Continue tooltip)
+- `src/features/foundry/store/foundryDraftStore.test.ts` — extended from 4 → 9 tests (new sourceMaterial slice: initial null / setSourceMaterial / clearSourceMaterial / clearDraft independence / persistence)
+- `src/App.routes.test.tsx` — `/admin/foundry/source` assertion strengthened to query a SourceBinderInputPage-specific element (the new eyebrow) instead of the H1 that the deleted stub also used
+
+One small deviation: in the page test, the upload heading is queried by `getByText('Upload a markdown file')` (rather than `getByRole('heading')`) because that string renders in a `<p>`, not a heading element. Documented and accepted.
+
+**Files touched** (17 total):
+- **New (9)**: `markdownSections.ts`, 3 components (`SourcePastePanel`/`SourceUploadDropzone`/`SourcePreviewPanel`), `SourceBinderInputPage.tsx`, 4 test files (`markdownSections.test.ts`, 3 component tests)
+- **New page test (1)**: `SourceBinderInputPage.test.tsx`
+- **Modified (5)**: `src/types/training.ts`, `src/lib/education/index.ts`, `src/features/foundry/store/foundryDraftStore.ts`, `src/features/foundry/store/foundryDraftStore.test.ts`, `src/App.tsx`, `src/App.routes.test.tsx`, `docs/architecture.md`, `docs/redex_education_build_bible.md` (this entry)
+- **Deleted (2)**: `src/features/foundry/pages/FoundrySourceStubPage.tsx`, `src/features/foundry/pages/FoundrySourceStubPage.test.tsx`
+- **Plan export** `prompt-exports/slice-2-3-plan.md` deleted after this entry lands
+
+**Verification (orchestrator final run)**:
+- ✅ `npm run typecheck` — green
+- ✅ `npm run lint` — **0 errors / 0 warnings**
+- ✅ `npm test` — **108/108 passing** across **18 test files** (was 83/14 going in; -3 from stub-test deletion, +28 from new = +25 net)
+- ✅ `npm run test:coverage`:
+  - **Statements 87.59%** (was 86.95% — **+0.64**)
+  - **Branches 88.45%** (was 87.86% — +0.59)
+  - **Functions 70.83%** (was 69.01% — **+1.82**)
+  - **Lines 87.59%** (was 86.95% — +0.64)
+- ✅ `npm run build` — green; app entry grew 57.33 KB → 66.27 KB (+9 KB, gzip +3.85 KB) from the new source-binder code; vendor chunks essentially unchanged; CSS marginal growth (+2.83 KB) for new utility combinations; no new chunk-size warnings
+
+**Acceptance criteria** (master roadmap Slice 2.3):
+- [x] **Admin can paste markdown** — `SourcePastePanel` textarea, controlled by page state
+- [x] **System parses headings into simple source sections** — `parseMarkdownSections` with stable IDs + code-fence safety + 6 heading levels
+- [x] **Source preview shows parsed sections** — `SourcePreviewPanel` renders count summary + per-section heading, body preview, placeholder badge
+- [x] **No AI generation yet** — pure parser, no API calls
+- [x] **Build Bible updated** — this entry
+
+**Known gaps / out of scope (deferred)**:
+- AI setup questions wizard (Slice 2.4 — the disabled "Continue" button points here)
+- PDF / DOCX / Notion / web URL ingestion (type select includes these but processing is paste-only)
+- Real file upload to a backend (this slice uses FileReader; no network)
+- Real Supabase persistence (Phase 8 of master roadmap)
+- Drag-and-drop file drop fully supported but not test-covered (visual-only behavior, low risk)
+- Multi-source-document handling (one `sourceMaterial` per draft today)
+
+**Naming guardrails honored**:
+- Redex Education = repo/platform ✓
+- Redex Academy = not surfaced in admin/foundry UI ✓
+- Redex AI Course Foundry = page eyebrow, breadcrumb ✓
+- Redex Training OS = not surfaced ✓
+- No real AI / Supabase / production auth wired ✓
+- No secrets introduced ✓
+
+**Next**: **Slice 2.4 — AI Setup Questions Wizard**. Linear ticket: `Foundry: build AI setup questions wizard`. The disabled "Continue → Setup questions" button gets flipped to enabled with `onClick` navigating to `/admin/foundry/questions` (new route). The wizard captures Criticality (Informational / Basic Knowledge / Operational / Compliance-Safety-High-Risk) and Assessment style (No assessment / Light quiz / Standard quiz / Strict quiz / Scenario-based / Acknowledgment only) plus the other question groups from the master roadmap section 14. Continues the established pattern: Zustand draft store extended with `setupAnswers`, prescribed contracts in the plan, parallel dispatch where independent.
+
+---
+
+## 2026-05-22 — Architecture Revision: Drive-Based Source Model (CEO Co-Pilot)
+
+A six-angle audit of the live codebase (codebase reality-check, Supabase data model, Course Foundry app, UI/design system, source ingestion & binding, change detection & staleness) drove a revision of the master roadmap and the structured sections of this Build Bible. **No code was changed; no completed-work log entries above were altered.**
+
+**Decisions locked:**
+
+- **Google Drive is the source-material intake.** A `_library/` zone of canonical source files by topic; a `modules/` zone of per-module folders, each with a `00-manifest.md`. Source files referenced by stable Drive file ID; each carries an `authority` level (authoritative / supporting / context). Conflict resolution: authoritative > supporting > context; equal-authority conflicts are flagged for a human, never auto-resolved.
+- **Notion is dropped.** The registry lives in Supabase / the app. Recorded in ADR 010.
+- **Doc usage:** generation-time grounding now; live runtime grounding (learner Q&A) is a later phase.
+
+**Roadmap changes:**
+
+- New **Slice 2.4 — Source Library & Drive Ingestion** inserted after Slice 2.3. The old Slice 2.4 (AI Setup Questions Wizard) is renumbered to **Slice 2.5**.
+- Phase 3 intro, Phase 4 type list, Slice 7.3 (rewritten from a mock stub into a real source-change-detection spec), and Slice 8.2 (schema) updated for the Drive source model and the module↔source binding.
+- "Live Policy Sync — Google Drive" promoted out of the Phase-3 moonshot backlog into MVP (Slice 2.4).
+
+**Build Bible changes:** Sections 6 (Current Phase), 10 (Open Decisions), 11 (Known Gaps), 12 (Database Changes), and Pillar 3 corrected. Sections 16 (Linear Ticket Mapping) and 17 (Acceptance Criteria) remain stale and are Codex's to reconcile against its own commit log.
+
+**Boundary respected:** Slice 2.3 was under active build when this revision began and completed during it; its roadmap spec text and completed-work log entry were deliberately left untouched. The Drive model lands as the new Slice 2.4.
+
+**⚠ Corrected next build target — this supersedes the "Next" line in the Slice 2.3 entry above:**
+
+The Slice 2.3 entry names the next slice as "Slice 2.4 — AI Setup Questions Wizard." That work is now **Slice 2.5**. The next build target is the **new Slice 2.4 — Source Library & Drive Ingestion** (Google Drive `_library/` integration, source ingestion, module↔source binding). Re-read the master roadmap before starting — the Phase 2 slice list is now 2.1, 2.2, 2.3, 2.4 (Source Library), 2.5 (Setup Questions). The Setup Questions wizard follows the Source Library.
+
+**New ADR:** `docs/decisions/010-drive-source-library-notion-dropped.md`.
+
+---
+
+## 2026-05-22 — Slice 2.4: Source Library & Drive Ingestion
+
+**Status**: ✅ Code-deliverable items complete · ⏳ operator deployment steps documented in runbook (gated on user-executed Supabase + GCP setup)
+
+**Master roadmap reference**: Phase 2 (Admin Course Foundry Prototype) / Slice 2.4 (per Architecture Revision).
+**Linear ticket**: `Source Binder: build Google Drive Source Library and ingestion`.
+**ADR**: `docs/decisions/010-drive-source-library-notion-dropped.md`.
+
+**Context**:
+First slice to ship real backend infrastructure. Replaces the Slice 2.3 paste-markdown-only intake with Google Drive as the primary source-material surface, while keeping paste as a secondary input. Source files referenced by stable Drive file ID with an authority enum (`authoritative` > `supporting` > `context`), parsed into sections, and bound to modules by version — the foundation for source-grounded generation (Phase 3) and source-change detection (Slice 7.3).
+
+**Orchestration**:
+**5 sub-agents** driven from an 808-line plan at `prompt-exports/slice-2-4-plan.md`. Pattern: A blocking → B/C parallel → D parallel with C → E sequential. The user concurrently completed Drive setup via a separate agent — co-work pattern; this orchestrator handed the user a Drive structural brief in chat, the user's agent executed it, and the user reported back with the resolved folder ID (`GOOGLE_DRIVE_LIBRARY_FOLDER_ID = 1_a_C2WgpG2BXYhssypWPXPydvOiAE5Hb`).
+
+Mid-flight: ESLint flagged the new `supabase/functions/**` Deno files (URL imports, `Deno` global) — orchestrator added `supabase/functions/**` to ESLint `globalIgnores` (same pattern as `_archive/**`). One-line config fix; Deno code remains independently checked via `deno check`.
+
+Session IDs (all cleaned up): A `C0B65B1C…`, B `491A1CAB…`, C `3DC79FA3…`, D `9680B3D8…`, E `D79E83E3…`.
+
+**Summary**:
+
+### Item A — Schema + canonical types + Row aliases (`engineer`, blocking)
+- **`supabase/migrations/20260522220557_source_library_v1.sql`** (already on disk, verified to match plan A.1) — 4 tables (`source_files`, `source_file_versions`, `source_sections`, `module_source_bindings`), 2 enum types (`source_authority_level`, `source_file_processing_status`), indices on `topic`/`authority`/`source_file_id`/`module_id`, RLS enabled with `authenticated`-role-permissive policies plus in-migration comment noting RLS will tighten to admin-role once profiles + role-checking land
+- **`src/types/training.ts`** — added canonical types `SourceAuthorityLevel`, `SourceFile`, `SourceFileVersion`, `ModuleSourceBinding`
+- **`src/lib/education/index.ts`** — re-exported all four
+- **`src/integrations/supabase/db-rows.ts`** — added `SourceFileRow`, `SourceFileVersionRow`, `SourceSectionRow`, `ModuleSourceBindingRow` with Slice 8.3 mapper deferral comment
+
+### Item B — Manifest + frontmatter parser (`engineer`, parallel)
+- **`src/features/source-binder/lib/manifest.ts`** (216 lines) — pure utility, no React, no deps. Three exported functions: `parseFrontmatter`, `parseMetaMd`, `parseManifest`. Hand-rolled YAML mini-parser. Index-based, start-anchored frontmatter detection (only matches leading `---\n...\n---\n`, ignores body `---` lines including code-fence boundaries). Unknown/missing `authority` defaults to `'context'` with `authority_source: 'default'`. `parseManifest` throws on missing `module_slug` (robust over-silent).
+
+### Item C — Edge functions + service-account auth (`pair`, parallel)
+- **`supabase/functions/_shared/google-jwt.ts`** (179 lines) — Deno-native JWT signer. Reads `GOOGLE_SERVICE_ACCOUNT_JSON` from env, parses PKCS8 PEM private key, imports via `crypto.subtle.importKey('pkcs8', ...)`, signs RS256 JWT, exchanges at `https://oauth2.googleapis.com/token` for OAuth access token. In-memory token cache keyed by `client_email`, 50-minute TTL.
+- **`supabase/functions/_shared/parsers.ts`** (213 lines) — Deno-compatible ports of `parseMarkdownSections` + `parseFrontmatter` + `parseMetaMd`. Intentional small duplication with the frontend `src/features/source-binder/lib/manifest.ts` (different module-resolution contexts; ports stay simple).
+- **`supabase/functions/drive-sync/index.ts`** (352 lines) — POST/OPTIONS handler. Recursively walks the configured `_library/` folder via Drive API v3 `files.list?q=...in parents and trashed=false`. Upserts `source_files` keyed on `drive_file_id`. Fire-and-forget invokes `parse-source-file` for each. Returns the prescribed summary shape.
+- **`supabase/functions/parse-source-file/index.ts`** (533 lines) — POST/OPTIONS handler. Fetches Drive file content (`files.get?alt=media`), parses markdown bodies via `parseFrontmatter` → updates authority on `source_files` → parses body into sections via `parseMarkdownSections` → batch-inserts `source_sections`. For binaries: SHA-256 content hash, sibling `.meta.md` lookup for authority. Idempotent upserts on `(source_file_id, head_revision_id)` make repeated syncs safe.
+- All 4 files pass `deno check` locally.
+
+### Item D — Frontend + page + Source Binder integration (`pair`, parallel)
+- **3 atomic components** (per prescribed prop interfaces):
+  - `DriveSyncButton.tsx` (134 lines) — primary Redex red button; invokes `supabase.functions.invoke('drive-sync', {...})`; spinner during run; success/error toasts via Sonner; fires the prescribed callbacks
+  - `SourceAuthorityBadge.tsx` (34 lines) — pill component with three brand-correct variants (red for authoritative + ShieldCheck; amber for supporting + Info; slate for context + Tag)
+  - `SourceLibraryBrowser.tsx` (131 lines) — groups files by topic; each row title + authority badge + last-modified + optional checkbox; friendly empty state with "click Sync to begin" prompt
+- **`useSourceLibrary.ts`** (92 lines) — hook reading `source_files` from Supabase; returns `{ files, loading, error, refresh }`; handles env-less environments gracefully (empty array, no crash)
+- **`SourceLibraryPage.tsx`** (129 lines) — Operational archetype: eyebrow "REDEX AI COURSE FOUNDRY · SOURCE LIBRARY", H1 "Source Library", subhead, sync button + last-synced timestamp, topic filter, browser, footer card linking to ADR 010
+- **`foundryDraftStore.ts`** extended (56 lines total) with `selectedLibraryFileIds` slice + `toggleLibraryFile` + `clearLibrarySelection` actions; persisted via existing middleware
+- **`SourceBinderInputPage.tsx`** integration (151 lines) — new "Browse the Source Library" Tier 1 card prepended above the existing paste/upload/preview workflow; navigates to `/admin/foundry/library`
+- **`App.tsx`** (141 lines) — added `SourceLibraryRoute` helper following established pattern; new `/admin/foundry/library` route placed BEFORE `/admin/*` wildcard
+- **`docs/architecture.md`** — new route table row for `/admin/foundry/library`
+
+### Item E — Tests + README env section + deploy runbook (`engineer`, after all)
+- **20 new tests** across 6 new test files + 2 extended existing files; total tests **108 → 128 passing** across 24 files (1 Deno-only file skipped in Vitest, runs separately under `deno test` with 3 passing)
+- **`README.md`** — added "Source Library setup (Slice 2.4)" subsection (120 lines added to README) covering the env var distinction (frontend `.env` vs Supabase Edge Function secrets — the Google service-account JSON never reaches the browser)
+- **`prompt-exports/SLICE_2_4_DEPLOY.md`** (58 lines, NEW) — operator runbook with **front-loaded user-action checklist** (Drive structure + GCP setup) followed by the technical deploy commands (`supabase secrets set`, `supabase db push`, `supabase functions deploy`). Uses `<PLACEHOLDER>` everywhere — no real folder IDs or SA emails baked in.
+
+### Orchestrator inline fix
+- **`eslint.config.js`** — added `supabase/functions/**` to `globalIgnores` (same pattern as `_archive/**`). Deno files use URL imports + `Deno` global; they're outside browser/Node ESLint scope. Verified separately via `deno check`. One-line config tightening; lint went from "Item D in-flight reported a future-blocker" to 0/0 clean.
+
+**Files touched** (~30 total):
+- **New (16)**: 1 migration SQL, 1 frontend lib (`manifest.ts`), 4 Deno files, 4 components, 1 hook, 1 page, 6 new test files, 1 deploy runbook
+- **Modified (8)**: `src/types/training.ts`, `src/lib/education/index.ts`, `src/integrations/supabase/db-rows.ts`, `src/features/foundry/store/foundryDraftStore.ts` (+ its `.test.ts`), `src/features/source-binder/pages/SourceBinderInputPage.tsx`, `src/App.tsx` (+ `src/App.routes.test.tsx`), `eslint.config.js`, `docs/architecture.md`, `README.md`, `docs/redex_education_build_bible.md` (this entry)
+- **Deleted**: none
+- **Plan export** `prompt-exports/slice-2-4-plan.md` deleted after this Bible entry
+
+**Verification (orchestrator final run)**:
+- ✅ `npm run typecheck` — green
+- ✅ `npm run lint` — **0 errors / 0 warnings** (after the `supabase/functions/**` ignore added)
+- ✅ `npm test` — **128/128 passing** across **24 test files** (1 Deno-only skipped in Vitest, runs separately under `deno test`)
+- ✅ `npm run test:coverage`:
+  - **Statements 86.32%** (was 87.59% — **-1.27**)
+  - **Branches 85.15%** (was 88.45% — -3.30)
+  - **Functions 74.19%** (was 70.83% — **+3.36**)
+  - **Lines 86.32%** (was 87.59% — -1.27)
+  - Statement/branch dips are expected — new components (DriveSyncButton, SourceLibraryBrowser, SourceLibraryPage) landed with smoke-level test coverage; error paths and conditional branches aren't all exercised yet. Function coverage rose because the new exported functions are mostly all called. Acceptable trade-off for a large new feature surface; future slices can deepen.
+- ✅ `npm run build` — green; app entry grew 57 KB → ~78 KB raw (~19.9 KB gzip; +5 KB gzip) from the new components + hook + page. Vendor chunks unchanged. Supabase vendor chunk is present (200 KB raw / 51 KB gzip).
+- ✅ Deno: `deno check` passes locally for all 4 edge function files; `deno test supabase/functions/_shared/parsers.test.ts` → 3/3 passing.
+
+**Acceptance criteria** (from master roadmap Slice 2.4):
+- ✅ Admin can connect Drive and browse the `_library/` Source Library (UI ships; activation requires Part 2-4 of the runbook)
+- ✅ Source files ingest with their Drive file ID, authority level, and parsed sections (edge functions ship; activation requires deploy)
+- ✅ A module records which source files (and versions) it was built from (schema + types in place; binding writes land when modules become real DB rows in later slices)
+- ✅ Manifest is parsed advisory-only; the app's binding records are authoritative (encoded in types + parser docstrings)
+- ✅ Paste path from Slice 2.3 still works as a secondary input (no Slice 2.3 surface modified; "Browse Source Library" prepended as an entry option without disturbing paste/upload/preview)
+- ✅ Build Bible updated (this entry)
+
+**Operator-gated deployment** (documented in `prompt-exports/SLICE_2_4_DEPLOY.md`):
+- ⏳ `supabase db push` — apply the migration to the project
+- ⏳ `supabase secrets set GOOGLE_SERVICE_ACCOUNT_JSON=...`
+- ⏳ `supabase secrets set GOOGLE_DRIVE_LIBRARY_FOLDER_ID=1_a_C2WgpG2BXYhssypWPXPydvOiAE5Hb`
+- ⏳ `supabase functions deploy drive-sync && supabase functions deploy parse-source-file`
+- ⏳ Smoke test: click "Sync from Drive" on `/admin/foundry/library`; expect file counts in the success toast
+
+**Known gaps (deferred to later slices)**:
+- Scheduled polling sync (Slice 7.3 fast-follow — Drive watch channels deferred further still)
+- Per-user OAuth (service-account only for v1)
+- Conflict resolution UI for equal-authority sources (Slice 3.4 side-by-side review)
+- Source impact review UI (Slice 7.3)
+- PDF/DOCX/Notion/web URL parsing beyond metadata (v1 records the file + meta; markdown body parsing only)
+- Binding row inserts (`module_source_bindings`) — schema + types ready, but writes wait until modules become real DB rows (Slice 8.x)
+- File ownership note: the user's Drive folder/files are owned by `hatchbendcards@gmail.com` (not the primary `blewis@lewisinsurance.com`). Doesn't affect the SA's API read access (Viewer permission is independent of ownership). If long-term stability matters, consider transferring ownership to a Workspace-managed account or moving the structure into a Shared Drive.
+
+**Naming guardrails honored**:
+- Redex Education = repo/platform ✓
+- Redex Academy = not surfaced in admin/foundry UI ✓
+- Redex AI Course Foundry = page eyebrow, breadcrumb, all foundry surfaces ✓
+- Redex Training OS = not surfaced ✓
+
+**Next**: Slice 2.5 — AI Setup Questions Wizard (renumbered from old 2.4 per the Architecture Revision). Captures the question groups from master roadmap §14 (course/module identity, audience, training type, criticality, assessment style, experience style, timing, source control, approval requirements). Extends `useFoundryDraftStore` with a `setupAnswers` slice. The disabled "Continue → Setup questions" button on the Source Binder gets wired.
 
 ---
 

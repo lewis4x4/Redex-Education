@@ -12,11 +12,9 @@ if (!hasSupabaseEnv) {
     '[supabase] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. ' +
     'Copy .env.example to .env and fill in real values, or keep VITE_MOCK_AUTH=true for local/mock flows.';
 
-  if (import.meta.env.DEV && !MOCK_AUTH_ENABLED) {
+  if (!MOCK_AUTH_ENABLED) {
     throw new Error(message);
   }
-
-  console.warn(message);
 }
 
 // Never pass empty URL/key to Supabase client creation.

@@ -41,12 +41,13 @@ export type {
   UUID,
   ISODateTime,
   // Enums
-  LessonType,
   Criticality,
-  ProgressStatus,
   CourseStatus,
   EnrollmentStatus,
   GenerationStatus,
+  LessonType,
+  ProgressStatus,
+  TrainingType,
   // Core entities
   LearnerProfile,
   Course,
@@ -74,11 +75,19 @@ export type {
   Enrollment,
   LessonProgress,
   // Foundry
-  SourceMaterial,
   CourseOutlineDraft,
+  ModuleSourceBinding,
+  SourceAuthorityLevel,
+  SourceFile,
+  SourceFileVersion,
+  SourceMaterial,
+  SourceSection,
   // Facade contract
   EducationFacade,
   // UI helpers
+  AdminDashboardMetrics,
+  AdminDashboardSummary,
+  AdminModuleListItem,
   LearnerDashboardSummary,
 } from '@/types/training';
 
@@ -91,3 +100,5 @@ export {
   DEMO_ENROLLMENT,
   DEMO_VALUES_QUIZ_QUESTIONS,
 };
+
+export { TRAINING_TYPE_LABELS } from '@/types/training';

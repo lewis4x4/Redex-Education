@@ -2,10 +2,13 @@ import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-do
 import AuthGate from '@/components/auth/AuthGate'
 import { AppShell } from '@/components/layout/AppShell'
 import { NotFoundPage } from '@/components/layout/NotFoundPage'
-import { LearnerWelcomePage } from '@/features/learner/pages/LearnerWelcomePage'
+import { AdminDashboardPage } from '@/features/admin/pages/AdminDashboardPage'
+import { FoundryStartPage } from '@/features/foundry/pages/FoundryStartPage'
+import { SourceBinderInputPage } from '@/features/source-binder/pages/SourceBinderInputPage'
+import { SourceLibraryPage } from '@/features/source-binder/pages/SourceLibraryPage'
 import { LearnerDashboardPage } from '@/features/learner/pages/LearnerDashboardPage'
+import { LearnerWelcomePage } from '@/features/learner/pages/LearnerWelcomePage'
 import { ModulePlayer } from '@/features/learner/components/ModulePlayer'
-import { AdminPlaceholderPage } from '@/features/admin/pages/AdminPlaceholderPage'
 import { useEducation } from '@/hooks/useEducation'
 import type { ProgressStatus } from '@/lib/education'
 
@@ -75,7 +78,37 @@ function AdminRoute() {
   return (
     <AppShell breadcrumb="Admin flow › Course Foundry">
       <AuthGate>
-        <AdminPlaceholderPage />
+        <AdminDashboardPage />
+      </AuthGate>
+    </AppShell>
+  )
+}
+
+function FoundryStartRoute() {
+  return (
+    <AppShell breadcrumb="Admin flow › Course Foundry › New module">
+      <AuthGate>
+        <FoundryStartPage />
+      </AuthGate>
+    </AppShell>
+  )
+}
+
+function FoundrySourceRoute() {
+  return (
+    <AppShell breadcrumb="Admin flow › Course Foundry › Source material">
+      <AuthGate>
+        <SourceBinderInputPage />
+      </AuthGate>
+    </AppShell>
+  )
+}
+
+function SourceLibraryRoute() {
+  return (
+    <AppShell breadcrumb="Admin flow › Course Foundry › Source Library">
+      <AuthGate>
+        <SourceLibraryPage />
       </AuthGate>
     </AppShell>
   )
@@ -98,6 +131,9 @@ export default function App() {
       <Route path="/learn/player" element={<LearnerModuleRoute />} />
       <Route path="/learn/player/:moduleId" element={<LearnerModuleRoute />} />
       <Route path="/admin" element={<AdminRoute />} />
+      <Route path="/admin/foundry/start" element={<FoundryStartRoute />} />
+      <Route path="/admin/foundry/source" element={<FoundrySourceRoute />} />
+      <Route path="/admin/foundry/library" element={<SourceLibraryRoute />} />
       <Route path="/admin/*" element={<AdminRoute />} />
       <Route path="*" element={<NotFoundRoute />} />
     </Routes>

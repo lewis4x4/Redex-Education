@@ -20,6 +20,19 @@ This is the build roadmap.
 
 ---
 
+## Revision Note — 2026-05-22 (Architecture Revision)
+
+This roadmap was revised on 2026-05-22 after a six-angle audit of the live codebase. Key changes:
+
+1. The **Source Binder now has two intake paths** — paste markdown (Slice 2.3, unchanged) and a **Google Drive Source Library** (new Slice 2.4).
+2. The old Slice 2.4 (AI Setup Questions Wizard) is renumbered to **Slice 2.5**.
+3. Phase 3, Phase 4, Slice 7.3, and Slice 8.2 were updated to reference the Drive-based source model and the module↔source binding.
+4. **Notion is not used** — the registry lives in Supabase. Rationale: `docs/decisions/010-drive-source-library-notion-dropped.md`.
+
+Slice 2.3's spec text was deliberately left untouched — it was under active build at revision time.
+
+---
+
 # 1. Product Name
 
 **Redex Education**  
@@ -869,7 +882,72 @@ Source Binder: build markdown paste and preview step
 
 ---
 
-## SLICE 2.4 — AI Setup Questions Wizard
+## SLICE 2.4 — Source Library & Drive Ingestion
+
+### Goal
+
+Connect the Course Foundry to a Google Drive **Source Library** so admins can build modules from real, versioned Redex source material — not only pasted markdown.
+
+### Background
+
+Slice 2.3 delivers the paste-markdown path. Slice 2.4 adds the primary intake path: a Google Drive folder structure that non-technical staff (HR, SMEs) can dump source material into without learning the app.
+
+Drive structure:
+
+- `_library/` — canonical source files organized by topic. Each file is the single source of truth; never duplicated.
+- `modules/<module>/` — one folder per training module, each with a `00-manifest.md`.
+- Each source file declares an `authority` level — `authoritative`, `supporting`, or `context` — in YAML frontmatter (markdown files) or a sibling `<filename>.meta.md` (PDFs, images, video transcripts).
+- Source files are referenced by **stable Google Drive file ID**, never by path.
+
+### End State
+
+Admin can connect the Drive Source Library, browse `_library/` files, and select source files for a module. Selected files are ingested into the app and parsed into source sections. `00-manifest.md` is an advisory human-readable mirror — the app owns the authoritative binding records.
+
+### Expected UI
+
+- "Connect / Sync from Drive" action on the Source Binder screen, alongside the Slice 2.3 paste path.
+- Source Library browser — `_library/` files with topic, authority badge, last-modified.
+- Per-module source selection — pick the files this module is built from.
+- Ingestion/parsing status per file.
+
+### Likely Files
+
+```txt
+src/features/source-binder/pages/SourceLibraryPage.tsx
+src/features/source-binder/components/DriveSyncButton.tsx
+src/features/source-binder/components/SourceLibraryBrowser.tsx
+src/features/source-binder/components/SourceAuthorityBadge.tsx
+src/features/source-binder/lib/manifest.ts
+supabase/functions/drive-sync/index.ts
+supabase/functions/parse-source-file/index.ts
+```
+
+### Data Requirements
+
+New tables (see Slice 8.2): `source_files` (keyed by Drive file ID), `source_file_versions`, `source_sections`, `module_source_bindings`. Authority level is a column on `source_files`. v1 sync is a manual admin-triggered "Sync from Drive" action; scheduled polling is a fast-follow (see Slice 7.3).
+
+### Conflict Rule
+
+The generator resolves conflicting sources by authority: `authoritative` > `supporting` > `context`. Two sources of **equal** authority that conflict must be flagged for a human — never auto-resolved.
+
+### Acceptance Criteria
+
+- Admin can connect Drive and browse the `_library/` Source Library.
+- Source files ingest with their Drive file ID, authority level, and parsed sections.
+- A module records which source files (and versions) it was built from.
+- Manifest is parsed advisory-only; the app's binding records are authoritative.
+- Paste path from Slice 2.3 still works as a secondary input.
+- Build Bible updated.
+
+### Linear Ticket Title
+
+```txt
+Source Binder: build Google Drive Source Library and ingestion
+```
+
+---
+
+## SLICE 2.5 — AI Setup Questions Wizard
 
 ### Goal
 
@@ -938,6 +1016,8 @@ Foundry: build AI setup questions wizard
 This phase makes the Course Foundry feel intelligent and safe.
 
 Actual AI calls may still be mocked initially, but the UI and data structures must match the intended production flow.
+
+**Source model note (2026-05-22 revision):** "Source sections" throughout Phase 3 are sections of source files held in the Google Drive Source Library (Slice 2.4), identified by Drive file ID and revision. Every generated lesson, claim, and assessment item must bind to the specific source file + section it derived from — this binding is what powers side-by-side review (Slice 3.4) and version-impact detection (Slice 7.3).
 
 ---
 
@@ -1259,6 +1339,12 @@ src/types/reviews.ts
 - SourceDocument
 - SourceSection
 - SourceReference
+- SourceFile
+- SourceFileVersion
+- SourceAuthorityLevel
+- ModuleSourceBinding
+- ModuleVersion
+- SourceChangeEvent
 - GeneratedContentReview
 - Assignment
 - ProgressRecord
@@ -1688,38 +1774,53 @@ Versioning: add module version history behavior
 
 ---
 
-## SLICE 7.3 — Source Binder Version Impact Review
+## SLICE 7.3 — Source Change Detection and Version Impact Review
 
 ### Goal
 
-When source material changes, show affected modules and lessons.
+When a source file changes in the Google Drive Source Library, detect it, identify every module built from that source, and let an admin review and act on the impact.
+
+### Detection Mechanism
+
+- **v1:** a manual admin-triggered "Sync from Drive" action. On sync, the system compares each tracked source file's current Drive revision (`headRevisionId`, plus a content hash for binary files) against the `bound_revision_id` stored when each module was generated.
+- **Fast-follow:** a scheduled poll (`pg_cron` → edge function, ~30 min) of `modifiedTime`, confirmed by `headRevisionId`. Drive push notifications (watch channels) are intentionally deferred — they add webhook and channel-renewal complexity not justified for an internal tool.
+
+### Impact Computation
+
+A module is **stale** when any source file it is bound to has a newer revision than the module's bound revision. Binding is at the source-section level (see `module_source_bindings`, Slice 8.2), so a change to one section only flags modules that actually used that section. The system writes `source_change_events` and sets an advisory `source_stale` flag on affected modules — a Published module stays Published, but flagged.
 
 ### End State
 
-Admin can see what published training references outdated source sections.
+Admin can open a Source Impact Review screen showing changed source files, the changed sections, and every affected lesson / assessment / published module, with a per-module staleness state and a scoped "regenerate affected lessons" action.
 
 ### Expected UI
 
-- Source binder version list.
-- Changed source sections.
-- Affected lessons.
-- Affected assessments.
-- Affected published modules.
-- Action: regenerate affected lessons.
+- Changed-source list (file, who/when, old vs. new revision).
+- Section-level diff (before/after).
+- Affected content grouped by module, each with a status: Up-to-date / Stale / Regenerating.
+- Regenerate action — per lesson and bulk; only lessons bound to changed sections re-run.
 
-This can be mock behavior for now.
+### Likely Files
+
+```txt
+src/features/source-binder/pages/SourceImpactReviewPage.tsx
+src/features/source-binder/components/SourceChangeList.tsx
+src/features/source-binder/components/SectionDiffView.tsx
+src/features/source-binder/components/AffectedModulesPanel.tsx
+```
 
 ### Acceptance Criteria
 
-- Source version change can be simulated.
-- Impact review screen shows affected content.
-- Regenerate affected lessons action exists as mocked flow.
+- A changed Drive source file is detected on sync.
+- Affected modules are identified via section-level bindings — unaffected modules are not flagged.
+- Stale modules are flagged without losing their Published state.
+- Scoped regeneration re-runs only affected lessons and, on approval, advances their bound revision.
 - Build Bible updated.
 
 ### Linear Ticket Title
 
 ```txt
-Source Binder: add version impact review for changed source
+Source Binder: add source change detection and version impact review
 ```
 
 ---
@@ -1814,21 +1915,27 @@ Create initial database schema for MVP.
 
 ### Tables
 
-- profiles/users
-- courses
-- modules
-- lessons
+**Already migrated (2026-05-22):** `supabase/migrations/20260522000100_create_training_schema_and_rls.sql` covers the learner-side tables (training courses, modules, lessons, enrollments, progress) with RLS.
+
+**Still to add — learner/admin core:**
+
+- profiles (roles — required before admin RLS works)
 - assessments
 - assessment_questions
-- source_binders
-- source_documents
-- source_sections
-- generated_content_reviews
-- assignments
-- progress_records
 - assessment_attempts
+- assignments
 - acknowledgments
 - audit_logs
+
+**Still to add — Course Foundry + Drive Source Library:**
+
+- source_files (keyed by Google Drive file ID; carries authority level)
+- source_file_versions (Drive revision tracking)
+- source_sections (parsed sections of a source file)
+- module_source_bindings (which source file + section + revision a module/lesson/question was generated from)
+- module_versions (publish-state lifecycle and audit)
+- source_change_events (detected source changes, for version-impact review)
+- generated_content_reviews
 
 ### Acceptance Criteria
 
@@ -2091,7 +2198,7 @@ When employees ask Redex Coach questions that hit “I don’t have approved con
 
 ### Live Policy Sync
 
-Connect Source Binder to Google Drive, Notion, SharePoint, or internal wiki.
+**Google Drive sync was promoted to MVP (Slice 2.4) on 2026-05-22.** Remaining moonshot scope: additional connectors (SharePoint, internal wiki). Notion was evaluated and dropped — the registry lives in Supabase, not a separate tool (see `docs/decisions/010-drive-source-library-notion-dropped.md`).
 
 ### Role-Twin Engine
 

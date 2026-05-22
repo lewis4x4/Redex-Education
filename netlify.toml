@@ -6,3 +6,13 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://toghxeuhgkcrbrdxewdw.supabase.co; font-src 'self' data:; connect-src 'self' https://toghxeuhgkcrbrdxewdw.supabase.co wss://toghxeuhgkcrbrdxewdw.supabase.co; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"

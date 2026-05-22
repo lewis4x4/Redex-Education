@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Module, Lesson, ProgressStatus, QuizLessonContent } from '@/lib/education';
 import { LessonContentRenderer } from './LessonContentRenderer';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,26 @@ export function ModulePlayer({
   const [currentIndex, setCurrentIndex] = useState(() => getInitialLessonIndex(lessons, initialLessonId));
   // Track quiz outcomes so we can gate "Mark Complete" for quiz lessons and auto-record progress on pass
   const [quizResults, setQuizResults] = useState<Record<string, { score: number; passed: boolean }>>({});
+  const completeModuleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (completeModuleTimeoutRef.current) {
+        clearTimeout(completeModuleTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const scheduleModuleCompletion = () => {
+    if (completeModuleTimeoutRef.current) {
+      clearTimeout(completeModuleTimeoutRef.current);
+    }
+
+    completeModuleTimeoutRef.current = setTimeout(() => {
+      completeModuleTimeoutRef.current = null;
+      onCompleteModule?.();
+    }, 650);
+  };
 
   const lessonIds = useMemo(() => new Set(lessons.map((lesson) => lesson.id)), [lessons]);
   const completedLessons = useMemo(
@@ -52,7 +72,7 @@ export function ModulePlayer({
 
   if (lessons.length === 0) {
     return (
-      <div className="flex h-[calc(100vh-8rem)] bg-white rounded-2xl border overflow-hidden">
+      <div className="flex min-h-[calc(100vh-8rem)] bg-white rounded-2xl border overflow-hidden">
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-redex-offwhite">
           <div className="max-w-md rounded-2xl border bg-white p-8 shadow-sm">
             <div className="text-xs uppercase tracking-widest text-slate-500 mb-2">MODULE</div>
@@ -71,7 +91,7 @@ export function ModulePlayer({
 
   if (!currentLesson) {
     return (
-      <div className="flex h-[calc(100vh-8rem)] bg-white rounded-2xl border overflow-hidden">
+      <div className="flex min-h-[calc(100vh-8rem)] bg-white rounded-2xl border overflow-hidden">
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-redex-offwhite">
           <div className="max-w-md rounded-2xl border bg-white p-8 shadow-sm">
             <h2 className="text-2xl font-semibold text-slate-900 mb-3">Lesson unavailable</h2>
@@ -130,9 +150,9 @@ export function ModulePlayer({
   };
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] bg-white rounded-2xl border overflow-hidden">
+    <div className="flex min-h-[calc(100vh-8rem)] flex-col overflow-visible rounded-2xl border bg-white md:h-[calc(100vh-8rem)] md:flex-row md:overflow-hidden">
       {/* Sidebar - Lesson Outline */}
-      <div className="w-72 border-r bg-slate-50 p-4 overflow-y-auto">
+      <div className="w-full max-h-72 border-b bg-slate-50 p-4 overflow-y-auto md:max-h-none md:w-72 md:border-b-0 md:border-r">
         <div className="mb-4">
           <button onClick={onExit} className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900">
             <ArrowLeft className="w-4 h-4" /> Back to Dashboard
@@ -144,7 +164,14 @@ export function ModulePlayer({
 
         <div className="mb-3">
           <div className="text-xs text-slate-500 mb-1">Module Progress</div>
-          <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+          <div
+            className="h-2 bg-slate-200 rounded-full overflow-hidden"
+            role="progressbar"
+            aria-label="Module progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progress}
+          >
             <div className="h-2 bg-redex-red" style={{ width: `${progress}%` }} />
           </div>
           <div className="text-xs text-right mt-1 text-slate-500">{progress}% complete</div>
@@ -196,8 +223,8 @@ export function ModulePlayer({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="border-b px-6 py-4 flex items-center justify-between bg-white">
+      <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
+        <div className="border-b px-4 py-4 flex flex-col gap-2 bg-white sm:px-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-xs text-slate-500">LESSON {currentIndex + 1} OF {lessons.length}</div>
             <div className="font-semibold text-xl">{currentLesson.title}</div>
@@ -207,7 +234,7 @@ export function ModulePlayer({
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-8 bg-redex-offwhite">
+        <div className="flex-1 overflow-auto bg-redex-offwhite p-4 sm:p-6 md:p-8">
           <LessonContentRenderer
             lesson={currentLesson}
             onQuizComplete={(score, passed) => {
@@ -228,7 +255,7 @@ export function ModulePlayer({
                 // If this was the final lesson and passed via quiz, complete the module flow too
                 if (isLastLesson) {
                   // Brief pause so learner sees the success banner + score in Quiz before dashboard transition
-                  setTimeout(() => onCompleteModule?.(), 650);
+                  scheduleModuleCompletion();
                 }
               }
             }}
@@ -237,12 +264,12 @@ export function ModulePlayer({
 
         {/* Quiz lock banner — forces real interaction before progress can advance on quiz lessons */}
         {isQuizLocked && (
-          <div className="border-t bg-amber-50 px-6 py-2.5 text-sm text-amber-700 flex items-center gap-2">
+          <div className="border-t bg-amber-50 px-4 py-2.5 text-sm text-amber-700 flex items-center gap-2 sm:px-6">
             <span>🔒 Pass the quiz above with {quizPassingThreshold}% or higher to unlock lesson completion and continue.</span>
           </div>
         )}
 
-        <div className="border-t p-4 bg-white flex items-center justify-between">
+        <div className="border-t p-4 bg-white flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Button variant="outline" onClick={() => goToLesson(currentIndex - 1)} disabled={currentIndex === 0}>
             <ArrowLeft className="w-4 h-4 mr-2" /> Previous
           </Button>

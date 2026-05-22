@@ -61,6 +61,34 @@ export type LessonType =
 
 export type Criticality = 'required' | 'recommended' | 'optional' | 'bonus';
 
+/**
+ * High-level pedagogical category for a module.
+ *
+ * Used by the Course Foundry to drive setup-question defaults and
+ * by the learner-side dashboard to group / filter assigned training.
+ *
+ * The labels are stable identifiers; UI displays them via a helper
+ * (e.g. `'customer_specific' → "Customer-specific"`).
+ */
+export type TrainingType =
+  | 'hr'
+  | 'operational'
+  | 'safety'
+  | 'compliance'
+  | 'customer_specific'
+  | 'role_specific'
+  | 'general_informational';
+
+export const TRAINING_TYPE_LABELS: Record<TrainingType, string> = {
+  hr: 'HR',
+  operational: 'Operational',
+  safety: 'Safety',
+  compliance: 'Compliance',
+  customer_specific: 'Customer-specific',
+  role_specific: 'Role-specific',
+  general_informational: 'General informational',
+};
+
 export type ProgressStatus =
   | 'not_started'
   | 'in_progress'
@@ -306,12 +334,83 @@ export type GenerationStatus =
   | 'published'
   | 'failed';
 
+/**
+ * A single parsed section of source material — typically derived from
+ * a markdown heading and the text content underneath it until the next
+ * sibling-or-higher heading.
+ *
+ * Section levels follow markdown heading levels (1=H1, 2=H2, 3=H3, ...).
+ * The Foundry uses these as the unit of source grounding: each generated
+ * lesson should be traceable back to one or more sections.
+ */
+export interface SourceSection {
+  id: UUID;
+  /** Heading level (1=H1, 2=H2, 3=H3). Sections without a heading get level 0. */
+  level: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  /** Heading text. Empty string if section has no heading (level 0). */
+  heading: string;
+  /** Section body content (markdown, with the heading line stripped). */
+  body: string;
+  /** Position in the source document (0-indexed, document order). */
+  position_index: number;
+  /** True when the section contains placeholder tokens that block generation. */
+  has_placeholders: boolean;
+}
+
+export type SourceAuthorityLevel = 'authoritative' | 'supporting' | 'context';
+
+export interface SourceFile {
+  id: UUID;
+  drive_file_id: string;
+  drive_path?: string;
+  title: string;
+  mime_type: string;
+  authority: SourceAuthorityLevel;
+  /** How the authority value was resolved at ingest time. */
+  authority_source: 'frontmatter' | 'meta_md' | 'default';
+  topic?: string;
+  current_version_id?: UUID;
+  last_synced_at?: ISODateTime;
+  processing_status: 'pending' | 'processing' | 'processed' | 'failed';
+  created_at: ISODateTime;
+  updated_at: ISODateTime;
+}
+
+export interface SourceFileVersion {
+  id: UUID;
+  source_file_id: UUID;
+  head_revision_id: string;
+  content_hash?: string;
+  size_bytes?: number;
+  modified_time?: ISODateTime;
+  raw_text?: string;
+  raw_text_preview?: string;
+  parse_status: 'pending' | 'processing' | 'processed' | 'failed';
+  created_at: ISODateTime;
+}
+
+export interface ModuleSourceBinding {
+  id: UUID;
+  module_id: string;
+  source_file_id: UUID;
+  source_file_version_id: UUID;
+  source_section_id?: UUID;
+  binding_kind: 'whole_file' | 'section';
+  flagged_for_review: boolean;
+  flag_reason?: 'equal_authority_conflict' | 'stale' | null;
+  created_at: ISODateTime;
+}
+
 export interface SourceMaterial {
   id: UUID;
   title: string;
   type: 'pdf' | 'markdown' | 'docx' | 'notion' | 'web_url';
+  /** Full raw text (e.g. the pasted markdown). Optional for non-text source types. */
+  raw_text?: string;
   raw_text_preview?: string;
   processing_status: 'pending' | 'processed' | 'failed';
+  /** Parsed sections from the raw text (empty array when not yet processed). */
+  sections: SourceSection[];
 }
 
 export interface CourseOutlineDraft {
@@ -353,6 +452,45 @@ export interface EducationFacade {
 // ============================================================
 // HELPER / UI SHAPES
 // ============================================================
+
+export interface AdminModuleListItem {
+  /** Stable identifier for a module in admin list views. */
+  id: string;
+  /** Human-readable module title shown in dashboard lists. */
+  title: string;
+  /** Current admin lifecycle state for the module. */
+  status: 'Draft' | 'Needs review' | 'Published' | 'Archived';
+  /** Human-readable timestamp or review context detail. */
+  meta: string;
+}
+
+export interface AdminDashboardMetrics {
+  /** Number of modules currently in draft authoring. */
+  drafts: number;
+  /** Number of modules waiting for admin/HR review. */
+  needs_review: number;
+  /** Number of modules currently published. */
+  published: number;
+  /** Number of learners actively progressing through assigned training. */
+  learners_in_progress: number;
+}
+
+export interface AdminDashboardSummary {
+  /** Top-level KPI metrics for the admin dashboard shell. */
+  metrics: AdminDashboardMetrics;
+  /** Modules currently being authored. */
+  drafts: AdminModuleListItem[];
+  /** Modules currently waiting for review. */
+  needs_review: AdminModuleListItem[];
+  /** Modules currently available to learners. */
+  published: AdminModuleListItem[];
+  /** Lightweight at-a-glance assignment stats for dashboard footer. */
+  assignment_summary: {
+    active_assignments: number;
+    overdue: number;
+    completion_rate_percent: number;
+  };
+}
 
 export interface LearnerDashboardSummary {
   learner: LearnerProfile;

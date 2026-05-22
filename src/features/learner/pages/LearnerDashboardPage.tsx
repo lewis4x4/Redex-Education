@@ -1,15 +1,25 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import type { LearnerProfile, Enrollment, Course, Lesson } from '@/lib/education';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMyProgress } from '@/hooks/useEducation';
+import type { Course, Enrollment, LearnerProfile, Lesson } from '@/lib/education';
+import { ArrowRight, CheckCircle2, Circle, Clock, HelpCircle, Lock } from 'lucide-react';
 
 // Temporary inline progress
 function Progress({ value, className }: { value: number; className?: string }) {
+  const boundedValue = Math.min(100, Math.max(0, value));
+
   return (
-    <div className={`bg-[#e5e7eb] rounded-full overflow-hidden ${className}`}>
+    <div
+      className={`bg-slate-200 rounded-full overflow-hidden ${className}`}
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={boundedValue}
+      aria-label="Onboarding progress"
+    >
       <div 
         className="h-full bg-redex-red transition-all" 
-        style={{ width: `${value}%` }} 
+        style={{ width: `${boundedValue}%` }} 
       />
     </div>
   );
@@ -22,7 +32,6 @@ interface LearnerDashboardPageProps {
   onContinue?: () => void;
   onStartJourney?: () => void;
 }
-import { Clock, HelpCircle, ArrowRight } from 'lucide-react';
 
 /**
  * Learner Journey Dashboard - Slice 1.2 foundation
@@ -44,83 +53,111 @@ export function LearnerDashboardPage({ learner, onContinue }: LearnerDashboardPa
     estimatedMinutesLeft: Math.max(5, Math.round((100 - percentage) * 0.25)),
     dueInDays: 5,
   };
+  const progressValueClass = currentAssignment.progress > 0 ? 'text-redex-red' : 'text-slate-500';
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Good morning, {displayName}.</h1>
-        <p className="text-[#6b7280] mt-1">Here's what you need to focus on today.</p>
+        <p className="text-sm font-semibold uppercase tracking-[3px] text-redex-red">
+          YOUR LEARNING DASHBOARD
+        </p>
+        <h1 className="mt-2 text-2xl md:text-3xl font-semibold tracking-tight">
+          Good morning, {displayName}. 👋
+        </h1>
+        <p className="text-slate-600 mt-2">Here's what you need to focus on today.</p>
       </div>
 
       {/* Primary CTA Card - What do I need to do now? */}
-      <Card className="border-redex-red/20 bg-white shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+      <Card className="rounded-2xl border-slate-200 bg-white shadow-md">
+        <CardHeader className="p-6 pb-4 md:p-8 md:pb-4">
+          <CardTitle className="flex items-start justify-between gap-4 text-lg md:text-xl">
             <span>Continue where you left off</span>
-            <span className="text-sm font-normal text-[#6b7280]">Due in {currentAssignment.dueInDays} days</span>
+            <span className="shrink-0 text-sm font-normal text-slate-500">
+              Due in {currentAssignment.dueInDays} days
+            </span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 p-6 pt-0 md:p-8 md:pt-0">
           <div>
             <div className="font-medium text-lg">{currentAssignment.title}</div>
-            <div className="text-sm text-[#6b7280] mt-1">
+            <div className="text-sm text-slate-600 mt-1">
               {currentAssignment.completedLessons} of {currentAssignment.totalLessons} lessons complete • {currentAssignment.progress}%
             </div>
           </div>
 
           <div className="flex items-center gap-4">
             <div className="flex-1">
-              <Progress value={currentAssignment.progress} className="h-2" />
+              <Progress value={currentAssignment.progress} className="h-3" />
             </div>
-            <div className="text-sm font-medium text-redex-red">{currentAssignment.progress}%</div>
+            <div className={`text-sm font-medium ${progressValueClass}`}>{currentAssignment.progress}%</div>
           </div>
 
-          <div className="flex items-center gap-2 text-sm text-[#6b7280]">
+          <div className="flex items-center gap-2 text-sm text-slate-600">
             <Clock className="w-4 h-4" />
             <span>~{currentAssignment.estimatedMinutesLeft} minutes remaining</span>
           </div>
 
-          <Button 
-            size="lg" 
-            className="w-full md:w-auto bg-redex-red hover:bg-redex-red-hover mt-2"
-            onClick={onContinue}
-          >
-            Continue Training <ArrowRight className="ml-2 w-4 h-4" />
-          </Button>
+          <div className="space-y-2 pt-2">
+            <Button
+              size="lg"
+              className="w-full md:w-auto bg-redex-red hover:bg-redex-red-hover"
+              onClick={onContinue}
+            >
+              Continue Training <ArrowRight className="ml-2 w-4 h-4" />
+            </Button>
+            <p className="flex items-center gap-1.5 text-xs text-slate-500">
+              <Lock className="w-3.5 h-3.5" aria-hidden="true" />
+              Progress saves automatically
+            </p>
+          </div>
         </CardContent>
       </Card>
 
       {/* Two column: Progress + Help */}
       <div className="grid md:grid-cols-2 gap-6">
         {/* How far along am I? */}
-        <Card>
+        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Your Onboarding Progress</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
+            <ul className="space-y-3 text-sm">
+              <li className="flex items-center justify-between gap-4">
                 <span>HR Basics</span>
-                <span className="text-[#16a34a] font-medium">Complete</span>
-              </div>
-              <div className="flex justify-between">
+                <span className="flex items-center gap-2 font-medium text-emerald-600">
+                  <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
+                  Complete
+                </span>
+              </li>
+              <li className="flex items-center justify-between gap-4">
                 <span>Systems & Tools</span>
-                <span className="text-[#f59e0b] font-medium">In Progress</span>
-              </div>
-              <div className="flex justify-between text-[#6b7280]">
+                <span className="flex items-center gap-2 font-medium text-amber-600">
+                  <span className="flex w-4 h-4 items-center justify-center" aria-hidden="true">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  </span>
+                  In Progress
+                </span>
+              </li>
+              <li className="flex items-center justify-between gap-4 text-slate-600">
                 <span>Safety & Compliance</span>
-                <span>Not started</span>
-              </div>
-              <div className="flex justify-between text-[#6b7280]">
+                <span className="flex items-center gap-2 font-medium text-slate-500">
+                  <Circle className="w-4 h-4 text-slate-400" aria-hidden="true" />
+                  Not started
+                </span>
+              </li>
+              <li className="flex items-center justify-between gap-4 text-slate-600">
                 <span>Role-specific Training</span>
-                <span>Not started</span>
-              </div>
-            </div>
+                <span className="flex items-center gap-2 font-medium text-slate-500">
+                  <Circle className="w-4 h-4 text-slate-400" aria-hidden="true" />
+                  Not started
+                </span>
+              </li>
+            </ul>
           </CardContent>
         </Card>
 
         {/* Who can help? */}
-        <Card>
+        <Card className="rounded-2xl border-slate-200 bg-white shadow-md">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <HelpCircle className="w-4 h-4" /> Need Help?
@@ -129,11 +166,19 @@ export function LearnerDashboardPage({ learner, onContinue }: LearnerDashboardPa
           <CardContent className="space-y-4 text-sm">
             <div>
               <div className="font-medium">Your Onboarding Buddy</div>
-              <div className="text-[#6b7280]">Sarah Chen • People Ops</div>
-              <Button variant="outline" size="sm" className="mt-2">Message Sarah</Button>
+              <div className="text-slate-600">Sarah Chen • People Ops</div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3 border-redex-red/20 text-redex-red hover:bg-redex-red/5 hover:text-redex-red"
+                disabled
+                aria-describedby="buddy-contact-status"
+              >
+                Message Sarah
+              </Button>
             </div>
-            <div className="text-xs text-[#6b7280]">
-              Average response time: under 2 hours during business days.
+            <div id="buddy-contact-status" className="text-xs text-slate-500">
+              Messaging will connect to People Ops in a later release. Average response time target: under 2 hours during business days.
             </div>
           </CardContent>
         </Card>

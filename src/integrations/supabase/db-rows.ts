@@ -15,7 +15,7 @@
 // Phase 1 scope:
 //   - Establish the boundary file (this file).
 //   - Declare aliases for the rows we expect to consume.
-//   - Do NOT implement mappers yet — they land alongside real reads.
+//   - Do NOT implement mappers yet — they land alongside real reads in Slice 8.3.
 //
 // HARD RULE:
 //   UI components MUST NOT import from this file. Only mappers,
@@ -57,8 +57,30 @@ export type UserTrainingProgressRow = Tables extends {
   ? R
   : never;
 
+/** Row shape for the `source_files` table (Slice 2.4). */
+export type SourceFileRow = Tables extends { source_files: { Row: infer R } } ? R : never;
+
+/** Row shape for the `source_file_versions` table (Slice 2.4). */
+export type SourceFileVersionRow = Tables extends {
+  source_file_versions: { Row: infer R };
+}
+  ? R
+  : never;
+
+/** Row shape for the `source_sections` table (Slice 2.4). */
+export type SourceSectionRow = Tables extends { source_sections: { Row: infer R } } ? R : never;
+
+/** Row shape for the `module_source_bindings` table (Slice 2.4). */
+export type ModuleSourceBindingRow = Tables extends {
+  module_source_bindings: { Row: infer R };
+}
+  ? R
+  : never;
+
 // ============================================================
-// FUTURE WORK (do not implement until Supabase reads are wired):
+// FUTURE WORK (do not implement until Supabase reads are wired in Slice 8.3):
+//
+// TODO (Slice 8.3): add row→domain mappers once real Supabase reads land.
 //
 //   export function mapCourseRow(row: TrainingCourseRow): Course { ... }
 //   export function mapModuleRow(row: TrainingModuleRow): Module { ... }

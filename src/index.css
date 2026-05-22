@@ -9,14 +9,6 @@
 
 @layer base {
   :root {
-    /* Supporting accent palette */
-    --neon-cyan: #2ec4b6;
-    --neon-green: #10b981;
-    --neon-amber: #ff9f1c;
-    --neon-red: #ef4444;    /* High-vis Red */
-    --neon-purple: #8b5cf6;
-    --neon-blue: #3b82f6;
-
     /* Canonical Redex brand tokens */
     --redex-red: 357 85% 52%;        /* #ED1B24 */
     --redex-red-hover: 357 81% 43%;  /* #C8141B */
@@ -37,15 +29,7 @@
 
     /* Canvas / Backgrounds */
     --bg-canvas: #0a0a0a;          /* Deepest Charcoal/Black */
-    --bg-card: rgba(20, 20, 20, 0.6); /* Glass Card Base */
-    --bg-glass: rgba(255, 255, 255, 0.03);
-    --bg-input: rgba(0, 0, 0, 0.3);
-    
-    /* Borders & Glass */
-    --border-default: rgba(255, 255, 255, 0.08);
-    --border-glow: rgba(239, 68, 68, 0.3); /* Subtle red glow */
-    --glass-blur: blur(12px);
-    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+
 
     /* Spacing & Radius */
     --radius-sm: 0.25rem;
@@ -139,84 +123,9 @@
     @apply selection:bg-red-500/30 selection:text-white;
   }
   
-  /* Technical Headers (for labels throughout the app) */
-  .tech-header {
-    @apply text-[10px] uppercase tracking-[0.2em] text-gray-400 font-bold;
-  }
-  
-  /* Mono data values */
-  .tech-value {
-    @apply font-mono text-white;
-  }
 }
 
 @layer components {
-  /* 
-    Legacy glass card utility
-    Core component of the shared Redex Education design system
-  */
-  .gravity-card {
-    background: var(--bg-card);
-    backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--border-default);
-    box-shadow: var(--glass-shadow);
-    border-radius: var(--radius-lg);
-    @apply transition-all duration-300;
-  }
-  
-  .gravity-card:hover {
-    border-color: rgba(255, 255, 255, 0.15);
-    transform: translateY(-2px);
-  }
-
-  /* Status Badges */
-  .neon-badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border;
-  }
-  
-  .badge-success {
-    background-color: rgba(16, 185, 129, 0.1);
-    border-color: rgba(16, 185, 129, 0.2);
-    color: var(--neon-green);
-  }
-  
-  .badge-warning {
-    background-color: rgba(255, 159, 28, 0.1);
-    border-color: rgba(255, 159, 28, 0.2);
-    color: var(--neon-amber);
-  }
-  
-  .badge-critical {
-    background-color: rgba(239, 68, 68, 0.1);
-    border-color: rgba(239, 68, 68, 0.2);
-    color: var(--neon-red);
-  }
-  
-  .badge-info {
-    background-color: rgba(46, 196, 182, 0.1);
-    border-color: rgba(46, 196, 182, 0.2);
-    color: var(--neon-cyan);
-  }
-
-  /* Buttons */
-  .btn-neon {
-    @apply relative overflow-hidden transition-all duration-300;
-    backdrop-filter: blur(4px);
-  }
-  
-  .btn-neon-primary {
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.5);
-    color: #fff;
-    box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
-  }
-  
-  .btn-neon-primary:hover {
-    background: rgba(239, 68, 68, 0.2);
-    box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
-    border-color: var(--neon-red);
-  }
-
   /* Scrollbar customization for dark surfaces */
   ::-webkit-scrollbar {
     width: 8px;
@@ -232,13 +141,4 @@
   ::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.2);
   }
-}
-
-/* Utility: Hide scrollbar while keeping scroll functionality */
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
 }
