@@ -1,12 +1,19 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Play, Check, Cloud, ArrowRight } from 'lucide-react';
+import type { LearnerProfile } from '@/types/training';
 
 /**
  * First-day Welcome Screen for Redex Academy
  * Matches the provided UI mockup (v3) for new learner "Marcus"
  */
-export function LearnerWelcomePage() {
+interface LearnerWelcomePageProps {
+  learner?: LearnerProfile;
+}
+
+export function LearnerWelcomePage({ learner }: LearnerWelcomePageProps) {
+  const displayName = learner?.preferred_name ?? learner?.display_name ?? 'Marcus';
+
   return (
     <div className="max-w-4xl mx-auto">
       {/* Main Welcome Card - matches the mockup */}
@@ -17,9 +24,9 @@ export function LearnerWelcomePage() {
             WELCOME TO REDEX ACADEMY
           </div>
 
-          {/* Greeting */}
+          {/* Greeting - now uses typed learner profile */}
           <h1 className="text-4xl font-semibold tracking-tight mb-3">
-            Great to have you here, Marcus. <span className="inline-block">👋</span>
+            Great to have you here, {displayName}. <span className="inline-block">👋</span>
           </h1>
 
           <p className="text-lg text-[#6b7280] max-w-xl mb-8">

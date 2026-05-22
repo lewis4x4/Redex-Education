@@ -259,7 +259,12 @@ This Build Bible records what has been built.
 - Explorer agent (codebase audit)
 - Additional implementers and types agent active in background.
 
-**Current Slice**: Slice 0.2 + Slice 1.1 being executed in parallel for maximum velocity.
+**Current Slice**: Slice 0.2 + Slice 1.1 + early Slice 1.2 complete in working form.
+
+Major addition:
+- Core domain types integrated (`src/types/training.ts`) — LearnerProfile, Course, Module, Lesson, Progress, Enrollment, Foundry generation shapes, etc. (inspired by the excellent modeling produced by the types agent).
+
+Continuous non-stop execution in progress.
 
 ---
 

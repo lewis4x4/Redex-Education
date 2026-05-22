@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import type { LearnerProfile, Enrollment, Course, Lesson } from '@/types/training';
 
-// Temporary inline progress until we add the shadcn Progress component
+// Temporary inline progress
 function Progress({ value, className }: { value: number; className?: string }) {
   return (
     <div className={`bg-[#e5e7eb] rounded-full overflow-hidden ${className}`}>
@@ -12,6 +13,12 @@ function Progress({ value, className }: { value: number; className?: string }) {
     </div>
   );
 }
+
+interface LearnerDashboardPageProps {
+  learner?: LearnerProfile;
+  enrollment?: Enrollment & { course: Course };
+  nextLesson?: Lesson | null;
+}
 import { Clock, HelpCircle, ArrowRight } from 'lucide-react';
 
 /**
@@ -21,11 +28,13 @@ import { Clock, HelpCircle, ArrowRight } from 'lucide-react';
  * 2. How far along am I?
  * 3. Who can help me if I’m stuck?
  */
-export function LearnerDashboardPage() {
-  // Mock assigned training for demo
+export function LearnerDashboardPage({ learner, enrollment }: LearnerDashboardPageProps) {
+  const displayName = learner?.preferred_name ?? learner?.display_name ?? 'Marcus';
+
+  // Mock data fallback
   const currentAssignment = {
-    title: "HR Onboarding Essentials",
-    progress: 25,
+    title: enrollment?.course?.title ?? "HR Onboarding Essentials",
+    progress: enrollment?.progress_percentage ?? 25,
     totalLessons: 8,
     completedLessons: 2,
     estimatedMinutesLeft: 14,
@@ -35,7 +44,7 @@ export function LearnerDashboardPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Good morning, Marcus.</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Good morning, {displayName}.</h1>
         <p className="text-[#6b7280] mt-1">Here's what you need to focus on today.</p>
       </div>
 
