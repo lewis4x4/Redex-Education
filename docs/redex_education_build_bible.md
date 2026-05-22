@@ -1055,3 +1055,23 @@ Moved the largest obvious chunks of dead, unimported legacy code (verified by fu
 
 ---
 
+## 2026-05-22 — Education Progress Context + Player Sync Final Polish (Task D1 Glue)
+
+**Status**: ✅ Completed (this mission)
+
+**Summary**:
+Completed the Education Progress Context / facade wiring as requested. `LearnerWelcomePage` "Start my journey →" launches real `ModulePlayer` with seeded "Redex Academy Orientation". Completing lessons (via mark or auto on quiz pass) updates progress visible on dashboard *and* correctly reflected in player UI/sidebar when returning or after refresh — via `completedLessonIds` prop + seeding + sync effect in player, driven by context `getLessonStatus` + `recordLessonProgress` + localStorage.
+
+**Key files enhanced**:
+- `src/App.tsx`: live computation + prop passing of completed ids from context to player
+- `src/features/learner/components/ModulePlayer.tsx`: prop support, initializer seed from context, useEffect merge, import useEffect
+- `docs/redex_education_build_bible.md`: this record + prior Task D1/C sections
+
+Uses strictly existing types (`@/lib/education/training-types`), demo data, EducationContext (no new files created). Local-first. Build verified clean.
+
+**Focused commit**: ff30dbd (plus follow-up for Bible/docs hygiene if needed).
+
+This makes the full vertical slice real and end-to-end observable. 
+
+---
+
