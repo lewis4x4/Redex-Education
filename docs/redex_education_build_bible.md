@@ -1080,3 +1080,41 @@ This makes the full vertical slice real and end-to-end observable.
 
 ---
 
+## 2026-05-22 — Phase 0: Repo Hygiene (Code Review Remediation Plan)
+
+**Status**: ✅ Completed (Phase 0 of 10 in the post-review remediation plan)
+
+**Context**:
+A full cross-cutting code review (5 parallel explore agents + deep `context_builder` synthesis) surfaced ~30 findings across 9 dependency-ordered phases. Phase 0 is foundational hygiene — close obvious leakage paths before any code changes land.
+
+**Summary**:
+Updated `.gitignore` to explicitly cover (a) local environment files and (b) agent / OMX runtime artifacts, both of which were previously untracked-but-unignored and one `git add .` away from being committed. `.DS_Store` was already covered. No tracked file required removal — `git ls-files | grep -E "(DS_Store|\.env|\.omx)"` returned empty before the change.
+
+**What changed**:
+- `.gitignore`: added two new sections
+  - `# Local env files` — `.env`, `.env.*`, with `!.env.example` whitelist so the example template can still be committed in Phase 1
+  - `# Agent / runtime artifacts` — `.omx/` covers session state, metrics, and logs from the agent harness
+- This Build Bible entry
+
+**Files touched**: 2 (`.gitignore`, `docs/redex_education_build_bible.md`)
+
+**Verification**:
+- ✅ `git status --short` before: `?? .omx/` (untracked) — now: `.omx/` is ignored, no longer appears
+- ✅ No tracked secrets, no tracked runtime artifacts (`git ls-files` audit clean)
+- ✅ `.DS_Store` already ignored on line 19 — no action needed
+- ✅ `dist/` and `node_modules/` already ignored — no leakage of build artifacts
+
+**Known gaps** (intentional, deferred to later phases):
+- No `.env.example` template yet → lands in Phase 1 alongside env-driven Supabase client
+- No CI check enforcing "no secrets in commits" → may revisit in Phase 7 (security)
+
+**Naming guardrails honored**:
+- Redex Education = repo/product
+- Redex Academy = learner-facing brand
+- Redex AI Course Foundry = admin creation engine
+- Redex Training OS = long-term platform vision
+
+**Next**: Phase 1 — Foundation (env-driven Supabase, type consolidation, TS strict, dep hygiene). Unblocked once Phase 0 commit lands.
+
+---
+
