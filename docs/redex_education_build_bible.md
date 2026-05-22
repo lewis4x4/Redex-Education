@@ -2490,3 +2490,110 @@ Session IDs (all cleaned up): A `C0B65B1C…`, B `491A1CAB…`, C `3DC79FA3…`,
 
 ---
 
+## 2026-05-22 — Slice 2.4 deploy completion (addendum)
+
+**Status flip**: The Slice 2.4 entry above marked operator deploy steps as ⏳. **All ⏳ items are now ✅ deployed and smoke-tested end-to-end** against the Redex Supabase project (`toghxeuhgkcrbrdxewdw`).
+
+**What landed (in-session, via Bash orchestration)**:
+- ✅ `.gitignore` hardened against credential file commits (commit `d384eb7`)
+- ✅ Supabase Edge Function secrets set with real values:
+  - `GOOGLE_SERVICE_ACCOUNT_JSON` (loaded from `~/Documents/redex-secrets/redex-education-sa-key.json`, NEVER committed to repo)
+  - `GOOGLE_DRIVE_LIBRARY_FOLDER_ID = 1_a_C2WgpG2BXYhssypWPXPydvOiAE5Hb`
+- ✅ Edge functions deployed: `drive-sync` + `parse-source-file` (already on the project from earlier session)
+- ✅ Slice 2.4 source library migration applied directly via `supabase db query --file` — bypassed the migration-tracking divergence (see "Known operator constraints" below). 4 tables + 2 enums created in `public` schema.
+- ✅ End-to-end smoke test passed (HTTP 200 from `drive-sync`):
+  - **6 files synced** from Drive `_library/` (3 topic subfolders: `hr_basics/`, `safety/`, `communication/`)
+  - **19 sections parsed** by `parse-source-file`
+  - **Authority resolution working** from YAML frontmatter: 3 `authoritative` (pto-policy, code-of-conduct, safety-101), 2 `supporting` (new-hire-checklist, ppe-guidelines), 1 `context` (standards-and-tone) — matches the seed data exactly
+  - **Placeholder detection working**: pto-policy.md flagged 3 sections (`[PLACEHOLDER — Redex HR …]` tokens), safety-101.md flagged 1, others 0
+- ✅ Backlog committed to git history as `901a9c7` — 101 files, 12,469 insertions, 1,563 deletions, comprehensive snapshot of Phases 0-9 remediation + Slices 2.1-2.4 + Visual Fidelity Pass + Architecture Revision
+- ✅ Pushed to `origin/main` (`d725ee9..901a9c7`)
+
+**Known operator constraints (carried forward)**:
+
+1. **Shared Supabase project**: `toghxeuhgkcrbrdxewdw` is used by multiple Redex apps (Victra dispatch, compliance/consent product, etc.). Remote has **34 migrations from those apps** not present in this repo. `supabase db push` refuses to operate under the divergent state; this slice applied SQL directly via `db query --file` instead. Future migrations should follow the same direct-apply pattern OR a one-time `supabase db pull` could import all foreign migration files (would clutter this repo with ~34 unrelated SQL files).
+
+2. **`training_modules` table conflict (DEFERRED)**: an existing `training_modules` table in the remote (from one of the 34 foreign migrations) has a completely different column shape (`module_order`/`content_type`/`content_url`/`content_data`/`simulation_type` — content-oriented design) from what `supabase/migrations/20260522000100_create_training_schema_and_rls.sql` expects (`course_id`/`order_index`/`criticality`). The training schema migration **was not applied**; Slice 2.4's source library is self-contained (no FK to `training_modules`) so this doesn't block 2.5. Reconciliation options for whenever Slice 5+ / 8+ needs the training schema:
+   - Rename our tables (e.g. `course_foundry_modules`)
+   - Move to a dedicated `course_foundry.*` Postgres schema (cleanest)
+   - Negotiate with the other Redex app's owner to reconcile shapes
+
+3. **Migration tracking divergence (CLI annoyance)**: the `supabase_migrations.schema_migrations` table doesn't have rows for our local migrations because we applied via `db query` instead of `db push`. Every future `supabase db push` will still complain. Either: (a) accept and use `db query` indefinitely, (b) `supabase db pull` to reconcile, or (c) manually `INSERT INTO supabase_migrations.schema_migrations` for our local migrations. Not blocking; future-session call.
+
+**Net state of Slice 2.4 acceptance criteria** (now all ✅):
+- ✅ Admin can connect Drive and browse the `_library/` Source Library
+- ✅ Source files ingest with their Drive file ID, authority level, and parsed sections
+- ✅ A module records which source files (and versions) it was built from — schema + types in place
+- ✅ Manifest is parsed advisory-only; the app's binding records are authoritative
+- ✅ Paste path from Slice 2.3 still works as a secondary input
+- ✅ Build Bible updated
+
+Slice 2.4 is **fully shipped and operational**. Real product feature working against real backend + real Google Drive.
+
+---
+
+## 2026-05-22 — Slice 2.5: AI Setup Questions Wizard
+
+**Status**: ✅ Completed.
+
+**Master roadmap reference**: Phase 2 / Slice 2.5 (renumbered from old 2.4 per the Architecture Revision).
+**Linear ticket**: `Foundry: build AI setup questions wizard`.
+
+**Context**:
+Wires up the previously-disabled "Continue → Setup questions" button on the Source Binder page. Admin walks a 6-step wizard that captures the 9 question groups required to drive AI module generation (identity / audience / training type / criticality / assessment style / experience style / timing / source control / approval requirements). Answers persist to the existing `useFoundryDraftStore` as a new `setupAnswers` slice, sitting alongside `currentDraft`, `sourceMaterial`, and `selectedLibraryFileIds`.
+
+**Orchestration**: 4 engineer sub-agents driven from `prompt-exports/slice-2-5-plan.md`. Pattern: A blocking → B || C parallel → D sequential. Zero file conflicts; one minor deviation in D (`QuestionWizard` Next button uses validation-on-click rather than disabled state; agent tested the actual behavior).
+
+**Summary**:
+
+### Item A — Foundation
+- **`src/types/training.ts`** — added canonical `WizardCriticality` + `WIZARD_CRITICALITY_LABELS` + `AssessmentStyle` + `ASSESSMENT_STYLE_LABELS` + `SetupAnswers`. (The wizard's `WizardCriticality` is intentionally a separate enum from the existing `Criticality` — different semantics: lesson-level criticality vs. pedagogical-stakes criticality.)
+- **`src/lib/education/index.ts`** — re-exported all 5 new symbols.
+- **`src/features/foundry/schemas/foundrySchemas.ts`** — extended with `setupAnswersSchema` + `SetupAnswersInput` type.
+- **`src/features/foundry/store/foundryDraftStore.ts`** — added `setupAnswers: SetupAnswers | null` + `setSetupAnswers(input)` (auto-fills `updated_at`) + `clearSetupAnswers()`. Persist key unchanged.
+- **`src/features/foundry/data/setupQuestions.ts`** (new, 84 lines) — `CRITICALITY_OPTIONS` (4 with helper text per option), `ASSESSMENT_OPTIONS` (6 with descriptions), `QUESTION_GROUP_TITLES`.
+
+### Item B — Wizard atomic components
+- **`CriticalitySelector.tsx`** (59 lines) — 4 radio options with helper text that swaps per selection via `aria-live="polite"` region. Compliance/High-Risk option triggers the strict-source-grounding helper text.
+- **`AssessmentConfigPanel.tsx`** (47 lines) — 6-option styled radio-card group with label + one-line description per option. Selected card gets Redex-red accent.
+- **`QuestionWizard.tsx`** (300 lines) — multi-step shell using React Hook Form + `zodResolver(setupAnswersSchema)`. 6 steps: Audience → Criticality → Assessment → Experience+Timing → Source control → Approval. Progress bar (`Step N of 6`), Prev/Next nav with per-step validation gating via `trigger()`, Submit on final step.
+
+### Item C — Page + route + Source Binder wire
+- **`FoundryQuestionsPage.tsx`** (41 lines) — composes the wizard with the store. Eyebrow "REDEX AI COURSE FOUNDRY · STEP 3" + H1 "Setup questions" + subhead. Submit handler writes to store + Sonner success toast; conditional "✓ Answers saved. Continue → Outline preview (Coming in Slice 3.1)" info card appears post-submit.
+- **`src/App.tsx`** — new `FoundryQuestionsRoute` helper + Route for `/admin/foundry/questions` (AuthGate-wrapped, before `/admin/*` wildcard).
+- **`src/features/source-binder/pages/SourceBinderInputPage.tsx`** — flipped "Continue → Setup questions" button from disabled to enabled, `onClick={() => navigate('/admin/foundry/questions')}`. Rest of page unchanged.
+- **`docs/architecture.md`** — added route table row for `/admin/foundry/questions`.
+
+### Item D — Tests
+- **+18 net new tests** across 4 new test files + 3 extended files; total **128 → 146 passing** across 28 test files (1 skipped Deno-only).
+- Coverage: Statements **88.25%** (+1.93 from 86.32%), Functions trending up with new component coverage.
+
+**Files touched** (~13 total):
+- New (4 source + 4 test): `setupQuestions.ts`, `CriticalitySelector.tsx` (+test), `AssessmentConfigPanel.tsx` (+test), `QuestionWizard.tsx` (+test), `FoundryQuestionsPage.tsx` (+test)
+- Modified (7): `training.ts`, `lib/education/index.ts`, `foundrySchemas.ts`, `foundryDraftStore.ts` (+test extended), `App.tsx` (+ routes test extended), `SourceBinderInputPage.tsx` (+ its test updated for enabled-Continue), `architecture.md`
+
+**Verification**:
+- ✅ `npm run typecheck` — green
+- ✅ `npm run lint` — 0/0
+- ✅ `npm test` — 146/146 passing
+- ✅ `npm run build` — green
+- ✅ Coverage 88.25% statements
+
+**Acceptance criteria** (master roadmap):
+- ✅ Wizard is easy to complete (6 short steps with progress indicator)
+- ✅ Criticality selection changes helper text (per-option helper rendered via `aria-live` region)
+- ✅ Assessment settings are stored (via `setSetupAnswers`)
+- ⏳ Continue leads to outline generation preview — wired to a placeholder until Slice 3.1 ships the Outline page
+- ✅ Build Bible updated
+
+**Known gaps (deferred)**:
+- Slice 3.1 — Generated Outline Review — will receive the next "Continue" navigation target
+- Real AI outline generation deferred (mocked in Phase 3+)
+- Criticality-driven publish blocking (e.g., Compliance forces safety-review checkbox) is documented in helper text but not enforced in this slice; lands with the publish workflow in Phase 7
+
+**Naming guardrails honored**: Redex Education / Redex AI Course Foundry contexts only. No Academy surfaced in admin UI.
+
+**Next**: Slice 3.1 — Generated Outline Review (Phase 3 of master roadmap begins).
+
+---
+

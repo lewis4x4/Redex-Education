@@ -40,6 +40,7 @@ Grounded in `src/App.tsx`:
 | `/admin`, `/admin/*` | `AdminRoute` → `AdminDashboardPage` | ✓ | ✓ | Redex AI Course Foundry shell scaffold |
 | `/admin/foundry/start` | `FoundryStartRoute` → `FoundryStartPage` | ✓ | ✓ | Course Foundry module basics form |
 | `/admin/foundry/source` | `FoundrySourceRoute` → `SourceBinderInputPage` | ✓ | ✓ | Course Foundry source binder — paste markdown, parse headings into sections, preview |
+| `/admin/foundry/questions` | `FoundryQuestionsRoute` → `FoundryQuestionsPage` | ✓ | ✓ | Course Foundry setup questions wizard — captures criticality, assessment style, audience, source control, approval gates |
 | `/admin/foundry/library` | `SourceLibraryRoute` → `SourceLibraryPage` | ✓ | ✓ | Course Foundry source library — browse Drive-ingested source files with authority + version |
 | `*` | `NotFoundRoute` → `NotFoundPage` | ✓ | — | Catchall |
 

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import type { SourceMaterial } from '@/lib/education';
+import type { SetupAnswers, SourceMaterial } from '@/lib/education';
+import type { SetupAnswersInput } from '../schemas/foundrySchemas';
 import type { ModuleBasicsDraft, ModuleBasicsFormValues } from '../types';
 
 interface FoundryDraftState {
@@ -12,10 +13,16 @@ interface FoundryDraftState {
   clearDraft: () => void;
   /** The current source material draft for Slice 2.3 source binder */
   sourceMaterial: SourceMaterial | null;
+  /** Setup-question answers captured before outline generation */
+  setupAnswers: SetupAnswers | null;
   /** Save parsed source material */
   setSourceMaterial: (material: SourceMaterial) => void;
   /** Clear source material draft */
   clearSourceMaterial: () => void;
+  /** Save setup-question answers as the draft (sets updated_at) */
+  setSetupAnswers: (input: SetupAnswersInput) => void;
+  /** Clear setup-question answers draft */
+  clearSetupAnswers: () => void;
   /** Drive file IDs selected from the Source Library for this draft */
   selectedLibraryFileIds: string[];
   /** Toggle a Drive-backed source file selection */
@@ -29,6 +36,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
     (set) => ({
       currentDraft: null,
       sourceMaterial: null,
+      setupAnswers: null,
       selectedLibraryFileIds: [],
       setBasics: (values) =>
         set({
@@ -40,6 +48,14 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
       clearDraft: () => set({ currentDraft: null }),
       setSourceMaterial: (material) => set({ sourceMaterial: material }),
       clearSourceMaterial: () => set({ sourceMaterial: null }),
+      setSetupAnswers: (input) =>
+        set({
+          setupAnswers: {
+            ...input,
+            updated_at: new Date().toISOString(),
+          },
+        }),
+      clearSetupAnswers: () => set({ setupAnswers: null }),
       toggleLibraryFile: (driveFileId) =>
         set((state) => ({
           selectedLibraryFileIds: state.selectedLibraryFileIds.includes(driveFileId)

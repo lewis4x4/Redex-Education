@@ -63,6 +63,7 @@ describe('SourceBinderInputPage', () => {
         <Routes>
           <Route path="/admin/foundry/source" element={<SourceBinderInputPage />} />
           <Route path="/admin/foundry/start" element={<div>Reached basics route</div>} />
+          <Route path="/admin/foundry/questions" element={<div>Reached questions route</div>} />
           <Route path="/admin" element={<div>Reached admin route</div>} />
         </Routes>
       </MemoryRouter>,
@@ -105,15 +106,20 @@ describe('SourceBinderInputPage', () => {
     expect(screen.getByText('Body text')).toBeInTheDocument()
   })
 
-  it('renders disabled continue button with slice 2.4 tooltip', () => {
+  it('renders enabled continue button to setup questions', () => {
     renderWithRoutes()
 
     const continueButton = screen.getByRole('button', { name: /continue → setup questions/i })
 
-    expect(continueButton).toBeDisabled()
-    expect(continueButton).toHaveAttribute(
-      'title',
-      'Coming in Slice 2.4 — AI setup questions wizard',
-    )
+    expect(continueButton).toBeEnabled()
+  })
+
+  it('navigates to setup questions when continue is clicked', async () => {
+    const user = userEvent.setup()
+    renderWithRoutes()
+
+    await user.click(screen.getByRole('button', { name: /continue → setup questions/i }))
+
+    expect(await screen.findByText('Reached questions route')).toBeInTheDocument()
   })
 })

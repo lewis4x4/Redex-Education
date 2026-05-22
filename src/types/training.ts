@@ -62,6 +62,66 @@ export type LessonType =
 export type Criticality = 'required' | 'recommended' | 'optional' | 'bonus';
 
 /**
+ * Pedagogical stakes selected during Foundry setup-question intake.
+ *
+ * NOTE: this is distinct from lesson-level `Criticality` and models
+ * generation strictness / governance requirements for an entire module.
+ */
+export type WizardCriticality =
+  | 'informational'
+  | 'basic_knowledge'
+  | 'operational'
+  | 'compliance_high_risk';
+
+export const WIZARD_CRITICALITY_LABELS: Record<WizardCriticality, string> = {
+  informational: 'Informational',
+  basic_knowledge: 'Basic Knowledge',
+  operational: 'Operational',
+  compliance_high_risk: 'Compliance / Safety / High-Risk',
+};
+
+/**
+ * Assessment configuration style selected during Foundry setup intake.
+ */
+export type AssessmentStyle =
+  | 'no_assessment'
+  | 'light_quiz'
+  | 'standard_quiz'
+  | 'strict_quiz'
+  | 'scenario_based'
+  | 'acknowledgment_only';
+
+export const ASSESSMENT_STYLE_LABELS: Record<AssessmentStyle, string> = {
+  no_assessment: 'No assessment',
+  light_quiz: 'Light quiz',
+  standard_quiz: 'Standard quiz',
+  strict_quiz: 'Strict quiz',
+  scenario_based: 'Scenario-based assessment',
+  acknowledgment_only: 'Acknowledgment only',
+};
+
+/**
+ * Setup-question answers used by the Foundry wizard before outline generation.
+ */
+export interface SetupAnswers {
+  criticality: WizardCriticality;
+  assessment_style: AssessmentStyle;
+  /** Free text — admin description of who this module is for. */
+  audience_notes: string;
+  /** Free text — admin description of the experience style they want. */
+  experience_notes: string;
+  /** Estimated minutes; reuses ModuleBasicsDraft.estimated_minutes pattern. */
+  estimated_minutes: number;
+  /** Source control: 'strict' = no inference beyond source; 'flexible' = AI may rephrase. */
+  source_control: 'strict' | 'flexible';
+  /** Approval gates required before publish. */
+  requires_admin_approval: boolean;
+  requires_safety_review: boolean;
+  /** When the draft was last saved. */
+  updated_at: ISODateTime;
+}
+
+/**
  * High-level pedagogical category for a module.
  *
  * Used by the Course Foundry to drive setup-question defaults and

@@ -42,6 +42,7 @@ describe('useFoundryDraftStore', () => {
     act(() => {
       useFoundryDraftStore.getState().clearDraft()
       useFoundryDraftStore.getState().clearSourceMaterial()
+      useFoundryDraftStore.getState().clearSetupAnswers()
       useFoundryDraftStore.getState().clearLibrarySelection()
     })
   })
@@ -222,6 +223,57 @@ describe('useFoundryDraftStore', () => {
     expect(parsed.state.sourceMaterial).toEqual(
       expect.objectContaining({ title: 'Persisted source', type: 'markdown' }),
     )
+  })
+
+  it('starts with setupAnswers as null', () => {
+    expect(useFoundryDraftStore.getState().setupAnswers).toBeNull()
+  })
+
+  it('setSetupAnswers stores values and sets updated_at timestamp', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setSetupAnswers({
+        criticality: 'operational',
+        assessment_style: 'standard_quiz',
+        audience_notes: 'Field operators',
+        experience_notes: 'Scenario walk-through',
+        estimated_minutes: 30,
+        source_control: 'strict',
+        requires_admin_approval: true,
+        requires_safety_review: false,
+      })
+    })
+
+    const answers = useFoundryDraftStore.getState().setupAnswers
+    expect(answers).toEqual(
+      expect.objectContaining({
+        criticality: 'operational',
+        assessment_style: 'standard_quiz',
+        audience_notes: 'Field operators',
+      }),
+    )
+    expect(answers?.updated_at).toEqual(expect.any(String))
+    expect(new Date(answers?.updated_at ?? '').toString()).not.toBe('Invalid Date')
+  })
+
+  it('clearSetupAnswers resets setupAnswers to null', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setSetupAnswers({
+        criticality: 'informational',
+        assessment_style: 'light_quiz',
+        audience_notes: 'Everyone',
+        experience_notes: '',
+        estimated_minutes: 20,
+        source_control: 'flexible',
+        requires_admin_approval: false,
+        requires_safety_review: false,
+      })
+    })
+
+    act(() => {
+      useFoundryDraftStore.getState().clearSetupAnswers()
+    })
+
+    expect(useFoundryDraftStore.getState().setupAnswers).toBeNull()
   })
 
   it('starts with selectedLibraryFileIds as an empty array', () => {

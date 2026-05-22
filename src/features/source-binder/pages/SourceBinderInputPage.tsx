@@ -138,8 +138,7 @@ export function SourceBinderInputPage() {
           </Button>
           <Button
             type="button"
-            disabled
-            title="Coming in Slice 2.4 — AI setup questions wizard"
+            onClick={() => navigate('/admin/foundry/questions')}
             className="bg-redex-red hover:bg-redex-red-hover disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed"
           >
             Continue → Setup questions

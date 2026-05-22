@@ -41,6 +41,7 @@ export type {
   UUID,
   ISODateTime,
   // Enums
+  AssessmentStyle,
   Criticality,
   CourseStatus,
   EnrollmentStatus,
@@ -48,6 +49,7 @@ export type {
   LessonType,
   ProgressStatus,
   TrainingType,
+  WizardCriticality,
   // Core entities
   LearnerProfile,
   Course,
@@ -82,6 +84,7 @@ export type {
   SourceFileVersion,
   SourceMaterial,
   SourceSection,
+  SetupAnswers,
   // Facade contract
   EducationFacade,
   // UI helpers
@@ -101,4 +104,8 @@ export {
   DEMO_VALUES_QUIZ_QUESTIONS,
 };
 
-export { TRAINING_TYPE_LABELS } from '@/types/training';
+export {
+  ASSESSMENT_STYLE_LABELS,
+  TRAINING_TYPE_LABELS,
+  WIZARD_CRITICALITY_LABELS,
+} from '@/types/training';

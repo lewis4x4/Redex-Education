@@ -115,6 +115,14 @@ describe('Redex Education routes', () => {
     expect(screen.getByText('REDEX AI COURSE FOUNDRY · STEP 2')).toBeInTheDocument()
   })
 
+  it('renders FoundryQuestionsPage at /admin/foundry/questions', async () => {
+    vi.stubEnv('VITE_MOCK_AUTH', 'true')
+
+    renderAt('/admin/foundry/questions')
+
+    expect(await screen.findByRole('heading', { name: 'Setup questions' })).toBeInTheDocument()
+  })
+
   it('renders SourceLibraryPage at /admin/foundry/library', async () => {
     vi.stubEnv('VITE_MOCK_AUTH', 'true')
 
