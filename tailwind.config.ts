@@ -75,5 +75,5 @@ export default {
 			},
 		}
 	},
-	plugins: [], // tailwindcss-animate can be added later if needed for radix animations
+	plugins: [require("tailwindcss-animate")],
 } satisfies Config;
