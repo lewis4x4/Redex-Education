@@ -9,6 +9,7 @@ lerna-debug.log*
 
 node_modules
 dist
+coverage
 dist-ssr
 *.local
 
@@ -30,3 +31,12 @@ dist-ssr
 
 # Agent / runtime artifacts (OMX session state, metrics, logs)
 .omx/
+
+# Credential files — NEVER commit (Slice 2.4)
+*.key
+*.pem
+*service-account*.json
+*-credentials*.json
+**/redex-education-*.json
+docs/*.json
+docs/*key*
