@@ -302,10 +302,12 @@ Decision pending:
 
 ## Brand Tokens
 
-Decision pending:
+RESOLVED (2026-05-22) — Redex Brand Guide v1.0.
 
-- Redex red/black/gray direction is approved conceptually.
-- Exact final brand tokens may be refined later.
+- Primary brand red is **#ED1B24** (RGB 237,27,36 · Pantone 1788 C). Black #000000, White #FFFFFF.
+- Color ratio 60% white / 30% black / 10% red. Never use red as a large background fill.
+- Headings: Nexa Bold. Body: system sans-serif (Inter / SF Pro / Segoe UI). Bitsumishi is logo-only.
+- Locked token set and typography: `docs/SLICE_0.2_APP_SHELL_SPEC.md`.
 
 ---
 
@@ -448,12 +450,12 @@ Use:
 
 ---
 
-# 15. Design Tokens — Starting Point
+# 15. Design Tokens — Brand-Locked (Redex Brand Guide v1.0)
 
-These are starter tokens only, not final brand-approved values.
+Primary red corrected to the Brand Guide value **#ED1B24** (was the placeholder #ed1f24). The full locked token set and typography spec live in `docs/SLICE_0.2_APP_SHELL_SPEC.md`.
 
 ```css
---redex-red: #ed1f24;
+--redex-red: #ED1B24;
 --redex-red-dark: #b81419;
 --bg-page: #f4f5f7;
 --bg-card: #ffffff;
@@ -722,4 +724,22 @@ Do not skip source grounding.
 Do not skip approval gates.
 
 Do not skip the Build Bible updates.
+
+---
+
+## Latest Orchestration Update (Continuous Execution)
+
+**Date**: 2026-05-22 (ongoing)
+
+**Active Parallel Queue** (from velocity planning agent):
+- **Task A** — Education Domain Types + Mock Data + Facade → `src/lib/education/training-types.ts` created with seeded Orientation course.
+- **Task B** — Module Player Shell + Lesson Renderer → `ModulePlayer.tsx` + `LessonContentRenderer.tsx` started.
+- **Task C** — Quiz Component — queued.
+- **Task D** — Progress Context + Admin scaffolding — queued.
+
+All work is now locked to the correct repo: `/Users/brianlewis/Redex-Education`.
+
+We are building a real playable learner flow (welcome → dashboard → actual module player) while the architecture stays clean for the AI Course Foundry side.
+
+**Momentum**: Extremely high. Multiple agents remain active. No pauses.
 

@@ -2142,10 +2142,10 @@ Avoid:
 - Strong typography.
 - Clear visual states.
 
-## Suggested Tokens
+## Brand Tokens (Redex Brand Guide v1.0)
 
 ```css
---redex-red: #ed1f24;
+--redex-red: #ED1B24;
 --redex-red-dark: #b81419;
 --bg-page: #f4f5f7;
 --bg-card: #ffffff;
@@ -2159,7 +2159,7 @@ Avoid:
 --danger: #dc2626;
 ```
 
-Do not treat these as final brand-approved tokens. They are starting points.
+Primary red is the Redex Brand Guide v1.0 value (#ED1B24). The full locked token set and typography spec live in `docs/SLICE_0.2_APP_SHELL_SPEC.md`.
 
 ---
 
