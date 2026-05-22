@@ -8,7 +8,7 @@ interface QuizProps {
   onComplete?: (score: number, passed: boolean) => void;
 }
 
-const PASSING_THRESHOLD = 80;
+export const PASSING_THRESHOLD = 80;
 
 /**
  * Production-grade Quiz component for Redex Academy lessons.

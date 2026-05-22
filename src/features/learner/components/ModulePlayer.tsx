@@ -3,6 +3,7 @@ import type { Module, Lesson, ProgressStatus } from '@/lib/education/training-ty
 import { LessonContentRenderer } from './LessonContentRenderer';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Clock, ArrowLeft, ArrowRight } from 'lucide-react';
+import { PASSING_THRESHOLD } from './Quiz';
 
 interface ModulePlayerProps {
   module: Module;
@@ -185,7 +186,7 @@ export function ModulePlayer({
         {/* Quiz lock banner — forces real interaction before progress can advance on quiz lessons */}
         {isQuizLocked && (
           <div className="border-t bg-amber-50 px-6 py-2.5 text-sm text-amber-700 flex items-center gap-2">
-            <span>🔒 Pass the quiz above with 80% or higher to unlock lesson completion and continue.</span>
+            <span>🔒 Pass the quiz above with {PASSING_THRESHOLD}% or higher to unlock lesson completion and continue.</span>
           </div>
         )}
 
