@@ -774,7 +774,12 @@ This decision is logged here as the governing directive until the vertical slice
   - Progress is reactive and survives refresh via localStorage
   - Dashboard shows live data pulled from the new `EducationContext`
 - This is the first time the Redex Academy experience has been truly playable from end to end.
-- Remaining critical path items: Finish interactive Quiz integration + final pixel-level polish on the welcome screen.
+
+**Polish + Release – 2026-05-22**
+- Focused visual fidelity pass on `LearnerWelcomePage` (progress steps hierarchy, video + benefits row treatment, overall card presence, typography) to align with the exact high-fidelity mockup.
+- Legacy cleanup committed and pushed.
+- All changes committed to `main` and pushed to GitHub.
+- The Day 1 Orientation vertical slice is now both functionally complete and visually polished. Ready for demo.
 
 ---
 
