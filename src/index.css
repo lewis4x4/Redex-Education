@@ -1,0 +1,216 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 
+  ANTIGRAVITY INDUSTRIAL DESIGN SYSTEM 
+  Client: RedEx Ops Hub
+  Theme: "Sci-Fi Industrial" (Dark Mode First)
+*/
+
+@layer base {
+  :root {
+    /* 
+       GRAVITY TOKENS (The Neon Palette)
+       We use specific HEX for the neons as they need to be exact, but wrapped in CSS vars. 
+       We also provide HSL versions for Tailwind opacity modifiers if needed.
+    */
+    --neon-cyan: #2ec4b6;
+    --neon-green: #10b981;
+    --neon-amber: #ff9f1c;
+    --neon-red: #ef4444;    /* High-vis Red */
+    --neon-purple: #8b5cf6;
+    --neon-blue: #3b82f6;
+    
+    /* Brand Core (RedEx Identity) */
+    /* We map "Brand" to Neon Red in this theme for visibility against dark backgrounds */
+    --brand: 350 89% 60%; /* Bright Red for Dark Mode */
+    --brand-darker: 350 89% 45%; 
+    --brand-foreground: 0 0% 100%;
+
+    /* Canvas / Backgrounds - The "Charcoal" Industrial Void */
+    --bg-canvas: #0a0a0a;          /* Deepest Charcoal/Black */
+    --bg-card: rgba(20, 20, 20, 0.6); /* Glass Card Base */
+    --bg-glass: rgba(255, 255, 255, 0.03);
+    --bg-input: rgba(0, 0, 0, 0.3);
+    
+    /* Borders & Glass */
+    --border-default: rgba(255, 255, 255, 0.08);
+    --border-glow: rgba(239, 68, 68, 0.3); /* Subtle red glow */
+    --glass-blur: blur(12px);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+
+    /* Spacing & Radius */
+    --radius-sm: 0.25rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
+
+    /* Shadcn/System Mapping */
+    --background: 0 0% 4%; /* #0a0a0a */
+    --foreground: 0 0% 95%;
+    
+    --card: 0 0% 8%; 
+    --card-foreground: 0 0% 95%;
+    
+    --popover: 0 0% 4%;
+    --popover-foreground: 0 0% 95%;
+    
+    --primary: 350 89% 60%; /* Neon Red */
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 217 19% 27%; /* Slate 800ish */
+    --secondary-foreground: 0 0% 98%;
+    
+    --muted: 0 0% 15%;
+    --muted-foreground: 215 20% 65%;
+    
+    --accent: 217 19% 27%;
+    --accent-foreground: 0 0% 98%;
+    
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 98%;
+    
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 350 89% 60%; /* Red Ring */
+    
+    --radius: 0.5rem;
+    
+    /* Chart / Data Viz Colors (Neon Optimized) */
+    --chart-1: 350 89% 60%; /* Red */
+    --chart-2: 172 66% 50%; /* Cyan */
+    --chart-3: 142 71% 45%; /* Green */
+    --chart-4: 25 95% 53%;  /* Orange */
+    --chart-5: 262 83% 58%; /* Purple */
+
+    --font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    background-color: var(--bg-canvas);
+    color: hsl(var(--foreground));
+    font-family: var(--font-family);
+    font-feature-settings: "rlig" 1, "calt" 1;
+    min-height: 100vh;
+    @apply selection:bg-red-500/30 selection:text-white;
+  }
+  
+  /* Typography Overrides for Industrial Feel */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold tracking-tight text-white;
+  }
+  
+  /* Technical Headers (for labels throughout the app) */
+  .tech-header {
+    @apply text-[10px] uppercase tracking-[0.2em] text-gray-400 font-bold;
+  }
+  
+  /* Mono data values */
+  .tech-value {
+    @apply font-mono text-white;
+  }
+}
+
+@layer components {
+  /* 
+    THE GRAVITY CARD 
+    Core component of the new design system
+  */
+  .gravity-card {
+    background: var(--bg-card);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--border-default);
+    box-shadow: var(--glass-shadow);
+    border-radius: var(--radius-lg);
+    @apply transition-all duration-300;
+  }
+  
+  .gravity-card:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+  }
+
+  /* Status Badges */
+  .neon-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border;
+  }
+  
+  .badge-success {
+    background-color: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.2);
+    color: var(--neon-green);
+  }
+  
+  .badge-warning {
+    background-color: rgba(255, 159, 28, 0.1);
+    border-color: rgba(255, 159, 28, 0.2);
+    color: var(--neon-amber);
+  }
+  
+  .badge-critical {
+    background-color: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.2);
+    color: var(--neon-red);
+  }
+  
+  .badge-info {
+    background-color: rgba(46, 196, 182, 0.1);
+    border-color: rgba(46, 196, 182, 0.2);
+    color: var(--neon-cyan);
+  }
+
+  /* Buttons */
+  .btn-neon {
+    @apply relative overflow-hidden transition-all duration-300;
+    backdrop-filter: blur(4px);
+  }
+  
+  .btn-neon-primary {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    color: #fff;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
+  }
+  
+  .btn-neon-primary:hover {
+    background: rgba(239, 68, 68, 0.2);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+    border-color: var(--neon-red);
+  }
+
+  /* Scrollbar Customization for Dark Mode */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent; 
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1); 
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+}
+
+/* Utility: Hide scrollbar while keeping scroll functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
