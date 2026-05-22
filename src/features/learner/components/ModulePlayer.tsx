@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { Module, Lesson, ProgressStatus } from '@/lib/education/training-types';
+import type { Module, Lesson, ProgressStatus } from '@/lib/education';
 import { LessonContentRenderer } from './LessonContentRenderer';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Clock, ArrowLeft, ArrowRight } from 'lucide-react';

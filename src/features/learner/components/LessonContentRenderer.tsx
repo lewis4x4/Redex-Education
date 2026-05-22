@@ -1,4 +1,4 @@
-import type { Lesson } from '@/lib/education/training-types';
+import type { Lesson } from '@/lib/education';
 import { Quiz } from './Quiz';
 
 interface Props {
@@ -23,12 +23,12 @@ export function LessonContentRenderer({ lesson, onQuizComplete }: Props) {
     );
   }
 
-  if (content.type === 'reading') {
+  if (content.type === 'text') {
     return (
       <div className="prose max-w-3xl mx-auto">
         <h2>{lesson.title}</h2>
         <div className="whitespace-pre-wrap text-slate-700 leading-relaxed">
-          {content.body_markdown || 'Reading content would render here as rich markdown.'}
+          {content.body_markdown || 'Text lesson content would render here as rich markdown.'}
         </div>
       </div>
     );

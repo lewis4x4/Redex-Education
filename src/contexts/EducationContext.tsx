@@ -7,13 +7,13 @@ import type {
   LessonProgress,
   ProgressStatus,
   UUID,
-} from '@/lib/education/training-types';
+} from '@/lib/education';
 import {
   DEMO_ORIENTATION_COURSE,
   DEMO_MODULES,
   DEMO_LESSONS,
   DEMO_ENROLLMENT,
-} from '@/lib/education/training-types';
+} from '@/lib/education';
 
 // ============================================================
 // Education Progress Context (Task D1)

@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import type { LearnerProfile, Enrollment, Course, Lesson } from '@/types/training';
+import type { LearnerProfile, Enrollment, Course, Lesson } from '@/lib/education';
 import { useMyProgress } from '@/contexts/EducationContext';
 
 // Temporary inline progress

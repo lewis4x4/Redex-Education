@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Play, Check, Cloud, ArrowRight } from 'lucide-react';
-import type { LearnerProfile } from '@/types/training';
+import type { LearnerProfile } from '@/lib/education';
 
 /**
  * First-day Welcome Screen for Redex Academy

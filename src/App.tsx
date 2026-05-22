@@ -5,7 +5,7 @@ import { LearnerWelcomePage } from '@/features/learner/pages/LearnerWelcomePage'
 import { LearnerDashboardPage } from '@/features/learner/pages/LearnerDashboardPage'
 import { ModulePlayer } from '@/features/learner/components/ModulePlayer'
 import { useEducation } from '@/contexts/EducationContext'
-import type { ProgressStatus } from '@/lib/education/training-types'
+import type { ProgressStatus } from '@/lib/education'
 
 // Redex Academy - Active Build
 // Slice 0.2 + Slice 1.1 in progress

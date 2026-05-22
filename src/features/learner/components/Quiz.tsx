@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { Lesson } from '@/lib/education/training-types';
+import type { Lesson } from '@/lib/education';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, RotateCcw, Award } from 'lucide-react';
 

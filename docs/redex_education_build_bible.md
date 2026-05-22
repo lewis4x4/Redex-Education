@@ -1118,3 +1118,70 @@ Updated `.gitignore` to explicitly cover (a) local environment files and (b) age
 
 ---
 
+## 2026-05-22 — Phase 1: Foundation (Env / Types / Strict / Deps)
+
+**Status**: ✅ Completed (Phase 1 of 10)
+
+**Context**:
+Foundation pass for the remediation plan. Lands env-driven Supabase, single-source-of-truth domain types with an extensible lesson model, the row-vs-domain boundary file, TypeScript `strict: true`, and dependency hygiene. Everything downstream (routing, state, theme, tests) consumes the surfaces established here.
+
+**Summary**:
+1. **Env-driven Supabase client** — `src/integrations/supabase/client.ts` now reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from `import.meta.env`. Fails loudly in dev when missing; logs a single warning in prod (will tighten in Phase 7). `localStorage` is guarded for SSR/test contexts via `typeof window` check. Hardcoded literals removed.
+2. **`.env.example` template** — committed so contributors can `cp .env.example .env` and fill in values. `.env*` itself remains gitignored (whitelist in Phase 0).
+3. **`src/env.d.ts`** — `ImportMetaEnv` interface augmentation so `import.meta.env.VITE_SUPABASE_URL` is strongly typed.
+4. **Canonical domain types** — `src/types/training.ts` rewritten as the single source of truth for the education domain. Notable changes:
+   - **Extensible `LessonContent` discriminated union** keyed on `content.type` with all variants required by the brief: `text`, `checklist`, `acknowledgment`, `quiz`, `scenario`, `video`, `coach` (Redex Coach placeholder), plus retained `assignment` and `reflection_prompt`. Each variant has its own strongly-typed interface (`TextLessonContent`, `ChecklistLessonContent`, etc.) so future fields land additively without weakening the union.
+   - **`lesson_type` aligned 1:1 with the union** — adding a new variant is a 3-step process documented inline (LessonType ∪ LessonContent variant ∪ renderer branch).
+   - **`AssignmentRubric` introduced** to eliminate the lone `any` in the codebase (was `rubric?: any`).
+   - **`reading` → `text` rename** — clean break, no compat alias; updated all consumers and seed data.
+   - **`EducationFacade` contract** preserved (still implemented by `EducationContext`).
+5. **Type consolidation: row-vs-domain split**
+   - **Deleted** `src/lib/education/training-types.ts` (was the duplicate domain file).
+   - **New `src/lib/education/demo-data.ts`** owns `DEMO_*` seeds, including the `lesson-values` migration to the `text` content variant.
+   - **New `src/lib/education/index.ts`** is the public facade — re-exports domain types and demo data. Components import from this single path.
+   - **New `src/integrations/supabase/db-rows.ts`** declares row aliases (`TrainingCourseRow`, `TrainingModuleRow`, `TrainingLessonRow`, `UserTrainingEnrollmentRow`, `UserTrainingProgressRow`) and documents the hard rule: UI never imports row types; mappers translate Row → Domain. Mapper implementations deferred until Supabase reads land (post-Phase 2).
+6. **TypeScript strict mode** — `strict: true` enabled in both `tsconfig.app.json` (with `"DOM.Iterable"` added) and `tsconfig.node.json`. `noUncheckedIndexedAccess` deliberately **deferred to Phase 3**: it would surface ~6 ModulePlayer/Quiz indexing bugs that Phase 3 is already going to fix, so co-locating those changes there keeps each phase reviewable. `tsc -b --noEmit` is green.
+7. **New `typecheck` script** — `npm run typecheck` runs `tsc -b --noEmit` so CI/contributors can verify types independently of the full Vite build.
+8. **Dependency hygiene**
+   - Moved `autoprefixer`, `postcss`, and `tailwindcss` from `dependencies` to `devDependencies`.
+   - Removed unused `date-fns` (verified via `file_search` — zero `src/` imports; only the lockfile and one historical docs mention).
+   - Added `"engines": { "node": "^20.19.0 || >=22.12.0" }` — mirrors Vite 8's actual Node requirement; admits Node 20 LTS and Node 22+ LTS without being artificially narrow.
+9. **Consumer migration** — all 7 import sites now import from `@/lib/education` (the public facade): `EducationContext`, `ModulePlayer`, `Quiz`, `LessonContentRenderer`, `App.tsx`, `LearnerDashboardPage`, `LearnerWelcomePage`. The dashboard/welcome pages that previously reached into `@/types/training` now go through the facade — clearer boundary.
+10. **`LessonContentRenderer`** — updated the only behavior-bearing rename: `content.type === 'reading'` → `content.type === 'text'` and refreshed the fallback message.
+
+**Files touched** (20 total):
+- Modified: `package.json`, `package-lock.json`, `tsconfig.app.json`, `tsconfig.node.json`, `src/types/training.ts`, `src/integrations/supabase/client.ts`, `src/contexts/EducationContext.tsx`, `src/App.tsx`, `src/features/learner/components/{ModulePlayer,Quiz,LessonContentRenderer}.tsx`, `src/features/learner/pages/{LearnerDashboardPage,LearnerWelcomePage}.tsx`, `docs/redex_education_build_bible.md`
+- Created: `.env.example`, `src/env.d.ts`, `src/lib/education/demo-data.ts`, `src/lib/education/index.ts`, `src/integrations/supabase/db-rows.ts`
+- Deleted: `src/lib/education/training-types.ts`
+
+**Verification**:
+- ✅ `npm install` — 1 package removed (date-fns), 0 vulnerabilities
+- ✅ `npm run typecheck` — green under `strict: true`
+- ✅ `npm run build` — green; 528 kB chunk warning is pre-existing (Phase 7/8 will revisit code-splitting)
+- ⚠️ `npm run lint` — 15 errors + 1 warning, **all pre-existing**, none introduced by Phase 1. None of the Phase 1 new/rewritten files appear in the lint output. Each existing error maps to a later phase:
+  - `_archive/**` (4) → Phase 7 (ESLint ignore for `_archive/`)
+  - `src/components/ui/button.tsx` → Phase 6 (variant exports)
+  - `src/contexts/EducationContext.tsx` (6) → Phase 3 (set-state-in-effect + unused vars + only-export-components on hooks)
+  - `src/features/learner/components/ModulePlayer.tsx` → Phase 3
+  - `src/features/learner/components/Quiz.tsx` → Phase 4
+  - `src/hooks/use-auth.tsx` → Phase 2 (split hook from provider)
+  - `tailwind.config.ts` → Phase 7 (ESM `import animate`)
+
+**Known gaps** (deferred intentionally):
+- `noUncheckedIndexedAccess` left off — Phase 3 will turn it on after fixing the empty-array crashes and bounds bugs in `ModulePlayer`/`Quiz` that it would surface.
+- Mapper functions (`mapCourseRow`, `mapModuleRow`, etc.) declared as future work in `db-rows.ts` comments — implemented when real Supabase reads land.
+- No `.env` committed (correct) — `.env.example` is the contributor template.
+- Pre-existing lint failures intentionally not touched — each is a later phase's atomic fix.
+
+**Naming guardrails honored**:
+- Redex Education = repo/product ✓ (used in file/header comments)
+- Redex Academy = learner-facing brand ✓ (used in demo course title)
+- Redex AI Course Foundry = admin creation engine ✓ (referenced in types header)
+- Redex Training OS = long-term platform vision ✓ (referenced in types header)
+- No real AI wired (the `coach` lesson variant is shape-only, explicitly noted)
+- No real auth or Supabase data flows wired
+
+**Next**: Phase 2 — Routing & Auth skeleton. Unblocked once Phase 1 commit lands.
+
+---
+
