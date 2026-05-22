@@ -743,3 +743,5 @@ We are building a real playable learner flow (welcome → dashboard → actual m
 
 **Momentum**: Extremely high. Multiple agents remain active. No pauses.
 
+**User Directive Update**: Chose **Option A** — focus on production polish and pixel-perfect alignment of the current App Shell + First-day Welcome screen to the provided high-fidelity mockup before expanding the module player or admin surfaces. TopNav toggle and welcome card have been refined accordingly.
+
