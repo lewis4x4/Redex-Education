@@ -1185,3 +1185,76 @@ Foundation pass for the remediation plan. Lands env-driven Supabase, single-sour
 
 ---
 
+## 2026-05-22 — Phase 2: Routing & Auth Skeleton
+
+**Status**: ✅ Completed (Phase 2 of 10) — orchestrated as 2 sequential sub-agent items
+
+**Context**:
+Replaces the single-`/` route + in-memory `experience` toggle with real React Router structure, lands a scaffold auth gate behind a mock-mode flag, and hardens the existing `useAuth` hook. Per Phase 10 answers: routes now (not deferred), AuthGate as scaffold only (no real production auth), `/admin/*` gated, `/learn/*` open.
+
+**Orchestration**:
+Two `pair` sub-agents dispatched sequentially against a shared plan at `prompt-exports/phase-2-plan.md`.
+- **Item 1** (auth hardening + AuthGate) — session `D9521073…14051F`
+- **Item 2** (router/routes/nav, depends on Item 1's import paths) — session `83C894B4…77E4F03`
+
+Both sessions cleaned up after verification. Plan file retained for audit trail.
+
+**Summary**:
+
+### Item 1 — Auth hardening + AuthGate scaffold
+- **Hook split** — `useAuth` moved to `src/hooks/useAuth.ts`; auth context + types to `src/hooks/auth-context.ts`; `src/hooks/use-auth.tsx` is provider-only now. This kills the `react-refresh/only-export-components` lint error.
+- **Provider hardened** — `createContext<AuthContextType | undefined>(undefined)` (no more always-truthy default), cancellation guard on `getSession` and the auth-state listener so post-unmount setState can't fire, error from `getSession` now warned (was silently ignored), provider value memoized.
+- **`AuthGate`** — new default-exported component at `src/components/auth/AuthGate.tsx`. Reads `useAuth()`. Three branches:
+  1. `import.meta.env.VITE_MOCK_AUTH === 'true'` → render children unconditionally (the explicit dev-mode bypass)
+  2. `loading` → render fallback ("Authenticating…")
+  3. `!session && !mock` → render branded "Sign-in required" placeholder card
+- **Env wiring** — `VITE_MOCK_AUTH` documented in `.env.example` (default `true` so contributors aren't blocked) and typed in `src/env.d.ts` as `readonly VITE_MOCK_AUTH?: 'true' | 'false'`.
+
+### Item 2 — Router foundation + routes + nav
+- **`BrowserRouter` relocated** from `App.tsx` → `src/main.tsx`, wrapping providers (safe-by-default position).
+- **Route structure** (in `App.tsx`):
+  - `/` → `<Navigate to="/learn" replace />`
+  - `/learn` → `LearnerDashboardPage` (dashboard-first; welcome moved to a dedicated route)
+  - `/learn/welcome` → `LearnerWelcomePage`
+  - `/learn/player` and `/learn/player/:moduleId` → `ModulePlayer` (defaults to `mod-001` if param absent)
+  - `/admin` and `/admin/*` → `AdminPlaceholderPage` wrapped in `<AuthGate>`
+  - `*` → `NotFoundPage`
+- **`TopNav` is router-driven** — `useNavigate` + `useLocation`; active state derived from `pathname.startsWith('/learn')` and `pathname.startsWith('/admin')`. Accessibility hits landed while editing: `aria-label="Primary navigation"` on `<nav>`, `aria-pressed` on toggle buttons, `type="button"` on all buttons.
+- **`AppShell` simplified** — `experience` prop drilling removed.
+- **New small files** — `src/components/layout/NotFoundPage.tsx`, `src/features/admin/pages/AdminPlaceholderPage.tsx`.
+- **Bonus** — Item 2's agent removed the unused `buttonVariants` export from `src/components/ui/button.tsx` to clear one more lint error. Verified zero external consumers (`_archive/` has its own copy); benign early-landing Phase 6 free fix.
+
+**Files touched** (15 total):
+- Modified: `src/main.tsx`, `src/App.tsx`, `src/components/layout/{AppShell,TopNav}.tsx`, `src/components/ui/button.tsx`, `src/hooks/use-auth.tsx`, `.env.example`, `src/env.d.ts`, `docs/redex_education_build_bible.md`
+- Created: `src/components/auth/AuthGate.tsx`, `src/components/layout/NotFoundPage.tsx`, `src/features/admin/pages/AdminPlaceholderPage.tsx`, `src/hooks/auth-context.ts`, `src/hooks/useAuth.ts`, `prompt-exports/phase-2-plan.md`
+
+**Verification**:
+- ✅ `npm run typecheck` — green
+- ✅ `npm run build` — green (528 kB chunk warning is pre-existing Phase 7/8 work)
+- ⚠️ `npm run lint` — **13 errors + 1 warning** (was 15+1 in Phase 1; down 2). Resolved this phase: `use-auth.tsx react-refresh/only-export-components`, `button.tsx react-refresh/only-export-components`. Remaining errors map to later phases:
+  - `_archive/**` (4) → Phase 7 (ESLint `_archive` ignore)
+  - `EducationContext.tsx` (6) → Phase 3 (set-state-in-effect + unused vars + hooks-export split)
+  - `ModulePlayer.tsx` → Phase 3
+  - `Quiz.tsx` → Phase 4
+  - `tailwind.config.ts` → Phase 7 (ESM `import animate`)
+- Route paths reasoned by reading App.tsx — `/`, `/learn`, `/learn/welcome`, `/learn/player[/:moduleId]`, `/admin`, unknown all wired.
+
+**Known gaps** (deferred intentionally):
+- AuthGate's mock bypass still requires `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` because `AuthProvider` imports `supabase/client` at module load (Phase 1 fail-fast). This is correct: mock mode skips gate checks, NOT env requirements. If we ever want full mock-without-Supabase boot, that's a Phase 7+ conversation.
+- `LearnerModuleRoute` synthesizes a `Module` shape with a passthrough `moduleId` when the param isn't `mod-001`. This means deep links like `/learn/player/garbage` will render mod-001's lesson content under a different ID. Phase 3 (state correctness) owns the proper "unknown module" handling.
+- Admin route shows a placeholder only — Redex AI Course Foundry implementation deferred.
+- Real production auth (sign-in UI, redirect-back, role gating) deliberately not wired per phase-10 instruction.
+
+**Naming guardrails honored**:
+- Redex Education = repo/product ✓
+- Redex Academy = `/learn/*` ✓ (TopNav, demo course, all branding strings)
+- Redex AI Course Foundry = `/admin/*` ✓ (AuthGate placeholder mentions it)
+- Redex Training OS — not surfaced here (correct; it's the long-term vision label)
+- No real AI wired ✓
+- No real auth wired ✓
+- No secrets introduced ✓
+
+**Next**: Phase 3 — State & progress correctness. Unblocks the EducationContext + ModulePlayer effect fixes plus `noUncheckedIndexedAccess` rollout. Should unblock the 7 Phase-3-tagged lint errors in one pass.
+
+---
+
