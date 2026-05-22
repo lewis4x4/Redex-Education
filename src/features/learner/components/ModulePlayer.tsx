@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Module, Lesson, ProgressStatus } from '@/lib/education/training-types';
 import { LessonContentRenderer } from './LessonContentRenderer';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,8 @@ interface ModulePlayerProps {
   onProgressUpdate?: (lessonId: string, status: ProgressStatus) => void;
   onCompleteModule?: () => void;
   onExit?: () => void;
+  /** Seed the player's completed lesson UI from persisted EducationContext progress (enables correct state on return from dashboard) */
+  completedLessonIds?: string[];
 }
 
 export function ModulePlayer({
@@ -20,18 +22,45 @@ export function ModulePlayer({
   onProgressUpdate,
   onCompleteModule,
   onExit,
+  completedLessonIds = [],
 }: ModulePlayerProps) {
   const [currentIndex, setCurrentIndex] = useState(
     lessons.findIndex(l => l.id === initialLessonId) > -1 
       ? lessons.findIndex(l => l.id === initialLessonId) 
       : 0
   );
-  const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
+  // Seed from EducationContext persisted progress so that returning to the player (after dashboard)
+  // correctly reflects previously completed lessons. Local Set tracks this-session marks for instant UI.
+  const [completedLessons, setCompletedLessons] = useState<Set<string>>(() => new Set(completedLessonIds));
   // Track quiz outcomes so we can gate "Mark Complete" for quiz lessons and auto-record progress on pass
   const [quizResults, setQuizResults] = useState<Record<string, { score: number; passed: boolean }>>({});
 
+  // Keep local completed state in sync with any updates from the EducationContext (via parent prop).
+  // This ensures the player's sidebar/progress always match the persisted source of truth when it changes.
+  useEffect(() => {
+    if (completedLessonIds.length > 0) {
+      setCompletedLessons((prev) => {
+        const next = new Set(prev);
+        let changed = false;
+        completedLessonIds.forEach((id) => {
+          if (!next.has(id)) {
+            next.add(id);
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    }
+  }, [completedLessonIds]);
+
   const currentLesson = lessons[currentIndex];
   const isLastLesson = currentIndex === lessons.length - 1;
+
+  // Quiz gating for production-feeling flow: quiz lessons must be passed to unlock "Mark Complete"
+  const isQuizLesson = currentLesson.lesson_type === 'quiz';
+  const currentQuizResult = quizResults[currentLesson.id];
+  const quizHasPassed = currentQuizResult?.passed === true;
+  const isQuizLocked = isQuizLesson && !quizHasPassed && !completedLessons.has(currentLesson.id);
 
   const handleMarkComplete = () => {
     const newCompleted = new Set(completedLessons);
@@ -126,11 +155,39 @@ export function ModulePlayer({
               console.log(
                 `[ModulePlayer] Quiz "${currentLesson.title}" completed: ${score}% — ${passed ? 'PASSED ✓' : 'NOT PASSED'}`
               );
-              // The Quiz component has already called its onComplete.
-              // Player can later persist scores or auto-mark when passed.
+              // Record result for gating + UI
+              setQuizResults((prev) => ({
+                ...prev,
+                [currentLesson.id]: { score, passed },
+              }));
+
+              // When the learner passes a quiz lesson, auto-mark it complete so progress updates immediately
+              // (the quiz itself is the interaction that fulfills the lesson requirement for the vertical slice)
+              if (passed) {
+                setCompletedLessons((prevCompleted) => {
+                  if (prevCompleted.has(currentLesson.id)) return prevCompleted;
+                  const next = new Set(prevCompleted);
+                  next.add(currentLesson.id);
+                  return next;
+                });
+                onProgressUpdate?.(currentLesson.id, 'completed');
+
+                // If this was the final lesson and passed via quiz, complete the module flow too
+                if (isLastLesson) {
+                  // Brief pause so learner sees the success banner + score in Quiz before dashboard transition
+                  setTimeout(() => onCompleteModule?.(), 650);
+                }
+              }
             }}
           />
         </div>
+
+        {/* Quiz lock banner — forces real interaction before progress can advance on quiz lessons */}
+        {isQuizLocked && (
+          <div className="border-t bg-amber-50 px-6 py-2.5 text-sm text-amber-700 flex items-center gap-2">
+            <span>🔒 Pass the quiz above with 80% or higher to unlock lesson completion and continue.</span>
+          </div>
+        )}
 
         <div className="border-t p-4 bg-white flex items-center justify-between">
           <Button variant="outline" onClick={() => goToLesson(currentIndex - 1)} disabled={currentIndex === 0}>
@@ -139,9 +196,12 @@ export function ModulePlayer({
 
           <Button 
             onClick={handleMarkComplete} 
+            disabled={isQuizLocked}
             className="bg-[#ED1B24] hover:bg-[#b81419] disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed"
           >
-            {isLastLesson ? 'Complete Module' : 'Mark Complete & Continue'}
+            {isQuizLocked 
+              ? 'Pass Quiz to Continue' 
+              : isLastLesson ? 'Complete Module' : 'Mark Complete & Continue'}
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </div>
