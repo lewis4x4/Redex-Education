@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import type { LearnerProfile, Enrollment, Course, Lesson } from '@/types/training';
+import { useMyProgress } from '@/contexts/EducationContext';
 
 // Temporary inline progress
 function Progress({ value, className }: { value: number; className?: string }) {
@@ -18,6 +19,8 @@ interface LearnerDashboardPageProps {
   learner?: LearnerProfile;
   enrollment?: Enrollment & { course: Course };
   nextLesson?: Lesson | null;
+  onContinue?: () => void;
+  onStartJourney?: () => void;
 }
 import { Clock, HelpCircle, ArrowRight } from 'lucide-react';
 
@@ -28,16 +31,17 @@ import { Clock, HelpCircle, ArrowRight } from 'lucide-react';
  * 2. How far along am I?
  * 3. Who can help me if I’m stuck?
  */
-export function LearnerDashboardPage({ learner, enrollment }: LearnerDashboardPageProps) {
+export function LearnerDashboardPage({ learner, onContinue }: LearnerDashboardPageProps) {
+  const { percentage, completed, total } = useMyProgress();
   const displayName = learner?.preferred_name ?? learner?.display_name ?? 'Marcus';
 
-  // Mock data fallback
+  // Live data from EducationContext (Task D1)
   const currentAssignment = {
-    title: enrollment?.course?.title ?? "HR Onboarding Essentials",
-    progress: enrollment?.progress_percentage ?? 25,
-    totalLessons: 8,
-    completedLessons: 2,
-    estimatedMinutesLeft: 14,
+    title: 'Redex Academy Orientation',
+    progress: percentage,
+    totalLessons: total,
+    completedLessons: completed,
+    estimatedMinutesLeft: Math.max(5, Math.round((100 - percentage) * 0.25)),
     dueInDays: 5,
   };
 
@@ -60,7 +64,7 @@ export function LearnerDashboardPage({ learner, enrollment }: LearnerDashboardPa
           <div>
             <div className="font-medium text-lg">{currentAssignment.title}</div>
             <div className="text-sm text-[#6b7280] mt-1">
-              Lesson 3 of {currentAssignment.totalLessons} • {currentAssignment.completedLessons} completed
+              {currentAssignment.completedLessons} of {currentAssignment.totalLessons} lessons complete • {currentAssignment.progress}%
             </div>
           </div>
 
@@ -76,7 +80,11 @@ export function LearnerDashboardPage({ learner, enrollment }: LearnerDashboardPa
             <span>~{currentAssignment.estimatedMinutesLeft} minutes remaining</span>
           </div>
 
-          <Button size="lg" className="w-full md:w-auto bg-[#ed1f24] hover:bg-[#c41a1e] mt-2">
+          <Button 
+            size="lg" 
+            className="w-full md:w-auto bg-[#ed1f24] hover:bg-[#c41a1e] mt-2"
+            onClick={onContinue}
+          >
             Continue Training <ArrowRight className="ml-2 w-4 h-4" />
           </Button>
         </CardContent>

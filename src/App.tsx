@@ -2,24 +2,89 @@ import { useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { LearnerWelcomePage } from '@/features/learner/pages/LearnerWelcomePage'
+import { LearnerDashboardPage } from '@/features/learner/pages/LearnerDashboardPage'
+import { ModulePlayer } from '@/features/learner/components/ModulePlayer'
+import { useEducation } from '@/contexts/EducationContext'
+import type { ProgressStatus } from '@/lib/education/training-types'
 
 // Redex Academy - Active Build
 // Slice 0.2 + Slice 1.1 in progress
 // Experience toggle is now live in the TopNav (matching the v3 mockup)
 
+type LearnerView = 'welcome' | 'dashboard' | 'player';
+
 function LearnerExperience({ experience, onExperienceChange }: { 
   experience: 'learner' | 'admin'; 
   onExperienceChange: (exp: 'learner' | 'admin') => void;
 }) {
+  const [view, setView] = useState<LearnerView>('welcome');
+  const education = useEducation();
+
+  const demoModule = education.getDemoModule();
+  const demoLessons = education.getDemoLessons();
+
+  const handleStartJourney = () => {
+    setView('player');
+  };
+
+  const handleExitPlayer = () => {
+    setView('dashboard');
+  };
+
+  const handleCompleteModule = () => {
+    // After completing the orientation module, drop user on the live dashboard
+    setView('dashboard');
+  };
+
+  const handleContinueFromDashboard = () => {
+    setView('player');
+  };
+
+  // Dynamic breadcrumb for the current learner view
+  const getBreadcrumb = () => {
+    if (view === 'welcome') return 'Learner flow › First-day welcome';
+    if (view === 'dashboard') return 'Learner flow › My Learning Dashboard';
+    return 'Learner flow › Orientation Module Player';
+  };
+
+  const renderContent = () => {
+    if (view === 'player') {
+      return (
+        <ModulePlayer
+          module={demoModule}
+          lessons={demoLessons}
+          onProgressUpdate={(lessonId: string, status: ProgressStatus) => {
+            education.recordLessonProgress(lessonId, status);
+          }}
+          onCompleteModule={handleCompleteModule}
+          onExit={handleExitPlayer}
+        />
+      );
+    }
+
+    if (view === 'dashboard') {
+      return (
+        <LearnerDashboardPage
+          onContinue={handleContinueFromDashboard}
+          onStartJourney={handleStartJourney}
+        />
+      );
+    }
+
+    // welcome
+    return <LearnerWelcomePage onStartJourney={handleStartJourney} />;
+  };
+
   return (
     <AppShell 
       experience={experience} 
       onExperienceChange={onExperienceChange}
-      breadcrumb="Learner flow › First-day welcome"
+      breadcrumb={getBreadcrumb()}
+      playerMode={view === 'player'}
     >
-      <LearnerWelcomePage />
+      {renderContent()}
     </AppShell>
-  )
+  );
 }
 
 function AdminExperience({ experience, onExperienceChange }: { 

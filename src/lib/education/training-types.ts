@@ -117,10 +117,53 @@ export const DEMO_MODULES: Module[] = [
   { id: 'mod-003', course_id: 'course-orientation-001', title: 'Safety & Compliance', order_index: 3, criticality: 'required', estimated_minutes: 15 },
 ];
 
+// Demo quiz questions for the Orientation "Values" lesson (Task C)
+export const DEMO_VALUES_QUIZ_QUESTIONS = [
+  {
+    id: 'q-values-001',
+    question: "What is Redex's stated priority when it comes to decision making?",
+    options: [
+      "Profit maximization above all",
+      "Speed and efficiency at any cost",
+      "People first — safety, respect, and long-term impact",
+      "Customer satisfaction only",
+    ],
+    correct_index: 2,
+  },
+  {
+    id: 'q-values-002',
+    question: "Redex requires all employees to complete safety training before accessing operational areas.",
+    options: ["True", "False"],
+    correct_index: 0,
+  },
+  {
+    id: 'q-values-003',
+    question: "Which tool will you primarily use for daily shift handoffs and real-time updates?",
+    options: [
+      "Company email only",
+      "The Redex Ops Hub mobile + web app",
+      "Paper logbooks at each station",
+      "Verbal briefings at shift change",
+    ],
+    correct_index: 1,
+  },
+  {
+    id: 'q-values-004',
+    question: "If you notice a potential safety hazard on the floor, the correct first action is:",
+    options: [
+      "Ignore it if the area is not your assigned station",
+      "Report it immediately via Ops Hub or your supervisor",
+      "Attempt to resolve it yourself without proper training",
+      "Mention it casually at the end of your shift",
+    ],
+    correct_index: 1,
+  },
+];
+
 export const DEMO_LESSONS: Lesson[] = [
   { id: 'lesson-welcome-video', module_id: 'mod-001', title: 'A quick hello from leadership', lesson_type: 'video', criticality: 'required', order_index: 1, estimated_minutes: 4, content: { type: 'video', video_url: 'https://example.com/welcome-video.mp4' } },
   { id: 'lesson-values', module_id: 'mod-001', title: 'Redex Values & What We Expect', lesson_type: 'reading', criticality: 'required', order_index: 2, estimated_minutes: 5, content: { type: 'reading', body_markdown: '...' } },
-  { id: 'lesson-values-quiz', module_id: 'mod-001', title: 'Quick Check: Values', lesson_type: 'quiz', criticality: 'required', order_index: 3, estimated_minutes: 3, content: { type: 'quiz', questions: [] } },
+  { id: 'lesson-values-quiz', module_id: 'mod-001', title: 'Quick Check: Values', lesson_type: 'quiz', criticality: 'required', order_index: 3, estimated_minutes: 3, content: { type: 'quiz', questions: DEMO_VALUES_QUIZ_QUESTIONS } },
 ];
 
 export const DEMO_ENROLLMENT: Enrollment = {

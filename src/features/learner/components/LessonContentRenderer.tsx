@@ -1,11 +1,12 @@
-import React from 'react';
 import type { Lesson } from '@/lib/education/training-types';
+import { Quiz } from './Quiz';
 
 interface Props {
   lesson: Lesson;
+  onQuizComplete?: (score: number, passed: boolean) => void;
 }
 
-export function LessonContentRenderer({ lesson }: Props) {
+export function LessonContentRenderer({ lesson, onQuizComplete }: Props) {
   const { content } = lesson;
 
   if (content.type === 'video') {
@@ -34,13 +35,7 @@ export function LessonContentRenderer({ lesson }: Props) {
   }
 
   if (content.type === 'quiz') {
-    return (
-      <div className="max-w-xl mx-auto text-center py-12">
-        <div className="text-6xl mb-4">📝</div>
-        <h3 className="text-xl font-semibold mb-2">Knowledge Check</h3>
-        <p className="text-slate-600">Quiz component will be wired here (see Task C).</p>
-      </div>
-    );
+    return <Quiz lesson={lesson} onComplete={onQuizComplete} />;
   }
 
   return (

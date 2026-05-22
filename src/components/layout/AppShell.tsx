@@ -7,13 +7,15 @@ interface AppShellProps {
   experience: 'learner' | 'admin';
   onExperienceChange: (exp: 'learner' | 'admin') => void;
   breadcrumb?: string;
+  playerMode?: boolean; // when true, relaxes constraints so ModulePlayer can take full available space
 }
 
 export function AppShell({ 
   children, 
   experience, 
   onExperienceChange,
-  breadcrumb 
+  breadcrumb,
+  playerMode = false,
 }: AppShellProps) {
   return (
     <div className="min-h-screen bg-[#f4f5f7] text-[#09090b]">
@@ -24,7 +26,13 @@ export function AppShell({
       
       {breadcrumb && <BreadcrumbBar text={breadcrumb} />}
       
-      <main className="max-w-[1200px] mx-auto px-6 py-8">
+      <main
+        className={
+          playerMode
+            ? 'max-w-none px-3 py-2'
+            : 'max-w-[1200px] mx-auto px-6 py-8'
+        }
+      >
         {children}
       </main>
     </div>

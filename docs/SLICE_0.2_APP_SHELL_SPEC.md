@@ -220,3 +220,27 @@ slice (shell only) · build the Manager experience yet.
 A premium, brand-correct Redex Academy shell that can immediately host the
 first-day welcome screen in Slice 1.1 — with the brand red, typography, and
 navigation locked so nothing downstream inherits a wrong value.
+
+---
+
+## 9. Correction required — wrong red already in code (found 2026-05-22)
+
+Codex built Slice 0.2 (App Shell) and Slice 1.1 (Welcome) before this spec landed,
+using placeholder reds. **Three different wrong reds are now in the source** — fix
+all of them to the brand value `#ED1B24`:
+
+| File : line | Current (wrong) | Correct |
+|---|---|---|
+| `src/index.css` : ~59 | `--primary: 350 89% 60%;` /* Neon Red */ | `--primary: 357 85% 52%;` /* Redex Red #ED1B24 */ |
+| `src/features/learner/pages/LearnerWelcomePage.tsx` : 23 | `text-[#ed1f24]` | `text-[#ED1B24]` |
+| `src/features/learner/pages/LearnerDashboardPage.tsx` : 10 | `bg-[#ed1f24]` | `bg-[#ED1B24]` |
+| `src/features/learner/pages/LearnerDashboardPage.tsx` : 52 | `border-[#ed1f24]/20` | `border-[#ED1B24]/20` |
+| `src/features/learner/pages/LearnerDashboardPage.tsx` : 71 | `text-[#ed1f24]` | `text-[#ED1B24]` |
+| `src/features/learner/pages/LearnerDashboardPage.tsx` : 79 | `bg-[#ed1f24] hover:bg-[#c41a1e]` | `bg-[#ED1B24] hover:bg-[#C2161E]` |
+
+**Root cause and the real fix:** components are hard-coding arbitrary hex values
+(`bg-[#ed1f24]`). That is why one wrong value multiplied into five places. Do the
+§2 token wiring *first* — `--primary` = `357 85% 52%`, plus a `redex.red` Tailwind
+color — then replace every hard-coded red with the token (`bg-primary`,
+`text-primary`, `text-redex-red`). After the pass,
+`grep -ri "ed1f24\|350 89%\|c41a1e" src` must return nothing.

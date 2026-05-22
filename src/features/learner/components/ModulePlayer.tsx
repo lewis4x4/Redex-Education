@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import type { Module, Lesson, LessonProgress, ProgressStatus } from '@/lib/education/training-types';
+import { useState } from 'react';
+import type { Module, Lesson, ProgressStatus } from '@/lib/education/training-types';
 import { LessonContentRenderer } from './LessonContentRenderer';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Clock, ArrowLeft, ArrowRight } from 'lucide-react';
@@ -118,7 +118,16 @@ export function ModulePlayer({
         </div>
 
         <div className="flex-1 overflow-auto p-8 bg-[#f8f7f4]">
-          <LessonContentRenderer lesson={currentLesson} />
+          <LessonContentRenderer
+            lesson={currentLesson}
+            onQuizComplete={(score, passed) => {
+              console.log(
+                `[ModulePlayer] Quiz "${currentLesson.title}" completed: ${score}% — ${passed ? 'PASSED ✓' : 'NOT PASSED'}`
+              );
+              // The Quiz component has already called its onComplete.
+              // Player can later persist scores or auto-mark when passed.
+            }}
+          />
         </div>
 
         <div className="border-t p-4 bg-white flex items-center justify-between">
