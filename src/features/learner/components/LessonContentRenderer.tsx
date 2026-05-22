@@ -35,7 +35,7 @@ export function LessonContentRenderer({ lesson, onQuizComplete }: Props) {
   }
 
   if (content.type === 'quiz') {
-    return <Quiz lesson={lesson} onComplete={onQuizComplete} />;
+    return <Quiz key={lesson.id} lesson={lesson} onComplete={onQuizComplete} />;
   }
 
   return (

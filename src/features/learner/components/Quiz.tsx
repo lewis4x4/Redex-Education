@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import type { Lesson } from '@/lib/education';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, RotateCcw, Award } from 'lucide-react';
@@ -24,33 +24,50 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
     return lesson.content.type === 'quiz' ? lesson.content.questions : [];
   }, [lesson]);
 
+  const gradeableQuestions = useMemo(() => {
+    return questions.filter((q) => {
+      if (q.correct_index === undefined) return false;
+      return q.correct_index >= 0 && q.correct_index < q.options.length;
+    });
+  }, [questions]);
+
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [score, setScore] = useState(0);
   const [hasPassed, setHasPassed] = useState(false);
+  const hasNotifiedEmptyQuiz = useRef(false);
 
-  // Reset internal state when switching lessons
-  useEffect(() => {
-    setAnswers({});
-    setIsSubmitted(false);
-    setScore(0);
-    setHasPassed(false);
-  }, [lesson.id]);
-
-  const allAnswered = questions.length > 0 && Object.keys(answers).length === questions.length;
+  const hasNoGradeableQuestions = gradeableQuestions.length === 0;
+  const allAnswered =
+    gradeableQuestions.length > 0 &&
+    gradeableQuestions.every((question) => answers[question.id] !== undefined);
 
   const calculateResults = (currentAnswers: Record<string, number>) => {
-    if (questions.length === 0) return { score: 0, correctCount: 0, total: 0 };
+    if (gradeableQuestions.length === 0) {
+      return { score: 0, correctCount: 0, total: 0, rawFraction: 0 };
+    }
+
     let correctCount = 0;
-    questions.forEach((q) => {
+    gradeableQuestions.forEach((q) => {
       const selected = currentAnswers[q.id];
-      if (q.correct_index !== undefined && selected === q.correct_index) {
+      if (selected === q.correct_index) {
         correctCount++;
       }
     });
-    const pct = Math.round((correctCount / questions.length) * 100);
-    return { score: pct, correctCount, total: questions.length };
+
+    const total = gradeableQuestions.length;
+    const rawFraction = correctCount / total;
+    const pct = Math.round(rawFraction * 100);
+
+    return { score: pct, correctCount, total, rawFraction };
   };
+
+  useEffect(() => {
+    if (hasNoGradeableQuestions && !hasNotifiedEmptyQuiz.current) {
+      hasNotifiedEmptyQuiz.current = true;
+      onComplete?.(0, false);
+    }
+  }, [hasNoGradeableQuestions, onComplete]);
 
   const handleSelect = (questionId: string, optionIndex: number) => {
     if (isSubmitted) return;
@@ -64,7 +81,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
     if (!allAnswered) return;
     const results = calculateResults(answers);
     setScore(results.score);
-    const passed = results.score >= PASSING_THRESHOLD;
+    const passed = results.rawFraction >= PASSING_THRESHOLD / 100;
     setHasPassed(passed);
     setIsSubmitted(true);
     onComplete?.(results.score, passed);
@@ -77,12 +94,12 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
     setHasPassed(false);
   };
 
-  if (questions.length === 0) {
+  if (hasNoGradeableQuestions) {
     return (
       <div className="max-w-xl mx-auto text-center py-8">
-        <div className="text-5xl mb-4">📝</div>
-        <h3 className="text-xl font-semibold mb-2">Knowledge Check</h3>
-        <p className="text-slate-600">This quiz is being prepared. Check back soon.</p>
+        <div className="text-5xl mb-4">⚠️</div>
+        <h3 className="text-xl font-semibold mb-2">Quiz unavailable</h3>
+        <p className="text-slate-600">Quiz has no questions — contact your administrator.</p>
       </div>
     );
   }
@@ -97,7 +114,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
           <div className="uppercase tracking-[2px] text-xs font-semibold text-[#ED1B24]">KNOWLEDGE CHECK</div>
           <h3 className="text-2xl font-semibold tracking-tight mt-1">{lesson.title}</h3>
           <p className="text-sm text-slate-500 mt-0.5">
-            {questions.length} questions • {PASSING_THRESHOLD}% to pass
+            {gradeableQuestions.length} questions • {PASSING_THRESHOLD}% to pass
           </p>
         </div>
 
@@ -142,6 +159,11 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
         {questions.map((question, qIndex) => {
           const selectedIdx = answers[question.id];
           const showFeedback = isSubmitted;
+          const hasValidCorrectIndex =
+            question.correct_index !== undefined &&
+            question.correct_index >= 0 &&
+            question.correct_index < question.options.length;
+          const correctIndex = hasValidCorrectIndex ? question.correct_index : undefined;
 
           return (
             <div
@@ -162,7 +184,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
               <div className="px-6 pb-5 space-y-[7px]">
                 {question.options.map((option, oIndex) => {
                   const isSelected = selectedIdx === oIndex;
-                  const isCorrect = question.correct_index === oIndex;
+                  const isCorrect = correctIndex === oIndex;
 
                   let optionClasses =
                     'w-full flex items-start gap-3 text-left px-4 py-[13px] rounded-xl border text-sm transition-all active:scale-[0.985] ';
@@ -170,7 +192,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
                   if (showFeedback) {
                     if (isCorrect) {
                       optionClasses += 'bg-emerald-50 border-emerald-200 text-emerald-900';
-                    } else if (isSelected) {
+                    } else if (isSelected && hasValidCorrectIndex) {
                       optionClasses += 'bg-red-50 border-red-200 text-red-900';
                     } else {
                       optionClasses += 'bg-slate-50 border-slate-200 text-slate-500';
@@ -183,7 +205,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
 
                   return (
                     <button
-                      key={oIndex}
+                      key={`${question.id}-${oIndex}-${option}`}
                       type="button"
                       disabled={isSubmitted}
                       onClick={() => handleSelect(question.id, oIndex)}
@@ -195,7 +217,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
                           showFeedback
                             ? isCorrect
                               ? 'border-emerald-600 bg-emerald-600'
-                              : isSelected
+                              : isSelected && hasValidCorrectIndex
                                 ? 'border-red-600 bg-red-600'
                                 : 'border-slate-300 bg-white'
                             : isSelected
@@ -214,7 +236,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
                       {showFeedback && isCorrect && (
                         <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-px" />
                       )}
-                      {showFeedback && isSelected && !isCorrect && (
+                      {showFeedback && isSelected && !isCorrect && hasValidCorrectIndex && (
                         <XCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-px" />
                       )}
                     </button>
@@ -225,11 +247,11 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
               {/* Inline correct answer hint for wrongs */}
               {isSubmitted &&
                 selectedIdx !== undefined &&
-                question.correct_index !== undefined &&
-                selectedIdx !== question.correct_index && (
+                correctIndex !== undefined &&
+                selectedIdx !== correctIndex && (
                   <div className="px-6 py-2.5 text-xs bg-emerald-50/60 border-t border-emerald-100 text-emerald-700 flex gap-1.5">
                     <span className="font-medium">Correct:</span>
-                    <span>{question.options[question.correct_index]}</span>
+                    <span>{question.options[correctIndex]}</span>
                   </div>
                 )}
             </div>
@@ -248,25 +270,14 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
             Submit Quiz
           </Button>
         ) : (
-          <>
-            <Button
-              variant="outline"
-              onClick={handleRetake}
-              className="flex-1 h-11 rounded-xl text-base font-medium border-slate-300 hover:bg-slate-50"
-            >
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Retake Quiz
-            </Button>
-
-            <Button
-              onClick={() => onComplete?.(score, hasPassed)}
-              variant="outline"
-              className="flex-1 h-11 rounded-xl text-base font-medium border-[#ED1B24]/70 text-[#ED1B24] hover:bg-red-50/60 hover:border-[#ED1B24]"
-            >
-              <Award className="w-4 h-4 mr-2" />
-              Re-announce Score
-            </Button>
-          </>
+          <Button
+            variant="outline"
+            onClick={handleRetake}
+            className="flex-1 h-11 rounded-xl text-base font-medium border-slate-300 hover:bg-slate-50"
+          >
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Retake Quiz
+          </Button>
         )}
       </div>
 

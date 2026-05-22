@@ -1337,3 +1337,56 @@ Both sessions cleaned up post-verification.
 
 ---
 
+## 2026-05-22 — Phase 4: Quiz Correctness
+
+**Status**: ✅ Completed (Phase 4 of 10) — single `engineer` sub-agent
+
+**Context**:
+Smallest phase of the plan — all 6 fixes lived in a single file. Skipped multi-item ceremony per orchestrator guidance and dispatched one `engineer` agent (clear path, well-scoped). Closes out the last learner-flow correctness defects from the original review.
+
+**Orchestration**:
+One sub-agent — session `D034DD49…1AB32B` (cleaned up post-verification). Plan at `prompt-exports/phase-4-plan.md`.
+
+**Summary**:
+- **Passing math fixed** — `passed = correctCount / total >= PASSING_THRESHOLD / 100`. Raw fraction comparison kills the off-by-rounding bug where a 79.5% could have passed. Rounded percentage is now used ONLY for display.
+- **0-question handling** — chose approach **(a) authoring error**. Renders a "Quiz unavailable" card and calls `onComplete?.(0, false)` exactly once via a `useRef` guard so `ModulePlayer` registers a fail (vs. locking forever) without silently auto-passing. Rationale: surfaces bad content instead of hiding it.
+- **Invalid `correct_index` filtered** — new `gradeableQuestions` `useMemo` excludes questions with missing/negative/out-of-bounds `correct_index`. If ALL questions are invalid, falls through to the 0-question path. Counts, denominators, "correct" hints, and feedback styling all respect this.
+- **Stable option keys** — composite `${question.id}-${oIndex}-${option}` replaces the index-only key. Option label inclusion catches reorder cases without requiring a per-option ID type extension (deferred to future authoring tooling).
+- **"Re-announce Score" button removed** — was a demo/debug action that could re-fire `onComplete`. Phase 3's `recordLessonProgress` idempotency made it harmless but UX-pointless; removing the JSX entirely is the cleanest fix. Footer when `isSubmitted` now has only "Retake Quiz".
+- **Lesson-switch reset effect deleted** — replaced with `<Quiz key={lesson.id} ... />` at the parent (`LessonContentRenderer.tsx`). React's reconciler remounts on key change, giving the same reset behavior with zero `setState-in-effect` ceremony. **Structural fix, not a suppression** — same approach used in Phase 3's ModulePlayer derived-state refactor.
+- **One strict-TS narrowing** — `correct_index` indexing with `noUncheckedIndexedAccess` required a local `correctIndex` variable to narrow once and reuse. Already handled cleanly without `!` or `as`.
+
+**Files touched** (2 modified, 1 new plan + Build Bible):
+- Modified: `src/features/learner/components/Quiz.tsx`, `src/features/learner/components/LessonContentRenderer.tsx`, `docs/redex_education_build_bible.md`
+- Created: `prompt-exports/phase-4-plan.md`
+- `ModulePlayer.tsx` deliberately NOT touched — the empty-quiz callback path uses the existing `onComplete` contract.
+
+**Verification**:
+- ✅ `npm run typecheck` — green under `noUncheckedIndexedAccess`
+- ✅ `npm run build` — green
+- ✅ `npm run lint` — **5 errors + 0 warnings** (was 6+0 after Phase 3; down 1). Quiz `set-state-in-effect` cleared.
+- Remaining errors (all Phase 7 work):
+  - `_archive/**` (4) → ESLint `_archive` ignore
+  - `tailwind.config.ts` (1) → ESM `import animate` migration
+
+**Walk-through reasoning**:
+- 4-question quiz, `PASSING_THRESHOLD = 80`. 3/4 correct = 0.75 → 0.75 >= 0.8 is **false** → does not pass. 4/4 = 1.0 → passes. Previously the rounded-comparison path could mark borderline scores incorrectly; now exact.
+- Quiz with all questions missing `correct_index`: `gradeableQuestions.length === 0` → renders "Quiz unavailable" card, fires `onComplete(0, false)` once, `ModulePlayer` shows its quiz-lock banner indefinitely (per design — authoring bug, not learner bug).
+- Lesson switch from `lesson-values-quiz` to a different quiz lesson: parent's `key={lesson.id}` changes → Quiz unmounts → remounts with fresh state. Previous answers/score/passed reset by initialization, not by side-effect.
+
+**Known gaps** (intentional, owned by later phases):
+- Hardcoded `#ED1B24`, `#c41a1e`, `#a31518` reds throughout `Quiz.tsx` — Phase 5 (brand unification).
+- Radio buttons use `<button>` + custom styling instead of native `<input type="radio">` with proper `aria-checked` semantics — Phase 6 (a11y).
+- No tests covering the threshold boundary, the empty-quiz path, or the `correct_index` filter — Phase 8 (test infra) will add these.
+- `QuizQuestion.options` is still `string[]` (no per-option ID) — fine for now; revisit when admin authoring tooling lands.
+
+**Naming guardrails honored**:
+- All four product/brand labels untouched in this phase ✓
+- No real AI / Supabase / production auth wired ✓
+- No secrets ✓
+- "KNOWLEDGE CHECK" Quiz label retained (matches the Redex Academy demo content)
+
+**Next**: Phase 5 — Brand & theme unification. Should land Redex `#ED1B24` tokens, `redex.*` Tailwind aliases, remove the global `h1-h6 { text-white }` rule, replace hardcoded reds across the learner pages, define missing `--success/--warning` CSS vars, and optimize the favicon. The lint count won't change (no Phase 5-tagged lint errors exist), but this is the biggest visual-fidelity payoff phase.
+
+---
+
