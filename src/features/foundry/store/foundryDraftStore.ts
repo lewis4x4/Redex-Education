@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import type { SetupAnswers, SourceMaterial } from '@/lib/education';
+import type { CourseOutlineDraft, SetupAnswers, SourceMaterial } from '@/lib/education';
 import type { SetupAnswersInput } from '../schemas/foundrySchemas';
 import type { ModuleBasicsDraft, ModuleBasicsFormValues } from '../types';
 
@@ -15,6 +15,10 @@ interface FoundryDraftState {
   sourceMaterial: SourceMaterial | null;
   /** Setup-question answers captured before outline generation */
   setupAnswers: SetupAnswers | null;
+  /** Generated course outline draft for Slice 3.1 review */
+  outline: CourseOutlineDraft | null;
+  /** Local outline lifecycle status for review/regeneration UX */
+  outline_status: 'draft' | 'approved' | 'regenerating';
   /** Save parsed source material */
   setSourceMaterial: (material: SourceMaterial) => void;
   /** Clear source material draft */
@@ -23,6 +27,14 @@ interface FoundryDraftState {
   setSetupAnswers: (input: SetupAnswersInput) => void;
   /** Clear setup-question answers draft */
   clearSetupAnswers: () => void;
+  /** Set generated outline and reset status to draft */
+  setOutline: (draft: CourseOutlineDraft) => void;
+  /** Mark current outline approved (no-op when no outline exists) */
+  approveOutline: () => void;
+  /** Clear current outline and reset status */
+  clearOutline: () => void;
+  /** Set regenerating status for simulated loading */
+  regenerateOutlineStart: () => void;
   /** Drive file IDs selected from the Source Library for this draft */
   selectedLibraryFileIds: string[];
   /** Toggle a Drive-backed source file selection */
@@ -37,6 +49,8 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
       currentDraft: null,
       sourceMaterial: null,
       setupAnswers: null,
+      outline: null,
+      outline_status: 'draft',
       selectedLibraryFileIds: [],
       setBasics: (values) =>
         set({
@@ -56,6 +70,25 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
           },
         }),
       clearSetupAnswers: () => set({ setupAnswers: null }),
+      setOutline: (draft) =>
+        set({
+          outline: draft,
+          outline_status: 'draft',
+        }),
+      approveOutline: () =>
+        set((state) =>
+          state.outline === null
+            ? state
+            : {
+                outline_status: 'approved',
+              }
+        ),
+      clearOutline: () =>
+        set({
+          outline: null,
+          outline_status: 'draft',
+        }),
+      regenerateOutlineStart: () => set({ outline_status: 'regenerating' }),
       toggleLibraryFile: (driveFileId) =>
         set((state) => ({
           selectedLibraryFileIds: state.selectedLibraryFileIds.includes(driveFileId)

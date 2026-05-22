@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { QuestionWizard } from '@/features/foundry/components/QuestionWizard'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
@@ -31,9 +32,12 @@ export function FoundryQuestionsPage() {
 
       {setupAnswers !== null ? (
         <Card className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-[15px] text-slate-600 leading-[1.45]">
-            ✓ Answers saved. Continue → Outline preview (Coming in Slice 3.1)
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[15px] text-slate-600 leading-[1.45]">✓ Answers saved</p>
+            <Button variant="brand" onClick={() => navigate('/admin/foundry/outline')}>
+              Continue → Outline preview
+            </Button>
+          </div>
         </Card>
       ) : null}
     </section>

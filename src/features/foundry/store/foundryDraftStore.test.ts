@@ -1,6 +1,8 @@
 import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { MOCK_GENERATED_OUTLINE } from '@/features/foundry/data/mockGeneratedOutline'
+
 function createStorageMock(): Storage {
   const store = new Map<string, string>()
 
@@ -43,6 +45,7 @@ describe('useFoundryDraftStore', () => {
       useFoundryDraftStore.getState().clearDraft()
       useFoundryDraftStore.getState().clearSourceMaterial()
       useFoundryDraftStore.getState().clearSetupAnswers()
+      useFoundryDraftStore.getState().clearOutline()
       useFoundryDraftStore.getState().clearLibrarySelection()
     })
   })
@@ -274,6 +277,41 @@ describe('useFoundryDraftStore', () => {
     })
 
     expect(useFoundryDraftStore.getState().setupAnswers).toBeNull()
+  })
+
+  it('starts with outline null and outline_status draft', () => {
+    expect(useFoundryDraftStore.getState().outline).toBeNull()
+    expect(useFoundryDraftStore.getState().outline_status).toBe('draft')
+  })
+
+  it('setOutline saves outline and resets outline_status to draft', () => {
+    act(() => {
+      useFoundryDraftStore.getState().regenerateOutlineStart()
+    })
+
+    expect(useFoundryDraftStore.getState().outline_status).toBe('regenerating')
+
+    act(() => {
+      useFoundryDraftStore.getState().setOutline(MOCK_GENERATED_OUTLINE)
+    })
+
+    expect(useFoundryDraftStore.getState().outline).toEqual(MOCK_GENERATED_OUTLINE)
+    expect(useFoundryDraftStore.getState().outline_status).toBe('draft')
+  })
+
+  it('approveOutline only sets approved when outline exists', () => {
+    act(() => {
+      useFoundryDraftStore.getState().approveOutline()
+    })
+
+    expect(useFoundryDraftStore.getState().outline_status).toBe('draft')
+
+    act(() => {
+      useFoundryDraftStore.getState().setOutline(MOCK_GENERATED_OUTLINE)
+      useFoundryDraftStore.getState().approveOutline()
+    })
+
+    expect(useFoundryDraftStore.getState().outline_status).toBe('approved')
   })
 
   it('starts with selectedLibraryFileIds as an empty array', () => {

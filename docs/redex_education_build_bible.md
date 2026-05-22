@@ -2597,3 +2597,63 @@ Wires up the previously-disabled "Continue → Setup questions" button on the So
 
 ---
 
+## 2026-05-22 — Slice 3.1: Generated Outline Review (Phase 3 begins)
+
+**Status**: ✅ Completed. First slice of Phase 3.
+
+**Master roadmap reference**: Phase 3 / Slice 3.1 (Source Binder and AI Review Loop phase begins).
+**Linear ticket**: `Foundry: build generated outline review step`.
+
+**Context**:
+Wires the previously-disabled "Continue → Outline preview" button on the Setup Questions wizard. Admin reviews an AI-generated module outline before approval — title, description, learning objectives, lesson list with types and source bindings, assessment recommendation, and missing-source warnings. AI generation is **mocked per Phase 3 intro note** but the data structure matches production shape, and mock outline references actual seeded Drive file IDs from the Source Library so the missing-source warnings tie to real `[PLACEHOLDER]` content.
+
+**Orchestration**: 4 engineer sub-agents (A blocking → B || C parallel → D). Zero file conflicts. One coordination note: Item B's component prop interfaces were prescribed in the plan, so Item C could compose them in parallel without negotiation (the proven pattern from Slices 2.1-2.5).
+
+**Summary**:
+
+### Item A — Foundation
+- **`foundryDraftStore`** extended additively with `outline: CourseOutlineDraft | null` + `outline_status: 'draft' | 'approved' | 'regenerating'` + actions: `setOutline`, `approveOutline`, `clearOutline`, `regenerateOutlineStart`. Persist key `redex-foundry-draft-v1` unchanged.
+- **`mockGeneratedOutline.ts`** (new, 95 lines) — `MOCK_GENERATED_OUTLINE` realistic AI-generated outline (course "HR Basics at Redex", 3 modules, 8 lessons across text/acknowledgment/quiz/checklist types). `MOCK_LESSON_SOURCE_BINDINGS` maps lesson titles → real seeded Drive file IDs from Slice 2.4's Source Library. `missing_source_notes` references actual `[PLACEHOLDER]` content in `pto-policy.md` and `safety-101.md`.
+
+### Item B — Atomic components
+- **`GeneratedOutlineCard.tsx`** (64 lines) — Tier 2 hero card: title + description + objectives list with CheckCircle2 icons + total estimated time (computed across all module lessons) + module/lesson summary stats. Proper h2/h3 hierarchy.
+- **`LessonOutlineList.tsx`** (84 lines) — semantic nested `<ol>` of modules + lessons. Each lesson row: number + title + lesson_type pill (text→Reading, quiz→Quiz, etc.) + estimated minutes with Clock icon + source-section count (`📎 N source sections`) when `sourceBindings` prop has an entry for that lesson title.
+- **`MissingInfoWarnings.tsx`** (48 lines) — amber Tier 1 status card (`bg-amber-50 border-amber-200 text-amber-900`) with AlertTriangle icon, h2 heading "Missing source information", and list of notes with Drive ID portions wrapped in inline `<code>`. Returns null when `notes.length === 0`.
+
+### Item C — Page + route + Questions wire
+- **`OutlineReviewPage.tsx`** (121 lines) — eyebrow "REDEX AI COURSE FOUNDRY · STEP 4", H1 "Review the generated outline", subhead. Action row: ← Back to questions + outline_status badge. **Mount behavior**: if `outline === null`, shows "Generating outline…" loader, then auto-populates `MOCK_GENERATED_OUTLINE` after ~600ms via the store. **Body**: GeneratedOutlineCard → LessonOutlineList → MissingInfoWarnings. **Footer actions**: Regenerate (sets outline_status='regenerating' for ~800ms then re-sets, with toast), Edit outline (disabled with "Coming in Slice 3.2" tooltip), Approve outline (calls `approveOutline()`, toast, renders "✓ Outline approved" info card pointing to the disabled-Slice-3.2 Continue).
+- **`src/App.tsx`** — new `OutlineReviewRoute` helper + `<Route path="/admin/foundry/outline">` before `/admin/*` wildcard.
+- **`FoundryQuestionsPage.tsx`** — flipped the prior conditional "(Coming in Slice 3.1)" text into a real enabled Continue button that navigates to `/admin/foundry/outline`.
+- **`docs/architecture.md`** — added `/admin/foundry/outline` row to the route table.
+
+### Item D — Tests
+- **+17 new tests** across 4 new test files + 3 extended files; total **146 → 163 passing** across 32 test files.
+- Coverage: Statements **89.28%** (+1.03 from 88.25%).
+
+**Files touched** (~14 total): 4 new source + 4 new tests + extended store/store-test/App-routes-test/Questions-page-test/architecture.md + Bible.
+
+**Verification**:
+- ✅ typecheck green, lint 0/0
+- ✅ npm test: 163/163 passing
+- ✅ build green
+- ✅ coverage 89.28% statements
+
+**Acceptance criteria** (master roadmap):
+- ✅ Outline renders from structured data
+- ✅ Admin can approve outline (sets `outline_status='approved'`)
+- ✅ Missing source warnings are visible (3 amber notes flagging real `[PLACEHOLDER]` content in `pto-policy.md` and `safety-101.md`)
+- ✅ Regenerate action exists as mocked behavior (800ms simulated loading)
+- ✅ Build Bible updated
+
+**Known gaps (deferred)**:
+- Real AI generation (Phase 3 explicitly mocks; lands in AI Slice C — secure server-side endpoint)
+- Edit-outline UI (Slice 3.2's full module generation preview)
+- Continue from approved outline (Slice 3.2's `/admin/foundry/preview`)
+- Source-section bindings are mocked at the page level (`MOCK_LESSON_SOURCE_BINDINGS`); real bindings persist to `module_source_bindings` when modules become DB rows (Slice 8.x)
+
+**Naming guardrails honored**: Foundry context only; no Academy.
+
+**Next**: Slice 3.2 — Full Module Generation Preview.
+
+---
+

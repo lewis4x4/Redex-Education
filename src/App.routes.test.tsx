@@ -130,4 +130,12 @@ describe('Redex Education routes', () => {
 
     expect(await screen.findByRole('heading', { name: 'Source Library' })).toBeInTheDocument()
   })
+
+  it('renders OutlineReviewPage at /admin/foundry/outline', async () => {
+    vi.stubEnv('VITE_MOCK_AUTH', 'true')
+
+    renderAt('/admin/foundry/outline')
+
+    expect(await screen.findByRole('heading', { name: 'Review the generated outline' })).toBeInTheDocument()
+  })
 })

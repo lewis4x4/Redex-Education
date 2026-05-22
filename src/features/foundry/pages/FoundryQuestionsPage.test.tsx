@@ -63,6 +63,7 @@ describe('FoundryQuestionsPage', () => {
         <Routes>
           <Route path="/admin/foundry/questions" element={<FoundryQuestionsPage />} />
           <Route path="/admin/foundry/source" element={<div>Back to source</div>} />
+          <Route path="/admin/foundry/outline" element={<div>Outline route reached</div>} />
         </Routes>
       </MemoryRouter>,
     )
@@ -77,7 +78,7 @@ describe('FoundryQuestionsPage', () => {
     expect(screen.getByRole('form', { name: /setup questions wizard/i })).toBeInTheDocument()
   })
 
-  it('submits wizard values, writes setupAnswers to store, and shows toast', async () => {
+  it('submits wizard values, writes setupAnswers to store, shows toast, and enables continue button', async () => {
     const user = userEvent.setup()
     renderWithRoutes()
 
@@ -109,5 +110,11 @@ describe('FoundryQuestionsPage', () => {
     )
     expect(useFoundryDraftStore.getState().setupAnswers?.updated_at).toEqual(expect.any(String))
     expect(toastSuccessMock).toHaveBeenCalledWith('Setup answers saved')
+
+    const continueButton = await screen.findByRole('button', { name: /continue.*outline preview/i })
+    expect(continueButton).toBeEnabled()
+
+    await user.click(continueButton)
+    expect(await screen.findByText('Outline route reached')).toBeInTheDocument()
   })
 })
