@@ -57,6 +57,7 @@ function LearnerModuleRoute() {
   return (
     <AppShell breadcrumb="Learner flow › Orientation Module Player" playerMode>
       <ModulePlayer
+        key={routeModule.id}
         module={routeModule}
         lessons={moduleLessons}
         completedLessonIds={completedLessonIds}

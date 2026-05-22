@@ -1,131 +1,56 @@
-# Redex Education
+# Redex Education (Redex Academy / Course Foundry)
 
-**CEU & License Management Portal** for Redex field technicians and staff.
+Redex Education is the Redex Academy learning app shell with:
+- Learner demo routes (`/learn`, `/learn/welcome`, `/learn/player/:moduleId`)
+- Admin placeholder route (`/admin`) behind auth gating
+- Local demo education data + progress context
 
-Track professional licenses, certifications, required continuing education units (CEUs), expirations, and renewal compliance across the organization.
+## Tech Stack
 
-## Purpose
+- Vite + React 19 + TypeScript
+- React Router 7 (`react-router-dom@^7`)
+- Tailwind CSS + shadcn/ui
+- Supabase JS client (auth scaffolding)
 
-- Provide technicians a clear view of their active licenses, required CEU hours, and upcoming renewal deadlines
-- Enable management to monitor company-wide compliance and proactively manage renewals (e.g. Locksmith, Guard Service, Low Voltage, etc.)
-- Record external CEU purchases (EliteCEU, state providers) and internal training completions
-- Maintain audit-ready records of certifications and CEU credits
-
-## Stack (matches Redex Ops Hub)
-
-- **Frontend**: Vite + React 18/19 + TypeScript + Tailwind CSS + shadcn/ui
-- **Routing**: React Router v6
-- **Backend / Auth / DB**: Supabase (shared project `toghxeuhgkcrbrdxewdw` with redex-ops-hub)
-- **Deployment**: Netlify (or Vercel)
-
-## Key Features (Planned)
-
-### Technician Experience
-- Personal dashboard with license cards (status, expiry, CEU progress)
-- CEU credit history and upload of completion certificates
-- Renewal calendar and action items
-- Links to approved CEU providers
-
-### Management Experience
-- Organization compliance heatmap / list of expiring certifications
-- Record bulk or individual CEU packages and assignments
-- Technician license matrix export
-- Alerts and reporting
-
-## Getting Started
+## Scripts
 
 ```bash
 npm install
 npm run dev
+npm run typecheck
+npm run build
+npm run lint
+npm run preview
 ```
 
 ## Environment
 
-Create `.env.local`:
+Copy `.env.example` to `.env` (or `.env.local`).
 
-```
-VITE_SUPABASE_URL=https://toghxeuhgkcrbrdxewdw.supabase.co
-VITE_SUPABASE_ANON_KEY=...
-```
+### Required for real Supabase auth
 
-(Use the same values as redex-ops-hub for now.)
-
-## Related Repos
-
-- [redex-ops-hub](https://github.com/lewis4x4/redex-ops-hub-37ca2a19) — Main operations platform (contains broader training + some certification tracking)
-- [redex-victra-portal](https://github.com/lewis4x4/redex-victra-portal)
-
-## License
-
-Private — Redex Education
-
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```env
+VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Mock-auth mode (default scaffold)
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```env
+VITE_MOCK_AUTH=true
 ```
+
+When `VITE_MOCK_AUTH=true`, learner/admin shell development can run without a real authenticated Supabase session.
+
+## Routing overview
+
+- `/` → redirects to `/learn`
+- `/learn` → learner dashboard
+- `/learn/welcome` → learner welcome flow
+- `/learn/player` and `/learn/player/:moduleId` → module player
+- `/admin` and `/admin/*` → admin placeholder (auth-gated)
+
+## Notes
+
+- Auth UI is intentionally deferred; `AuthGate` enforces session checks when mock auth is off.
+- Supabase credentials are read from Vite env variables (`VITE_*`).

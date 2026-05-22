@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, type KeyboardEvent } from 'react';
-import type { Lesson } from '@/lib/education';
+import type { Lesson, QuizLessonContent } from '@/lib/education';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, RotateCcw, Award } from 'lucide-react';
 
@@ -8,7 +8,7 @@ interface QuizProps {
   onComplete?: (score: number, passed: boolean) => void;
 }
 
-export const PASSING_THRESHOLD = 80;
+const DEFAULT_PASSING_THRESHOLD = 80;
 
 /**
  * Production-grade Quiz component for Redex Academy lessons.
@@ -31,6 +31,13 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
     });
   }, [questions]);
 
+  const quizContent: QuizLessonContent | null = lesson.content.type === 'quiz' ? lesson.content : null;
+  const passingThreshold =
+    quizContent && typeof quizContent.passing_threshold === 'number'
+      ? quizContent.passing_threshold
+      : DEFAULT_PASSING_THRESHOLD;
+  const allowRetakes = quizContent?.allow_retakes ?? true;
+
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [score, setScore] = useState(0);
@@ -38,9 +45,8 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
   const hasNotifiedEmptyQuiz = useRef(false);
 
   const hasNoGradeableQuestions = gradeableQuestions.length === 0;
-  const allAnswered =
-    gradeableQuestions.length > 0 &&
-    gradeableQuestions.every((question) => answers[question.id] !== undefined);
+  // Require answers for every visible question to avoid submit confusion when some prompts are ungraded.
+  const allAnswered = questions.length > 0 && questions.every((question) => answers[question.id] !== undefined);
 
   const calculateResults = (currentAnswers: Record<string, number>) => {
     if (gradeableQuestions.length === 0) {
@@ -110,7 +116,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
     if (!allAnswered) return;
     const results = calculateResults(answers);
     setScore(results.score);
-    const passed = results.rawFraction >= PASSING_THRESHOLD / 100;
+    const passed = results.rawFraction >= passingThreshold / 100;
     setHasPassed(passed);
     setIsSubmitted(true);
     onComplete?.(results.score, passed);
@@ -143,7 +149,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
           <div className="uppercase tracking-[2px] text-xs font-semibold text-redex-red">KNOWLEDGE CHECK</div>
           <h3 className="text-2xl font-semibold tracking-tight mt-1">{lesson.title}</h3>
           <p className="text-sm text-slate-500 mt-0.5">
-            {gradeableQuestions.length} questions • {PASSING_THRESHOLD}% to pass
+            {questions.length} questions ({gradeableQuestions.length} graded) • {passingThreshold}% to pass
           </p>
         </div>
 
@@ -313,7 +319,8 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
           <Button
             variant="outline"
             onClick={handleRetake}
-            className="flex-1 h-11 rounded-xl text-base font-medium border-slate-300 hover:bg-slate-50"
+            disabled={!allowRetakes}
+            className="flex-1 h-11 rounded-xl text-base font-medium border-slate-300 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <RotateCcw className="w-4 h-4 mr-2" />
             Retake Quiz
@@ -323,15 +330,20 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
 
       <div className="mt-4 text-center">
         {!isSubmitted && allAnswered && (
-          <p className="text-xs text-slate-500">All answers selected. Submit when ready — retakes are allowed.</p>
+          <p className="text-xs text-slate-500">
+            All answers selected. Submit when ready{allowRetakes ? ' — retakes are allowed.' : '.'}
+          </p>
         )}
         {isSubmitted && hasPassed && (
           <p className="text-emerald-600 text-sm font-medium inline-flex items-center gap-1.5">
             <CheckCircle className="w-4 h-4" /> Passed — ready to mark lesson complete.
           </p>
         )}
-        {isSubmitted && !hasPassed && (
-          <p className="text-sm text-red-600/90">Keep going — retake until you hit {PASSING_THRESHOLD}%.</p>
+        {isSubmitted && !hasPassed && allowRetakes && (
+          <p className="text-sm text-red-600/90">Keep going — retake until you hit {passingThreshold}%.</p>
+        )}
+        {isSubmitted && !hasPassed && !allowRetakes && (
+          <p className="text-sm text-red-600/90">Passing score is {passingThreshold}%. Retakes are disabled for this quiz.</p>
         )}
       </div>
     </div>

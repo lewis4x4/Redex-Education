@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react';
-import type { Module, Lesson, ProgressStatus } from '@/lib/education';
+import type { Module, Lesson, ProgressStatus, QuizLessonContent } from '@/lib/education';
 import { LessonContentRenderer } from './LessonContentRenderer';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Clock, ArrowLeft, ArrowRight } from 'lucide-react';
-import { PASSING_THRESHOLD } from './Quiz';
 
 interface ModulePlayerProps {
   module: Module;
@@ -90,6 +89,12 @@ export function ModulePlayer({
 
   // Quiz gating for production-feeling flow: quiz lessons must be passed to unlock "Mark Complete"
   const isQuizLesson = currentLesson.content.type === 'quiz';
+  const quizContent: QuizLessonContent | null =
+    currentLesson.content.type === 'quiz' ? (currentLesson.content as QuizLessonContent) : null;
+  const quizPassingThreshold =
+    quizContent && typeof quizContent.passing_threshold === 'number'
+      ? quizContent.passing_threshold
+      : 80;
   const currentQuizResult = quizResults[currentLesson.id];
   const quizHasPassed = currentQuizResult?.passed === true;
   const isQuizLocked = isQuizLesson && !quizHasPassed && !completedLessons.has(currentLesson.id);
@@ -156,8 +161,8 @@ export function ModulePlayer({
             return (
               <button
                 key={lesson.id}
+                type="button"
                 onClick={() => goToLesson(index)}
-                disabled={!canNavigate}
                 aria-disabled={!canNavigate}
                 aria-describedby={canNavigate ? undefined : lockedDescriptionId}
                 aria-label={canNavigate ? undefined : `${lesson.title}. ${lockedMessage}`}
@@ -233,7 +238,7 @@ export function ModulePlayer({
         {/* Quiz lock banner — forces real interaction before progress can advance on quiz lessons */}
         {isQuizLocked && (
           <div className="border-t bg-amber-50 px-6 py-2.5 text-sm text-amber-700 flex items-center gap-2">
-            <span>🔒 Pass the quiz above with {PASSING_THRESHOLD}% or higher to unlock lesson completion and continue.</span>
+            <span>🔒 Pass the quiz above with {quizPassingThreshold}% or higher to unlock lesson completion and continue.</span>
           </div>
         )}
 

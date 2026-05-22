@@ -26,19 +26,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (cancelled) {
-        return
-      }
+    supabase.auth
+      .getSession()
+      .then(({ data: { session }, error }) => {
+        if (cancelled) {
+          return
+        }
 
-      if (error) {
-        console.warn('[auth] Unable to load initial Supabase session.', error)
-      }
+        if (error) {
+          console.warn('[auth] Unable to load initial Supabase session.', error)
+        }
 
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+        setSession(session)
+        setUser(session?.user ?? null)
+        setLoading(false)
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return
+        }
+
+        console.warn('[auth] getSession() rejected while loading initial session.', error)
+        setSession(null)
+        setUser(null)
+        setLoading(false)
+      })
 
     return () => {
       cancelled = true

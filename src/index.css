@@ -53,33 +53,33 @@
     --radius-lg: 0.75rem;
     --radius-xl: 1rem;
 
-    /* Shadcn/System Mapping */
-    --background: 0 0% 4%; /* #0a0a0a */
-    --foreground: 0 0% 95%;
-    
-    --card: 0 0% 8%; 
-    --card-foreground: 0 0% 95%;
-    
-    --popover: 0 0% 4%;
-    --popover-foreground: 0 0% 95%;
-    
+    /* Shadcn/System Mapping (light default) */
+    --background: 0 0% 100%;
+    --foreground: 220 14% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 14% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 14% 11%;
+
     --primary: 357 85% 52%; /* Redex Red #ED1B24 */
     --primary-foreground: 0 0% 100%;
-    
-    --secondary: 217 19% 27%; /* Slate 800ish */
-    --secondary-foreground: 0 0% 98%;
-    
-    --muted: 0 0% 15%;
-    --muted-foreground: 215 20% 65%;
-    
-    --accent: 217 19% 27%;
-    --accent-foreground: 0 0% 98%;
-    
-    --destructive: 0 62% 30%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 14% 11%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 220 14% 96%;
+    --accent-foreground: 220 14% 11%;
+
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    
-    --border: 0 0% 15%;
-    --input: 0 0% 15%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
     --ring: 357 85% 52%; /* Redex Red */
     
     --radius: 0.5rem;
@@ -92,6 +92,32 @@
     --chart-5: 262 83% 58%; /* Purple */
 
     --font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  .dark {
+    --background: 0 0% 4%; /* #0a0a0a */
+    --foreground: 0 0% 95%;
+
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 0 0% 4%;
+    --popover-foreground: 0 0% 95%;
+
+    --secondary: 217 19% 27%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 0 0% 15%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 217 19% 27%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
   }
 }
 
