@@ -150,12 +150,17 @@ export function ModulePlayer({
             const isCompleted = completedLessons.has(lesson.id);
             const isActive = index === currentIndex;
             const canNavigate = isLessonNavigable(index);
+            const lockedDescriptionId = `${lesson.id}-locked-description`;
+            const lockedMessage = 'Locked. Complete required lessons in order to unlock.';
 
             return (
               <button
                 key={lesson.id}
                 onClick={() => goToLesson(index)}
                 disabled={!canNavigate}
+                aria-disabled={!canNavigate}
+                aria-describedby={canNavigate ? undefined : lockedDescriptionId}
+                aria-label={canNavigate ? undefined : `${lesson.title}. ${lockedMessage}`}
                 title={canNavigate ? undefined : 'Complete required lessons in order to unlock this lesson.'}
                 className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-sm transition-colors
                   ${isActive ? 'bg-redex-red/10 text-redex-red font-medium' : 'hover:bg-slate-100'}
@@ -174,6 +179,11 @@ export function ModulePlayer({
                 <span className="ml-auto text-[10px] text-slate-400 flex items-center gap-0.5">
                   <Clock className="w-3 h-3" /> {lesson.estimated_minutes}m
                 </span>
+                {!canNavigate && (
+                  <span id={lockedDescriptionId} className="sr-only">
+                    {lockedMessage}
+                  </span>
+                )}
               </button>
             );
           })}

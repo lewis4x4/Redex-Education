@@ -1465,3 +1465,75 @@ Both sessions cleaned up post-verification.
 
 ---
 
+## 2026-05-22 — Phase 6: UI Primitives & A11y
+
+**Status**: ✅ Completed (Phase 6 of 10) — orchestrated as 2 parallel sub-agent items (with mid-flight retry after a session-handle expiry)
+
+**Context**:
+Lands the accessibility and primitive-typing fixes from the original review. The two items had disjoint file scopes so they were dispatched concurrently. A connection interruption mid-flight expired the first dispatch handles — both agents had to be re-launched. The retry was sequential (Item 1 → Item 2) to avoid another expiry race.
+
+**Orchestration**:
+Plan at `prompt-exports/phase-6-plan.md`.
+- **Item 1** (`pair`, retry) — primitives + structural a11y. Session `AC9CF8E7…0C72105`.
+- **Item 2** (`engineer`, retry) — sanitized markdown rendering. Session `D2C41BBB…F03CC16F`.
+
+Both sessions cleaned up post-verification.
+
+**Summary**:
+
+### Item 1 — UI primitives + structural a11y
+- **`src/components/ui/card.tsx`** — `CardTitle` ref type corrected from `HTMLParagraphElement` to `HTMLHeadingElement` (the rendered tag is `<h3>`).
+- **`src/components/ui/button.tsx`** — chose plan **option (b)**: pragmatic union of `ButtonHTMLAttributes` + `AnchorHTMLAttributes` when `asChild` is true. No full polymorphic generics (over-engineering for this codebase). Existing callsites compile. **`default` variant rebased to neutral slate**; `brand` variant remains canonical Redex red. The two now have distinct semantics.
+- **`src/components/layout/BreadcrumbBar.tsx`** — restructured from a plain `<div>` to `<nav aria-label="Breadcrumb"><ol>…</ol></nav>` with `aria-current="page"` on the last item. Parses the existing `›`-separated breadcrumb prop into segments; falls back to a single current-page `<li>` if no separator is present.
+- **`src/features/learner/components/ModulePlayer.tsx`** — locked sidebar buttons now carry `aria-disabled`, `aria-label`, `aria-describedby`, and a sibling `<span className="sr-only">` lock explanation. Mouse `title` tooltip retained as a secondary affordance.
+- **`src/features/learner/components/Quiz.tsx`** — chose plan **option (b)**: ARIA layered on the existing custom button visuals instead of switching to native `<input type="radio">`. Adds `role="radiogroup"` to each question container (with `aria-labelledby` to the question text), `role="radio"` + `aria-checked` to each option, `aria-disabled` post-submit, and arrow/Home/End keyboard navigation between options. **Zero visual change** — pure a11y enhancement.
+
+### Item 2 — Sanitized markdown rendering
+- **Deps installed** as `dependencies`:
+  - `react-markdown@^10.1.0`
+  - `rehype-sanitize@^6.0.0`
+  - `@tailwindcss/typography@^0.5.19`
+- **`src/features/learner/components/LessonContentRenderer.tsx`** — text branch now renders via `<ReactMarkdown rehypePlugins={[rehypeSanitize]}>{markdownBody}</ReactMarkdown>`. The `prose max-w-3xl mx-auto` wrapper and the `<h2>{lesson.title}</h2>` header outside the markdown stay. Fallback string preserved.
+- **`tailwind.config.ts`** — Typography plugin added to `plugins`. **Bonus**: migrated `require('tailwindcss-animate')` to ESM `import animate from 'tailwindcss-animate'` to accommodate the Typography plugin import — this **incidentally cleared the Phase 7-tagged `no-require-imports` lint error**.
+- Sanitization uses `rehype-sanitize`'s default schema — blocks `<script>`, dangerous URLs, raw HTML by default. No schema extension.
+- Bundle delta: ~25 KB gzipped added (within expectations for `react-markdown` + `rehype-sanitize`).
+
+**Files touched** (9 modified, 1 plan + Build Bible):
+- Modified: `src/components/ui/{card,button}.tsx`, `src/components/layout/BreadcrumbBar.tsx`, `src/features/learner/components/{ModulePlayer,Quiz,LessonContentRenderer}.tsx`, `tailwind.config.ts`, `package.json`, `package-lock.json`, `docs/redex_education_build_bible.md`
+- Created: `prompt-exports/phase-6-plan.md`
+
+**Verification**:
+- ✅ `npm run typecheck` — green under strict + `noUncheckedIndexedAccess`
+- ✅ `npm run build` — green; build output ~655 kB JS / ~192 kB gzipped (added markdown deps land within the existing pre-Phase-7 chunk size warning band)
+- ✅ `npm run lint` — **4 errors + 0 warnings** (was 5+0 after Phase 5; down 1). Bonus `tailwind.config.ts no-require-imports` cleared via Typography plugin's ESM import switch.
+- Remaining errors all in `_archive/**` — Phase 7 owns the ESLint `_archive` ignore.
+
+**Coordination notes**:
+- **First dispatch died on connection break.** Both agents were initially launched concurrently with `detach: true`; mid-`wait` the session handles expired. After session resume, working tree was unchanged — neither agent had written anything before the interruption. Cleanup-skip on the old sessions, fresh re-dispatch (sequential this time for resilience), and Item 1 → Item 2 landed cleanly.
+- **No file conflicts** between Item 1 and Item 2 — the disjoint scope held.
+- **Bonus lint clear** in Item 2 was incidental, not a scope nibble: the agent needed ESM imports for the Typography plugin and migrated the existing `require('tailwindcss-animate')` line in the same edit. Defensible and clean.
+
+**Known gaps** (intentional, owned by later phases):
+- `_archive/**` lint exclusion + final eslint config polish → Phase 7
+- Native `<input type="radio">` semantics for the Quiz (option (a) from the plan) deferred — chose option (b) for zero visual regression. If a future accessibility audit demands the native pattern, it's a focused follow-up.
+- Bundle size 655 kB JS exceeds Vite's 500 kB warning — code-splitting / dynamic imports → Phase 7 or Phase 8 territory.
+- Inline status colors in Quiz score banner (`#15803d`, `#b91c1c`) still inline — Phase 7/8 may convert to semantic `success`/`warning` Tailwind classes.
+
+**Naming guardrails honored**:
+- All four product/brand labels untouched ✓
+- No real AI / Supabase / production auth wired ✓
+- No secrets introduced ✓
+
+**Next**: Phase 7 — Build, deploy, security. Should land:
+- ESLint flat config `_archive/**` ignore (clears the 4 remaining lint errors → 0)
+- `netlify.toml` security headers (CSP including Supabase origin, X-Content-Type-Options, Referrer-Policy, X-Frame-Options)
+- `index.html` proper title + description + OG/Twitter meta tags
+- `vite.config.ts` explicit `build: { target: 'es2023' }`
+- ESLint flat config JS-only block for `.js/.cjs/.mjs`
+- Prune the dead `neon-*` utility classes from `index.css` (Phase 5 left them; zero consumers confirmed)
+- Possibly initial code-splitting to address the 500 kB bundle warning (or defer to Phase 8)
+
+After Phase 7, lint should be 0 errors. After Phase 8 (testing) + Phase 9 (docs), the remediation plan is complete.
+
+---
+

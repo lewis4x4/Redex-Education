@@ -1,3 +1,6 @@
+import ReactMarkdown from 'react-markdown';
+import rehypeSanitize from 'rehype-sanitize';
+
 import type { Lesson } from '@/lib/education';
 import { Quiz } from './Quiz';
 
@@ -24,12 +27,12 @@ export function LessonContentRenderer({ lesson, onQuizComplete }: Props) {
   }
 
   if (content.type === 'text') {
+    const markdownBody = content.body_markdown || 'Text lesson content would render here as rich markdown.';
+
     return (
       <div className="prose max-w-3xl mx-auto">
         <h2>{lesson.title}</h2>
-        <div className="whitespace-pre-wrap text-slate-700 leading-relaxed">
-          {content.body_markdown || 'Text lesson content would render here as rich markdown.'}
-        </div>
+        <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{markdownBody}</ReactMarkdown>
       </div>
     );
   }

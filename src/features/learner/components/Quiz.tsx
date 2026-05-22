@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, type KeyboardEvent } from 'react';
 import type { Lesson } from '@/lib/education';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, RotateCcw, Award } from 'lucide-react';
@@ -75,6 +75,35 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
       ...prev,
       [questionId]: optionIndex,
     }));
+  };
+
+  const handleOptionKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    questionId: string,
+    optionIndex: number,
+    optionCount: number
+  ) => {
+    if (isSubmitted) return;
+
+    const nextIndexByKey: Record<string, number> = {
+      ArrowDown: (optionIndex + 1) % optionCount,
+      ArrowRight: (optionIndex + 1) % optionCount,
+      ArrowUp: (optionIndex - 1 + optionCount) % optionCount,
+      ArrowLeft: (optionIndex - 1 + optionCount) % optionCount,
+      Home: 0,
+      End: optionCount - 1,
+    };
+    const nextIndex = nextIndexByKey[event.key];
+
+    if (nextIndex === undefined) return;
+
+    event.preventDefault();
+    handleSelect(questionId, nextIndex);
+
+    const radioOptions = Array.from(
+      event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="radio"]') ?? []
+    );
+    radioOptions[nextIndex]?.focus();
   };
 
   const handleSubmit = () => {
@@ -164,6 +193,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
             question.correct_index >= 0 &&
             question.correct_index < question.options.length;
           const correctIndex = hasValidCorrectIndex ? question.correct_index : undefined;
+          const questionLabelId = `q-${question.id}`;
 
           return (
             <div
@@ -175,13 +205,18 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
                   <div className="mt-px flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold flex items-center justify-center ring-1 ring-inset ring-slate-200">
                     {qIndex + 1}
                   </div>
-                  <div className="font-medium text-[15px] leading-snug text-slate-900 pr-1">
+                  <div id={questionLabelId} className="font-medium text-[15px] leading-snug text-slate-900 pr-1">
                     {question.question}
                   </div>
                 </div>
               </div>
 
-              <div className="px-6 pb-5 space-y-[7px]">
+              <div
+                role="radiogroup"
+                aria-labelledby={questionLabelId}
+                aria-disabled={isSubmitted}
+                className="px-6 pb-5 space-y-[7px]"
+              >
                 {question.options.map((option, oIndex) => {
                   const isSelected = selectedIdx === oIndex;
                   const isCorrect = correctIndex === oIndex;
@@ -207,8 +242,13 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
                     <button
                       key={`${question.id}-${oIndex}-${option}`}
                       type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      aria-disabled={isSubmitted}
                       disabled={isSubmitted}
+                      tabIndex={isSubmitted ? -1 : isSelected || (selectedIdx === undefined && oIndex === 0) ? 0 : -1}
                       onClick={() => handleSelect(question.id, oIndex)}
+                      onKeyDown={(event) => handleOptionKeyDown(event, question.id, oIndex, question.options.length)}
                       className={optionClasses}
                     >
                       {/* Radio visual */}
