@@ -132,6 +132,7 @@ export {
   MOCK_ADMIN_USER,
   MOCK_MANAGER_USER,
   MOCK_LEARNER_DEVON,
+  MOCK_ORG_PEOPLE,
 } from './mockOrgPeople'
 
 export {

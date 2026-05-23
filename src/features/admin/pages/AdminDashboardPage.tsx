@@ -1,5 +1,5 @@
 import { AlertCircle, CheckCircle2, Eye, FileText, Users } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 import { AdminMetricCard } from '@/features/admin/components/AdminMetricCard'
 import { AssignmentsEntryCard } from '@/features/admin/components/AssignmentsEntryCard'
@@ -45,7 +45,15 @@ export function AdminDashboardPage() {
         <CourseStatusList title="Needs review" items={summary.needs_review} />
       </div>
 
-      <CourseStatusList title="Published" items={summary.published} />
+      <div className="space-y-3">
+        <CourseStatusList title="Published" items={summary.published} />
+        <Link
+          className="inline-flex text-sm font-semibold text-redex-red hover:underline"
+          to="/admin/modules/hr-basics-mod-001/versions"
+        >
+          View HR Basics versions →
+        </Link>
+      </div>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="assignment-summary-heading">
         <h2 id="assignment-summary-heading" className="text-sm font-semibold uppercase tracking-wider text-slate-500">

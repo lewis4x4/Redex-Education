@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
+import { useModuleVersionsStore } from '@/features/publishing/store/moduleVersionsStore'
 
 function formatPublishedAt(value: string | null) {
   if (value === null) {
@@ -24,8 +25,29 @@ export function PublishConfirmationPage() {
   const generatedModule = useFoundryDraftStore((state) => state.generatedModule)
   const publishedAt = useFoundryDraftStore((state) => state.publishedAt)
   const resetFoundryDraft = useFoundryDraftStore((state) => state.resetFoundryDraft)
+  const seedDraftFromModuleVersion = useFoundryDraftStore((state) => state.seedDraftFromModuleVersion)
+  const versions = useModuleVersionsStore((state) => state.versions)
+  const forkNewDraftVersion = useModuleVersionsStore((state) => state.forkNewDraftVersion)
+  const getLatestPublishedVersion = useModuleVersionsStore((state) => state.getLatestPublishedVersion)
 
   const moduleTitle = currentDraft?.title || generatedModule?.module_title || 'HR Basics at Redex'
+  const moduleId =
+    currentDraft?.module_id ??
+    versions.find((version) => version.module_title === moduleTitle && version.status === 'published')?.module_id ??
+    'hr-basics-mod-001'
+
+  const handleEditNewVersion = () => {
+    const latestPublishedVersion = getLatestPublishedVersion(moduleId)
+
+    if (!latestPublishedVersion) {
+      return
+    }
+
+    const forkedVersion = forkNewDraftVersion(latestPublishedVersion.id)
+    resetFoundryDraft()
+    seedDraftFromModuleVersion(forkedVersion)
+    navigate('/admin/foundry/start')
+  }
 
   return (
     <section className="mx-auto max-w-4xl space-y-6 md:space-y-8">
@@ -57,6 +79,9 @@ export function PublishConfirmationPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Button variant="brand" onClick={() => navigate('/admin')}>
               Return to admin dashboard
+            </Button>
+            <Button variant="outline" onClick={handleEditNewVersion}>
+              Edit &amp; create new version
             </Button>
             <Button
               variant="outline"

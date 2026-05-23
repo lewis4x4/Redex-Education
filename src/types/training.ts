@@ -709,12 +709,20 @@ export interface ModuleSourceBinding {
 export interface ModuleVersion {
   id: UUID;
   module_id: UUID;
+  /** Human-readable module title at the time this version was created. */
+  module_title: string;
   version_number: number;
   status: 'draft' | 'in_review' | 'approved' | 'published' | 'archived';
   published_at?: ISODateTime;
   published_by?: UUID;
+  /** Admin/reviewer who approved this version for publication. */
+  approved_by?: UUID;
   /** Source binder version this module version was generated from. */
   source_binder_version?: UUID;
+  /** Assessment version paired with this module version. */
+  assessment_version?: UUID;
+  /** Cached/mock count used by admin history views; live helpers can recompute it. */
+  completed_count?: number;
   created_at: ISODateTime;
 }
 

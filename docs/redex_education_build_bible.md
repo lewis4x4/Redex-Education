@@ -3350,3 +3350,53 @@ The Foundry store already implicitly represented the module lifecycle via its in
 
 ---
 
+## 2026-05-23 — Slice 7.2: Course/Module Versioning
+
+**Status**: ✅ Completed.
+
+**Linear ticket**: `Versioning: add module version history behavior`.
+
+**Context**:
+Slice 7.1's `publishedModulesStore` tracks "what's currently assignable" but holds a single record per `module_version_id`. The roadmap requires a full version history with attribution: every publish event creates a record; editing a published module forks a new draft version; the original record stays untouched. This slice adds the history store, the fork-edit flow, and the admin-visible version history page — without refactoring 7.1's registry.
+
+**Orchestration**: Single pair agent (Codex CLI · gpt-5.5 high) with internal Oracle review pass that flagged three real defects — all fixed before verification:
+1. Forking an older version could overwrite a later published version_number (now uses next available number across all versions of the module).
+2. `archiveVersion()` left the module assignable in `publishedModulesStore` (now also archives there).
+3. `seedDraftFromModuleVersion()` left stale Foundry state lingering when called mid-flow (now clears internally before seeding).
+
+**Files touched**:
+- `src/types/training.ts` — extended canonical `ModuleVersion` type with roadmap fields: `version_number`, `status: 'draft' | 'published' | 'archived'`, `published_at?`, `approved_by?`, `source_binder_version?`, `assessment_version?`, `created_at`.
+- `src/features/publishing/store/moduleVersionsStore.ts` (new) — Zustand + `persist` (`redex-module-versions-v1`); seeded with HR Basics v1; actions: `registerVersion`, `getVersionHistory`, `getLatestPublishedVersion`, `forkNewDraftVersion` (uses next available `version_number` to avoid collisions), `archiveVersion` (also flips `publishedModulesStore.archivePublishedModule`), `resetVersions`.
+- `src/features/publishing/lib/versionCompletions.ts` (new) — pure `getCompletedLearnersForVersion({ versionId, assignments, attempts })` returning unique completed learner IDs (cross-references completed assignments + passed quiz attempts).
+- `src/features/publishing/pages/ModuleVersionHistoryPage.tsx` (new) at `/admin/modules/:moduleId/versions` — newest-first list; per-version card shows version_number badge, status badge, published_at + approved_by name, source_binder_version + assessment_version, completed-by count + expandable learner list (names joined against `mockOrgPeople`). Reactive subscription via `useMemo` over raw versions (Oracle-flagged selector fix).
+- `src/features/foundry/store/foundryDraftStore.ts` — `setPublished()` now writes both stores; added `seedDraftFromModuleVersion(versionId)` action used by the fork-edit flow.
+- `src/features/foundry/pages/PublishConfirmationPage.tsx` — new "Edit & create new version" secondary CTA: calls `moduleVersionsStore.forkNewDraftVersion(latestPublishedVersionId)` then `seedDraftFromModuleVersion(newVersionId)` then navigates to `/admin/foundry/start`.
+- `src/features/admin/pages/AdminDashboardPage.tsx` — "View HR Basics versions →" link added under the published-courses surface.
+- `src/lib/education/mockOrgPeople.ts` + `index.ts` — small barrel update so the version history page can resolve admin names.
+- `src/App.tsx` — `/admin/modules/:moduleId/versions` lazy route added (bundle posture preserved).
+- Tests: `moduleVersionsStore.test.ts` (seed + CRUD + fork + archive cross-store side effect + persist round-trip), `versionCompletions.test.ts` (unique completed learners + edge cases), `ModuleVersionHistoryPage.test.tsx` (renders v1 + completed count + learner expansion), `foundryDraftStore.test.ts` (setPublished writes both stores; v1 untouched after fork), `PublishConfirmationPage.test.tsx` (edit CTA fork flow), `App.routes.test.tsx` smoke.
+
+**Verification**:
+- ✅ typecheck green
+- ✅ lint 0/0
+- ✅ npm test: **380 passed, 1 skipped** (+17 vs Slice 7.1 baseline of 363)
+- ✅ build green
+- ✅ Oracle review pass — three findings applied (version_number collision, archive cross-store, seed clears stale state)
+
+**Acceptance criteria** (master roadmap):
+- ✅ Mock version history renders (`ModuleVersionHistoryPage` shows seeded HR Basics v1 with all fields)
+- ✅ Published module cannot be silently edited (Slice 7.1's publish gate stays; fork creates a new draft record; v1 untouched)
+- ✅ Editing published content creates draft new version (CTA on `PublishConfirmationPage`)
+- ✅ Build Bible updated
+
+**Known scope deferred**:
+- `AssessmentAttempt` records lack a direct `module_version_id`. Completion attribution bridges via the current lesson → module_version map. Phase 8 backend wiring should add a denormalized version pointer so attempts are version-aware without the bridge.
+- No diff view between versions yet (content-level comparison comes in Slice 7.3 with source change impact).
+- Archive UI action is exposed at store level only — no archive button in the version history page yet (low-priority cleanup task).
+
+**Naming guardrails honored**: HR Basics, Jordan Patel (approver), Marcus / Sarah / Ana / Devon — established personas only.
+
+**Next**: Slice 7.3 — Source Change Detection and Version Impact Review. When a Drive source file changes, detect via headRevisionId comparison, flag every module bound to a changed section, surface in a Source Impact Review screen with per-module staleness state + scoped regenerate action. Published modules stay Published but flagged.
+
+---
+

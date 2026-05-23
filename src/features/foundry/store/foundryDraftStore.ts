@@ -12,9 +12,11 @@ import type {
   SourceMaterial,
 } from '@/lib/education';
 import { inferModuleState } from '@/features/publishing/lib/moduleStates';
+import { useModuleVersionsStore } from '@/features/publishing/store/moduleVersionsStore';
 import { usePublishedModulesStore } from '@/features/publishing/store/publishedModulesStore';
 import type { SetupAnswersInput } from '../schemas/foundrySchemas';
 import type { ModuleBasicsDraft, ModuleBasicsFormValues } from '../types';
+import type { ModuleVersion } from '@/lib/education';
 
 const DEFAULT_MODULE_VERSION_ID = 'module-version-hr-basics-v1';
 
@@ -58,6 +60,39 @@ function resolvePublishedModuleVersionId(
   return `module-version-${slugifyModuleTitle(title)}-v1`;
 }
 
+function parseVersionNumberFromVersionId(moduleVersionId: string): number | undefined {
+  const match = moduleVersionId.match(/-v(\d+)$/u);
+  const parsed = match?.[1] ? Number.parseInt(match[1], 10) : Number.NaN;
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function resolvePublishedModuleId(
+  currentDraft: ModuleBasicsDraft | null,
+  generatedModule: GeneratedModulePreview | null,
+  moduleVersionId: string,
+): string {
+  if (currentDraft?.module_id) {
+    return currentDraft.module_id;
+  }
+
+  const title = currentDraft?.title ?? generatedModule?.module_title ?? '';
+
+  if (moduleVersionId === DEFAULT_MODULE_VERSION_ID || title.trim().toLowerCase() === 'hr basics at redex' || title.trim() === '') {
+    return 'hr-basics-mod-001';
+  }
+
+  return `${slugifyModuleTitle(title)}-mod-001`;
+}
+
+function resolvePublishedVersionNumber(currentDraft: ModuleBasicsDraft | null, moduleVersionId: string): number {
+  if (typeof currentDraft?.version_number === 'number' && currentDraft.version_number > 0) {
+    return currentDraft.version_number;
+  }
+
+  return parseVersionNumberFromVersionId(moduleVersionId) ?? 1;
+}
+
 export type FoundryPublishStatus = 'draft' | 'ready_to_publish' | 'published';
 
 const resetPublishState = {
@@ -96,6 +131,8 @@ interface FoundryDraftState {
   resetPublishStatus: () => void;
   /** Reset the full Foundry draft flow back to an empty draft */
   resetFoundryDraft: () => void;
+  /** Seed a new working draft from a forked module version. */
+  seedDraftFromModuleVersion: (version: ModuleVersion) => void;
   /** Side-by-side review state for generated lessons */
   lessonReviews: LessonReviewItem[];
   /** Overwrite lesson review state */
@@ -187,6 +224,32 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
           selectedLibraryFileIds: [],
           ...resetPublishState,
         }),
+      seedDraftFromModuleVersion: (version) =>
+        set({
+          currentDraft: {
+            id: version.id,
+            module_id: version.module_id,
+            version_number: version.version_number,
+            source_binder_version: version.source_binder_version,
+            assessment_version: version.assessment_version,
+            title: version.module_title,
+            parent_course_id: 'standalone',
+            audience: 'New hires',
+            criticality: 'required',
+            training_type: 'general_informational',
+            estimated_minutes: 20,
+            updated_at: new Date().toISOString(),
+          },
+          sourceMaterial: null,
+          setupAnswers: null,
+          outline: null,
+          outline_status: 'draft',
+          generatedModule: null,
+          critique: null,
+          lessonReviews: [],
+          selectedLibraryFileIds: [],
+          ...resetPublishState,
+        }),
       setPublished: () => {
         const state = get();
         const blockers = state.getPublishBlockers();
@@ -212,15 +275,27 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
           return false;
         }
         const moduleVersionId = resolvePublishedModuleVersionId(state.currentDraft, state.generatedModule);
+        const moduleId = resolvePublishedModuleId(state.currentDraft, state.generatedModule, moduleVersionId);
+        const versionNumber = resolvePublishedVersionNumber(state.currentDraft, moduleVersionId);
         const title = state.currentDraft?.title ?? state.generatedModule?.module_title ?? 'HR Basics at Redex';
+        const moduleVersion = useModuleVersionsStore.getState().registerVersion({
+          module_id: moduleId,
+          module_title: title,
+          version_number: versionNumber,
+          status: 'published',
+          approved_by: MOCK_ADMIN_USER.id,
+          published_by: MOCK_ADMIN_USER.id,
+          source_binder_version: state.currentDraft?.source_binder_version ?? 'sbv-1',
+          assessment_version: state.currentDraft?.assessment_version ?? 'av-1',
+        });
 
         usePublishedModulesStore.getState().registerPublishedModule({
-          module_version_id: moduleVersionId,
+          module_version_id: moduleVersion.id,
           title,
           published_by: MOCK_ADMIN_USER.id,
         });
 
-        set({ publishStatus: 'published', publishedAt: new Date().toISOString() });
+        set({ publishStatus: 'published', publishedAt: moduleVersion.published_at ?? new Date().toISOString() });
         return true;
       },
       setCritique: (report) => set({ critique: report, ...resetPublishState }),

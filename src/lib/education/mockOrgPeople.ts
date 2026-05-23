@@ -81,3 +81,11 @@ export const MOCK_LEARNER_DEVON: User = {
   created_at: isoDaysAgo(90),
   updated_at: isoDaysAgo(3),
 }
+
+export const MOCK_ORG_PEOPLE: User[] = [
+  MOCK_LEARNER_MARCUS,
+  MOCK_LEARNER_ANA,
+  MOCK_LEARNER_DEVON,
+  MOCK_ADMIN_USER,
+  MOCK_MANAGER_USER,
+]

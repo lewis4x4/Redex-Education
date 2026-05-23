@@ -34,6 +34,7 @@ function createStorageMock(): Storage {
 describe('useFoundryDraftStore', () => {
   let useFoundryDraftStore: (typeof import('./foundryDraftStore'))['useFoundryDraftStore']
   let usePublishedModulesStore: (typeof import('@/features/publishing/store/publishedModulesStore'))['usePublishedModulesStore']
+  let useModuleVersionsStore: (typeof import('@/features/publishing/store/moduleVersionsStore'))['useModuleVersionsStore']
 
   beforeEach(async () => {
     vi.resetModules()
@@ -43,10 +44,12 @@ describe('useFoundryDraftStore', () => {
       value: createStorageMock(),
     })
 
+    ;({ useModuleVersionsStore } = await import('@/features/publishing/store/moduleVersionsStore'))
     ;({ usePublishedModulesStore } = await import('@/features/publishing/store/publishedModulesStore'))
     ;({ useFoundryDraftStore } = await import('./foundryDraftStore'))
 
     act(() => {
+      useModuleVersionsStore.getState().resetVersions()
       usePublishedModulesStore.getState().resetPublishedModules()
       useFoundryDraftStore.getState().clearDraft()
       useFoundryDraftStore.getState().clearSourceMaterial()
@@ -544,6 +547,16 @@ describe('useFoundryDraftStore', () => {
         }),
       ]),
     )
+    expect(useModuleVersionsStore.getState().getLatestPublishedVersion('hr-basics-mod-001')).toEqual(
+      expect.objectContaining({
+        id: 'module-version-hr-basics-v1',
+        module_id: 'hr-basics-mod-001',
+        module_title: 'HR Basics at Redex',
+        version_number: 1,
+        status: 'published',
+        approved_by: 'user-jordan-admin',
+      }),
+    )
   })
 
   it('setPublished rejects drafts that are not approved yet', () => {
@@ -564,6 +577,7 @@ describe('useFoundryDraftStore', () => {
     expect(didPublish).toBe(false)
     expect(useFoundryDraftStore.getState().publishStatus).toBe('draft')
     expect(usePublishedModulesStore.getState().isAssignable('module-version-basics-only-draft-v1')).toBe(false)
+    expect(useModuleVersionsStore.getState().getVersionHistory('basics-only-draft-mod-001')).toEqual([])
   })
 
   it('setPublished assigns custom drafts a distinct module version id instead of overwriting HR Basics', () => {
@@ -585,6 +599,43 @@ describe('useFoundryDraftStore', () => {
       ]),
     )
     expect(usePublishedModulesStore.getState().isAssignable('module-version-field-safety-refresher-v1')).toBe(true)
+    expect(useModuleVersionsStore.getState().getLatestPublishedVersion('field-safety-refresher-mod-001')).toEqual(
+      expect.objectContaining({
+        id: 'module-version-field-safety-refresher-v1',
+        module_title: 'Field Safety Refresher',
+        version_number: 1,
+      }),
+    )
+  })
+
+  it('forkNewDraftVersion leaves the published version untouched while seeding draft metadata', () => {
+    let forkedId = ''
+
+    act(() => {
+      seedPublishReadyModule()
+      useFoundryDraftStore.getState().setPublished()
+      const forked = useModuleVersionsStore.getState().forkNewDraftVersion('module-version-hr-basics-v1')
+      forkedId = forked.id
+      useFoundryDraftStore.getState().resetFoundryDraft()
+      useFoundryDraftStore.getState().seedDraftFromModuleVersion(forked)
+    })
+
+    expect(forkedId).toBe('module-version-hr-basics-v2')
+    expect(useModuleVersionsStore.getState().versions.find((version) => version.id === 'module-version-hr-basics-v1')).toEqual(
+      expect.objectContaining({
+        status: 'published',
+        version_number: 1,
+        published_at: expect.any(String),
+      }),
+    )
+    expect(useFoundryDraftStore.getState().currentDraft).toEqual(
+      expect.objectContaining({
+        id: 'module-version-hr-basics-v2',
+        module_id: 'hr-basics-mod-001',
+        version_number: 2,
+        title: 'HR Basics at Redex',
+      }),
+    )
   })
 
   it('review mutations reset a published draft back to draft status', () => {

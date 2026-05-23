@@ -36,6 +36,7 @@ describe('PublishConfirmationPage', () => {
   let PublishConfirmationPage: (typeof import('./PublishConfirmationPage'))['PublishConfirmationPage']
   let useFoundryDraftStore: (typeof import('@/features/foundry/store/foundryDraftStore'))['useFoundryDraftStore']
   let usePublishedModulesStore: (typeof import('@/features/publishing/store/publishedModulesStore'))['usePublishedModulesStore']
+  let useModuleVersionsStore: (typeof import('@/features/publishing/store/moduleVersionsStore'))['useModuleVersionsStore']
 
   beforeEach(async () => {
     vi.resetModules()
@@ -45,11 +46,13 @@ describe('PublishConfirmationPage', () => {
       value: createStorageMock(),
     })
 
+    ;({ useModuleVersionsStore } = await import('@/features/publishing/store/moduleVersionsStore'))
     ;({ usePublishedModulesStore } = await import('@/features/publishing/store/publishedModulesStore'))
     ;({ useFoundryDraftStore } = await import('@/features/foundry/store/foundryDraftStore'))
     ;({ PublishConfirmationPage } = await import('./PublishConfirmationPage'))
 
     act(() => {
+      useModuleVersionsStore.getState().resetVersions()
       usePublishedModulesStore.getState().resetPublishedModules()
       useFoundryDraftStore.getState().resetFoundryDraft()
       useFoundryDraftStore.getState().setBasics({
@@ -100,6 +103,7 @@ describe('PublishConfirmationPage', () => {
     expect(screen.getByText('Published at')).toBeInTheDocument()
     expect(screen.getByText(/\d{4}/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Return to admin dashboard' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit & create new version' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Start a new module' })).toBeInTheDocument()
   })
 
@@ -110,6 +114,30 @@ describe('PublishConfirmationPage', () => {
     await user.click(screen.getByRole('button', { name: 'Return to admin dashboard' }))
 
     expect(await screen.findByText('Admin dashboard route')).toBeInTheDocument()
+  })
+
+  it('forks a draft version and navigates when editing the published module', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(screen.getByRole('button', { name: 'Edit & create new version' }))
+
+    expect(usePublishedModulesStore.getState().isAssignable('module-version-hr-basics-v1')).toBe(true)
+    expect(useModuleVersionsStore.getState().versions.find((version) => version.id === 'module-version-hr-basics-v1')).toEqual(
+      expect.objectContaining({ status: 'published', version_number: 1 }),
+    )
+    expect(useModuleVersionsStore.getState().versions.find((version) => version.id === 'module-version-hr-basics-v2')).toEqual(
+      expect.objectContaining({ status: 'draft', version_number: 2 }),
+    )
+    expect(useFoundryDraftStore.getState().currentDraft).toEqual(
+      expect.objectContaining({
+        id: 'module-version-hr-basics-v2',
+        module_id: 'hr-basics-mod-001',
+        version_number: 2,
+        title: 'HR Basics at Redex',
+      }),
+    )
+    expect(await screen.findByText('Foundry start route')).toBeInTheDocument()
   })
 
   it('resets the foundry draft and navigates when starting a new module', async () => {

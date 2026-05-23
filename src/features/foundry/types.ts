@@ -6,6 +6,16 @@ import type { Criticality, TrainingType } from '@/lib/education';
  * (source binder, setup questions, outline review, etc.).
  */
 export interface ModuleBasicsDraft {
+  /** Optional module version id when editing a forked published version. */
+  id?: string;
+  /** Optional module id when editing a forked published version. */
+  module_id?: string;
+  /** Optional version number when editing a forked published version. */
+  version_number?: number;
+  /** Optional source binder version retained when editing a forked published version. */
+  source_binder_version?: string;
+  /** Optional assessment version retained when editing a forked published version. */
+  assessment_version?: string;
   /** Module title — required, 4-120 chars */
   title: string;
   /** 'standalone' or an existing course ID */

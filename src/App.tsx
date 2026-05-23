@@ -65,6 +65,10 @@ const PublishConfirmationPage = lazy(() =>
   import('@/features/foundry/pages/PublishConfirmationPage').then((m) => ({ default: m.PublishConfirmationPage })),
 )
 
+const ModuleVersionHistoryPage = lazy(() =>
+  import('@/features/publishing/pages/ModuleVersionHistoryPage').then((m) => ({ default: m.ModuleVersionHistoryPage })),
+)
+
 // Redex Academy - Active Build
 // Phase 2 routes: learner demo stays open; admin shell is protected by AuthGate.
 
@@ -328,6 +332,18 @@ function PublishConfirmationRoute() {
   )
 }
 
+function ModuleVersionHistoryRoute() {
+  return (
+    <AppShell breadcrumb="Admin flow › Module versions">
+      <AuthGate>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <ModuleVersionHistoryPage />
+        </Suspense>
+      </AuthGate>
+    </AppShell>
+  )
+}
+
 function NotFoundRoute() {
   return (
     <AppShell breadcrumb="Page not found">
@@ -346,6 +362,7 @@ export default function App() {
       <Route path="/learn/player/:moduleId" element={<LearnerModuleRoute />} />
       <Route path="/admin" element={<AdminRoute />} />
       <Route path="/admin/assignments" element={<AssignmentAdminRoute />} />
+      <Route path="/admin/modules/:moduleId/versions" element={<ModuleVersionHistoryRoute />} />
       <Route path="/manager" element={<ManagerRoute />} />
       <Route path="/admin/foundry/start" element={<FoundryStartRoute />} />
       <Route path="/admin/foundry/source" element={<FoundrySourceRoute />} />

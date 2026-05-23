@@ -7,6 +7,7 @@ import { useEducation, useMyProgress } from '@/hooks/useEducation'
 import { useAuth } from '@/hooks/useAuth'
 import { useAssignmentStore } from '@/features/assignments/store/assignmentStore'
 import { useAssessmentAttemptStore } from '@/features/progress/store/assessmentAttemptStore'
+import { useModuleVersionsStore } from '@/features/publishing/store/moduleVersionsStore'
 import { MOCK_HR_ONBOARDING_ASSIGNMENT } from '@/lib/education'
 
 vi.mock('@/hooks/useEducation', () => ({
@@ -88,6 +89,7 @@ describe('Redex Education routes', () => {
     } as never)
 
     act(() => {
+      useModuleVersionsStore.getState().resetVersions()
       useAssignmentStore.getState().resetAssignments()
       useAssessmentAttemptStore.getState().resetAttempts()
     })
@@ -286,6 +288,15 @@ describe('Redex Education routes', () => {
     renderAt('/admin/assignments')
 
     expect(await screen.findByRole('heading', { name: 'Manage assignments' })).toBeInTheDocument()
+  })
+
+  it('renders ModuleVersionHistoryPage at /admin/modules/:moduleId/versions', async () => {
+    vi.stubEnv('VITE_MOCK_AUTH', 'true')
+
+    renderAt('/admin/modules/hr-basics-mod-001/versions')
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'HR Basics at Redex' })).toBeInTheDocument()
+    expect(screen.getByText('Version history')).toBeInTheDocument()
   })
 
   it('renders ManagerDashboardPage at /manager', async () => {
