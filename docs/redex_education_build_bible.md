@@ -3065,3 +3065,48 @@ The mock data that the Foundry preview/critique/side-by-side surfaces consume wa
 
 ---
 
+## 2026-05-22 — Slice 5.3: End-to-End HR Learner Flow
+
+**Status**: ✅ Completed.
+
+**Master roadmap**: Phase 5 / Slice 5.3.
+**Linear ticket**: `HR Prototype: complete end-to-end learner HR flow`.
+
+**Context**:
+Slice 5.2 registered HR Basics in `DEMO_MODULES` but the learner-side flow still defaulted to Orientation. This slice makes HR Basics the canonical primary learner experience for Marcus (MOCK_LEARNER_MARCUS from Slice 4.2) and adds the missing acknowledgment lesson rendering + module completion screen the roadmap requires.
+
+**Orchestration**: Single pair agent (sequential implementation across routing, context, components, and tests). No parallelization needed — surfaces were tightly coupled (route default → progress hook → context primary enrollment → player flow → completion screen).
+
+**Files touched** (+/−):
+- `src/App.tsx` (+5 / −5) — `LearnerWelcomeRoute` and `LearnerDashboardRoute` "Start"/"Continue" CTAs navigate to `/learn/player/hr-basics-mod-001`; Orientation route at `/learn/player/mod-001` preserved.
+- `src/hooks/useEducation.ts` (+2 / −2) — `useMyProgress()` defaults to `DEMO_HR_BASICS_COURSE.id`.
+- `src/contexts/EducationContext.tsx` (+21 / −4) — HR Basics enrollment is primary; Orientation remains accessible as a secondary registered course.
+- `src/features/learner/pages/LearnerDashboardPage.tsx` (+6 / −2) — displays `HR Basics at Redex`, `0 of 6 lessons`, ~20-minute estimate.
+- `src/features/learner/components/LessonContentRenderer.tsx` (+52 / −1) — new `acknowledgment` lesson branch: markdown statement → accessible checkbox+label → disabled Redex-red `Acknowledge` button until checked → `onAcknowledge` callback.
+- `src/features/learner/components/ModulePlayer.tsx` (+78 / −41) — acknowledgment + quiz lessons mark complete and advance; inline completion screen renders when `completedLessons.size === lessons.length`; `onCompleteModule` deferred until explicit "Back to dashboard" click; final quiz score/pass indicator shown on completion screen.
+- Tests: `App.routes.test.tsx` (+41/−12), `EducationContext.test.tsx` (+32/−6), `ModulePlayer.test.tsx` (+86/−5), `LessonContentRenderer.test.tsx` (+47, new), `LearnerDashboardPage.test.tsx` (+65, new).
+
+**Verification**:
+- ✅ typecheck green
+- ✅ lint 0/0
+- ✅ npm test: **257 passed, 1 skipped** (+10 vs Slice 5.2 baseline of 247)
+- ✅ build green (no app-entry regression; React.lazy chunks intact)
+
+**Acceptance criteria** (master roadmap):
+- ✅ Marcus (welcome) → dashboard → module player → 6 lessons (incl. acknowledgment + final quiz) → completion screen, end-to-end
+- ✅ Acknowledgment lesson renders statement + checkbox + Acknowledge button (a11y label wired)
+- ✅ Module completion screen surfaces final quiz score
+- ✅ Orientation still directly routable for regression coverage
+- ✅ Progress tracked via EducationContext
+- ✅ Build Bible updated
+
+**Known scope deferred**:
+- No persistence of completion across reloads (still mock/in-memory). Phase 8 Supabase wiring will replace.
+- Marcus's assignment record (Slice 4.2 `mockAssignments.ts`) does not yet drive the dashboard — dashboard uses `useMyProgress()` only. Will be reconciled when Phase 6 (Assignment, Progress, Manager Visibility) wires assignment → dashboard binding.
+
+**Naming guardrails honored**: HR Basics, Marcus Chen, Sarah Chen (buddy) — no invented Redex names introduced this slice.
+
+**Next**: Slice 5.4 — End-to-End HR Admin Foundry Flow. Walk an admin from Foundry start → source binder (Drive library) → setup questions → outline review → generation preview → self-critique → side-by-side, all targeting the HR Basics canonical course with mock-AI grounding back to `HR_ONBOARDING_SOURCE_SAMPLE.md`.
+
+---
+

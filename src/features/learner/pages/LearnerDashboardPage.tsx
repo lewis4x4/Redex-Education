@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMyProgress } from '@/hooks/useEducation';
+import { DEMO_HR_BASICS_COURSE } from '@/lib/education';
 import type { Course, Enrollment, LearnerProfile, Lesson } from '@/lib/education';
 import { ArrowRight, CheckCircle2, Circle, Clock, HelpCircle, Lock } from 'lucide-react';
 
@@ -46,11 +47,14 @@ export function LearnerDashboardPage({ learner, onContinue }: LearnerDashboardPa
 
   // Live data from EducationContext (Task D1)
   const currentAssignment = {
-    title: 'Redex Academy Orientation',
+    title: DEMO_HR_BASICS_COURSE.title,
     progress: percentage,
     totalLessons: total,
     completedLessons: completed,
-    estimatedMinutesLeft: Math.max(5, Math.round((100 - percentage) * 0.25)),
+    estimatedMinutesLeft: Math.max(
+      0,
+      Math.round(DEMO_HR_BASICS_COURSE.estimated_minutes * ((100 - percentage) / 100))
+    ),
     dueInDays: 5,
   };
   const progressValueClass = currentAssignment.progress > 0 ? 'text-redex-red' : 'text-slate-500';

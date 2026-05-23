@@ -5,8 +5,24 @@ import { ModulePlayer } from './ModulePlayer';
 import type { Criticality, Lesson, LessonType, Module } from '@/lib/education';
 
 vi.mock('./LessonContentRenderer', () => ({
-  LessonContentRenderer: ({ lesson }: { lesson: Lesson }) => (
-    <div data-testid="lesson-content-renderer">Rendering {lesson.id}</div>
+  LessonContentRenderer: ({
+    lesson,
+    onAcknowledge,
+    onQuizComplete,
+  }: {
+    lesson: Lesson;
+    onAcknowledge?: () => void;
+    onQuizComplete?: (score: number, passed: boolean) => void;
+  }) => (
+    <div data-testid="lesson-content-renderer">
+      Rendering {lesson.id}
+      {lesson.content.type === 'acknowledgment' && (
+        <button type="button" onClick={onAcknowledge}>Acknowledge lesson</button>
+      )}
+      {lesson.content.type === 'quiz' && (
+        <button type="button" onClick={() => onQuizComplete?.(100, true)}>Complete quiz pass</button>
+      )}
+    </div>
   ),
 }));
 
@@ -97,7 +113,7 @@ describe('Redex Academy learner module player', () => {
       />
     );
 
-    expect(screen.getByRole('button', { name: /complete module/i })).toBeEnabled();
+    expect(screen.getByRole('heading', { name: /you've completed redex academy test module/i })).toBeInTheDocument();
     expect(screen.queryByText(/🔒 Pass the quiz above/i)).not.toBeInTheDocument();
   });
 
@@ -206,13 +222,72 @@ describe('Redex Academy learner module player', () => {
     expect(onProgressUpdate).toHaveBeenCalledTimes(1);
   });
 
-  it('fires onCompleteModule when Complete Module is clicked on single-lesson module', async () => {
+  it('shows completion with the calculated final quiz score after a passing quiz', async () => {
+    const user = userEvent.setup();
+    const onProgressUpdate = vi.fn();
+    const quizLesson = makeLesson({
+      id: 'lesson-final-quiz',
+      title: 'Final Quiz',
+      content: {
+        type: 'quiz',
+        passing_threshold: 80,
+        allow_retakes: true,
+        questions: [],
+      },
+    });
+
+    render(
+      <ModulePlayer
+        module={makeModule('hr-basics-mod-001')}
+        lessons={[quizLesson]}
+        onProgressUpdate={onProgressUpdate}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /complete quiz pass/i }));
+
+    expect(onProgressUpdate).toHaveBeenCalledWith('lesson-final-quiz', 'completed');
+    expect(screen.getByRole('heading', { name: /you've completed redex academy test module/i })).toBeInTheDocument();
+    expect(screen.getByText('100%')).toBeInTheDocument();
+    expect(screen.getByText('Passed')).toBeInTheDocument();
+  });
+
+  it('marks acknowledgment lessons complete and advances after acknowledge callback', async () => {
+    const user = userEvent.setup();
+    const onProgressUpdate = vi.fn();
+    const acknowledgmentLesson = makeLesson({
+      id: 'lesson-ack',
+      title: 'Required Acknowledgment',
+      content: {
+        type: 'acknowledgment',
+        statement_markdown: 'I understand the HR basics.',
+        required_signature: 'click',
+      },
+    });
+    const nextLesson = makeLesson({ id: 'lesson-next', title: 'Next Lesson', order_index: 1 });
+
+    render(
+      <ModulePlayer
+        module={makeModule()}
+        lessons={[acknowledgmentLesson, nextLesson]}
+        onProgressUpdate={onProgressUpdate}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /acknowledge lesson/i }));
+
+    expect(onProgressUpdate).toHaveBeenCalledWith('lesson-ack', 'completed');
+    expect(screen.getByText('LESSON 2 OF 2')).toBeInTheDocument();
+    expect(screen.getAllByText('Next Lesson')).toHaveLength(2);
+  });
+
+  it('shows completion inline after the final lesson and calls onCompleteModule from Back to dashboard', async () => {
     const user = userEvent.setup();
     const onCompleteModule = vi.fn();
 
     render(
       <ModulePlayer
-        module={makeModule()}
+        module={makeModule(undefined)}
         lessons={[makeLesson({ id: 'L1', title: 'Only Lesson' })]}
         onCompleteModule={onCompleteModule}
       />
@@ -220,6 +295,12 @@ describe('Redex Academy learner module player', () => {
 
     await user.click(screen.getByRole('button', { name: /complete module/i }));
 
+    expect(onCompleteModule).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { name: /you've completed redex academy test module/i })).toBeInTheDocument();
+
+    const completionBackButton = screen.getAllByRole('button', { name: /back to dashboard/i }).at(-1);
+    expect(completionBackButton).toBeDefined();
+    await user.click(completionBackButton!);
     expect(onCompleteModule).toHaveBeenCalledTimes(1);
   });
 

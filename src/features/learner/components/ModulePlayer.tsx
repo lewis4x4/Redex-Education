@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Module, Lesson, ProgressStatus, QuizLessonContent } from '@/lib/education';
 import { LessonContentRenderer } from './LessonContentRenderer';
 import { Button } from '@/components/ui/button';
@@ -33,34 +33,16 @@ export function ModulePlayer({
   onExit,
   completedLessonIds = [],
 }: ModulePlayerProps) {
-  const [currentIndex, setCurrentIndex] = useState(() => getInitialLessonIndex(lessons, initialLessonId));
+  const initialIndex = useMemo(() => getInitialLessonIndex(lessons, initialLessonId), [lessons, initialLessonId]);
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
   // Track quiz outcomes so we can gate "Mark Complete" for quiz lessons and auto-record progress on pass
   const [quizResults, setQuizResults] = useState<Record<string, { score: number; passed: boolean }>>({});
-  const completeModuleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (completeModuleTimeoutRef.current) {
-        clearTimeout(completeModuleTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const scheduleModuleCompletion = () => {
-    if (completeModuleTimeoutRef.current) {
-      clearTimeout(completeModuleTimeoutRef.current);
-    }
-
-    completeModuleTimeoutRef.current = setTimeout(() => {
-      completeModuleTimeoutRef.current = null;
-      onCompleteModule?.();
-    }, 650);
-  };
+  const [optimisticCompletedLessonIds, setOptimisticCompletedLessonIds] = useState<string[]>([]);
 
   const lessonIds = useMemo(() => new Set(lessons.map((lesson) => lesson.id)), [lessons]);
   const completedLessons = useMemo(
-    () => new Set(completedLessonIds.filter((id) => lessonIds.has(id))),
-    [completedLessonIds, lessonIds]
+    () => new Set([...completedLessonIds, ...optimisticCompletedLessonIds].filter((id) => lessonIds.has(id))),
+    [completedLessonIds, optimisticCompletedLessonIds, lessonIds]
   );
 
   const firstIncompleteRequiredIndex = useMemo(
@@ -69,6 +51,11 @@ export function ModulePlayer({
   );
 
   const progress = lessons.length > 0 ? Math.round((completedLessons.size / lessons.length) * 100) : 0;
+  const isModuleComplete = lessons.length > 0 && completedLessons.size === lessons.length;
+  const latestQuizResult = [...lessons]
+    .reverse()
+    .map((lesson) => quizResults[lesson.id])
+    .find((result) => result !== undefined);
 
   if (lessons.length === 0) {
     return (
@@ -133,14 +120,20 @@ export function ModulePlayer({
     return firstIncompleteRequiredIndex === -1 || index <= firstIncompleteRequiredIndex;
   };
 
-  const handleMarkComplete = () => {
-    onProgressUpdate?.(currentLesson.id, 'completed');
+  const markLessonCompleted = (lessonId: string) => {
+    setOptimisticCompletedLessonIds((prev) => (prev.includes(lessonId) ? prev : [...prev, lessonId]));
+    onProgressUpdate?.(lessonId, 'completed');
+  };
 
-    if (isLastLesson) {
-      onCompleteModule?.();
-    } else {
+  const advanceAfterCompletion = () => {
+    if (!isLastLesson) {
       setCurrentIndex(currentIndex + 1);
     }
+  };
+
+  const handleMarkComplete = () => {
+    markLessonCompleted(currentLesson.id);
+    advanceAfterCompletion();
   };
 
   const goToLesson = (index: number) => {
@@ -226,19 +219,65 @@ export function ModulePlayer({
       <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
         <div className="border-b px-4 py-4 flex flex-col gap-2 bg-white sm:px-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="text-xs text-slate-500">LESSON {currentIndex + 1} OF {lessons.length}</div>
-            <div className="font-semibold text-xl">{currentLesson.title}</div>
+            <div className="text-xs text-slate-500">
+              {isModuleComplete ? 'MODULE COMPLETE' : `LESSON ${currentIndex + 1} OF ${lessons.length}`}
+            </div>
+            <div className="font-semibold text-xl">{isModuleComplete ? module.title : currentLesson.title}</div>
           </div>
           <div className="text-sm text-slate-500 flex items-center gap-1">
-            <Clock className="w-4 h-4" /> {currentLesson.estimated_minutes} min
+            <Clock className="w-4 h-4" /> {isModuleComplete ? module.estimated_minutes : currentLesson.estimated_minutes} min
           </div>
         </div>
 
+        {isModuleComplete ? (
+          <div className="flex-1 overflow-auto bg-redex-offwhite p-4 sm:p-6 md:p-8">
+            <div className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-md">
+              <div className="text-5xl" aria-hidden="true">🎉</div>
+              <div className="mt-4 text-xs font-semibold uppercase tracking-[3px] text-redex-red">
+                TRAINING COMPLETE
+              </div>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+                You've completed {module.title}
+              </h2>
+              <p className="mt-3 text-slate-600">
+                Nice work. Your progress is saved locally, and this HR Basics assignment is complete.
+              </p>
+
+              <div className="mt-6 grid gap-3 text-left sm:grid-cols-2">
+                <div className="rounded-xl border border-slate-200 bg-redex-offwhite p-4">
+                  <div className="text-xs font-semibold uppercase tracking-widest text-slate-500">Estimated time</div>
+                  <div className="mt-1 text-2xl font-semibold text-slate-900">{module.estimated_minutes} min</div>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-redex-offwhite p-4">
+                  <div className="text-xs font-semibold uppercase tracking-widest text-slate-500">Quiz score</div>
+                  {latestQuizResult ? (
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="text-2xl font-semibold text-slate-900">{latestQuizResult.score}%</span>
+                      <span className={latestQuizResult.passed ? 'font-medium text-emerald-700' : 'font-medium text-amber-700'}>
+                        {latestQuizResult.passed ? 'Passed' : 'Not passed'}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-sm font-medium text-slate-600">Score not available this session</div>
+                  )}
+                </div>
+              </div>
+
+              <Button className="mt-8 bg-redex-red hover:bg-redex-red-hover" onClick={onCompleteModule}>
+                Back to dashboard <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        ) : (
         <div className="flex-1 overflow-auto bg-redex-offwhite p-4 sm:p-6 md:p-8">
           <LessonContentRenderer
             lesson={currentLesson}
+            onAcknowledge={() => {
+              markLessonCompleted(currentLesson.id);
+              advanceAfterCompletion();
+            }}
             onQuizComplete={(score, passed) => {
-              // Record result for gating + UI
+              // Record result for gating + completion UI
               setQuizResults((prev) => ({
                 ...prev,
                 [currentLesson.id]: { score, passed },
@@ -247,25 +286,22 @@ export function ModulePlayer({
               // When the learner passes a quiz lesson, auto-mark it complete so progress updates immediately
               // (the quiz itself is the interaction that fulfills the lesson requirement for the vertical slice)
               if (passed) {
-                onProgressUpdate?.(currentLesson.id, 'completed');
-
-                // If this was the final lesson and passed via quiz, complete the module flow too
-                if (isLastLesson) {
-                  // Brief pause so learner sees the success banner + score in Quiz before dashboard transition
-                  scheduleModuleCompletion();
-                }
+                markLessonCompleted(currentLesson.id);
+                advanceAfterCompletion();
               }
             }}
           />
         </div>
+        )}
 
         {/* Quiz lock banner — forces real interaction before progress can advance on quiz lessons */}
-        {isQuizLocked && (
+        {!isModuleComplete && isQuizLocked && (
           <div className="border-t bg-amber-50 px-4 py-2.5 text-sm text-amber-700 flex items-center gap-2 sm:px-6">
             <span>🔒 Pass the quiz above with {quizPassingThreshold}% or higher to unlock lesson completion and continue.</span>
           </div>
         )}
 
+        {!isModuleComplete && (
         <div className="border-t p-4 bg-white flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Button variant="outline" onClick={() => goToLesson(currentIndex - 1)} disabled={currentIndex === 0}>
             <ArrowLeft className="w-4 h-4 mr-2" /> Previous
@@ -282,6 +318,7 @@ export function ModulePlayer({
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </div>
+        )}
       </div>
     </div>
   );

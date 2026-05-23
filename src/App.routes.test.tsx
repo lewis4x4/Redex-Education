@@ -29,17 +29,31 @@ function renderAt(path: string) {
 describe('Redex Education routes', () => {
   beforeEach(() => {
     useEducationMock.mockReturnValue({
-      getModule: (id: string) =>
-        id === 'mod-001'
-          ? {
-              id: 'mod-001',
-              course_id: 'course-001',
-              title: 'Orientation Module',
-              order_index: 1,
-              criticality: 'required',
-              estimated_minutes: 10,
-            }
-          : undefined,
+      getModule: (id: string) => {
+        if (id === 'mod-001') {
+          return {
+            id: 'mod-001',
+            course_id: 'course-001',
+            title: 'Orientation Module',
+            order_index: 1,
+            criticality: 'required',
+            estimated_minutes: 10,
+          }
+        }
+
+        if (id === 'hr-basics-mod-001') {
+          return {
+            id: 'hr-basics-mod-001',
+            course_id: 'course-hr-basics-001',
+            title: 'HR Basics at Redex',
+            order_index: 1,
+            criticality: 'required',
+            estimated_minutes: 20,
+          }
+        }
+
+        return undefined
+      },
       getLessonsForModule: () => [],
       getLessonStatus: () => 'not_started',
       recordLessonProgress: vi.fn(),
@@ -77,9 +91,24 @@ describe('Redex Education routes', () => {
     expect(screen.getByText(/Continue where you left off/i)).toBeInTheDocument()
   })
 
-  it('renders the player route for a valid module id', () => {
+  it('renders the player route for the Orientation module direct URL', () => {
     renderAt('/learn/player/mod-001')
 
+    expect(screen.getByText('Orientation Module')).toBeInTheDocument()
+    expect(screen.getByText(/No lessons in this module yet/i)).toBeInTheDocument()
+  })
+
+  it('renders the player route for the HR Basics primary learner module', () => {
+    renderAt('/learn/player/hr-basics-mod-001')
+
+    expect(screen.getByText('HR Basics at Redex')).toBeInTheDocument()
+    expect(screen.getByText(/No lessons in this module yet/i)).toBeInTheDocument()
+  })
+
+  it('defaults /learn/player to the HR Basics primary learner module', () => {
+    renderAt('/learn/player')
+
+    expect(screen.getByText('HR Basics at Redex')).toBeInTheDocument()
     expect(screen.getByText(/No lessons in this module yet/i)).toBeInTheDocument()
   })
 

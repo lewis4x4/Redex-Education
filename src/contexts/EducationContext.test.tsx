@@ -5,7 +5,13 @@ import { render, renderHook, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EducationProvider } from '@/contexts/EducationContext';
 import { useEducation, useMyProgress } from '@/hooks/useEducation';
-import { DEMO_ORIENTATION_COURSE, DEMO_LESSONS } from '@/lib/education';
+import {
+  DEMO_HR_BASICS_COURSE,
+  DEMO_HR_BASICS_ENROLLMENT,
+  DEMO_HR_BASICS_LESSONS,
+  DEMO_ORIENTATION_COURSE,
+  DEMO_LESSONS,
+} from '@/lib/education';
 
 const STORAGE_KEY = 'redex-education-progress-v1';
 
@@ -150,14 +156,24 @@ describe('EducationContext', () => {
       });
     });
 
-    it('advances percentage after one completed lesson', () => {
+    it('returns course-scoped totals for HR Basics course', () => {
+      const { result } = renderHook(() => useEducation(), { wrapper });
+
+      expect(result.current.getProgressSummary(DEMO_HR_BASICS_COURSE.id)).toEqual({
+        completed: 0,
+        total: DEMO_HR_BASICS_LESSONS.length,
+        percentage: 0,
+      });
+    });
+
+    it('advances HR Basics percentage after one completed lesson', () => {
       const { result } = renderHook(() => useEducation(), { wrapper });
 
       act(() => {
-        result.current.recordLessonProgress(DEMO_LESSONS[0]!.id, 'completed');
+        result.current.recordLessonProgress(DEMO_HR_BASICS_LESSONS[0]!.id, 'completed');
       });
 
-      const summary = result.current.getProgressSummary(DEMO_ORIENTATION_COURSE.id);
+      const summary = result.current.getProgressSummary(DEMO_HR_BASICS_COURSE.id);
       expect(summary.completed).toBe(1);
       expect(summary.percentage).toBe(Math.round((1 / summary.total) * 100));
     });
@@ -207,16 +223,26 @@ describe('EducationContext', () => {
   });
 
   describe('provider stability', () => {
-    it('updates currentEnrollment.progress_percentage reactively via useMyProgress', () => {
+    it('updates HR Basics currentEnrollment.progress_percentage reactively via useMyProgress', () => {
       const { result } = renderHook(() => useMyProgress(), { wrapper });
 
+      expect(result.current.enrollment?.course_id).toBe(DEMO_HR_BASICS_COURSE.id);
       expect(result.current.enrollment?.progress_percentage).toBe(0);
 
       act(() => {
-        result.current.completeLesson(DEMO_LESSONS[0]!.id);
+        result.current.completeLesson(DEMO_HR_BASICS_LESSONS[0]!.id);
       });
 
       expect(result.current.enrollment?.progress_percentage).toBeGreaterThan(0);
+    });
+
+    it('returns HR Basics as Marcus primary enrollment while preserving Orientation as secondary', () => {
+      const { result } = renderHook(() => useEducation(), { wrapper });
+
+      const enrollments = result.current.getMyEnrollments();
+      expect(enrollments[0]?.id).toBe(DEMO_HR_BASICS_ENROLLMENT.id);
+      expect(enrollments[0]?.course_id).toBe(DEMO_HR_BASICS_COURSE.id);
+      expect(enrollments.map((enrollment) => enrollment.course_id)).toContain(DEMO_ORIENTATION_COURSE.id);
     });
   });
 });

@@ -59,8 +59,8 @@ function LearnerDashboardRoute() {
   return (
     <AppShell breadcrumb="Learner flow › My Learning Dashboard">
       <LearnerDashboardPage
-        onContinue={() => navigate('/learn/player/mod-001')}
-        onStartJourney={() => navigate('/learn/player/mod-001')}
+        onContinue={() => navigate('/learn/player/hr-basics-mod-001')}
+        onStartJourney={() => navigate('/learn/player/hr-basics-mod-001')}
       />
     </AppShell>
   )
@@ -71,13 +71,13 @@ function LearnerWelcomeRoute() {
 
   return (
     <AppShell breadcrumb="Learner flow › First-day welcome">
-      <LearnerWelcomePage onStartJourney={() => navigate('/learn/player/mod-001')} />
+      <LearnerWelcomePage onStartJourney={() => navigate('/learn/player/hr-basics-mod-001')} />
     </AppShell>
   )
 }
 
 function LearnerModuleRoute() {
-  const { moduleId = 'mod-001' } = useParams<{ moduleId?: string }>()
+  const { moduleId = 'hr-basics-mod-001' } = useParams<{ moduleId?: string }>()
   const navigate = useNavigate()
   const education = useEducation()
 
@@ -96,7 +96,7 @@ function LearnerModuleRoute() {
     .map((lesson) => lesson.id)
 
   return (
-    <AppShell breadcrumb="Learner flow › Orientation Module Player" playerMode>
+    <AppShell breadcrumb="Learner flow › Module Player" playerMode>
       <ModulePlayer
         key={routeModule.id}
         module={routeModule}

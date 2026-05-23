@@ -1,6 +1,6 @@
 import { useContext } from 'react';
 import { EducationContext } from '@/contexts/education-context';
-import { DEMO_ORIENTATION_COURSE } from '@/lib/education';
+import { DEMO_HR_BASICS_COURSE } from '@/lib/education';
 import type { UUID } from '@/lib/education';
 
 export function useEducation() {
@@ -15,7 +15,7 @@ export function useEducation() {
 
 export function useMyProgress(courseId?: UUID) {
   const education = useEducation();
-  const id = courseId ?? DEMO_ORIENTATION_COURSE.id;
+  const id = courseId ?? DEMO_HR_BASICS_COURSE.id;
   const summary = education.getProgressSummary(id);
 
   return {

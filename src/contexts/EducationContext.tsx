@@ -30,6 +30,15 @@ import {
 const LS_KEY = 'redex-education-progress-v1';
 const ALL_DEMO_LESSONS = [...DEMO_LESSONS, ...DEMO_HR_BASICS_LESSONS];
 
+function getEnrollmentIdForLesson(lessonId: UUID): UUID {
+  const lesson = ALL_DEMO_LESSONS.find((candidate) => candidate.id === lessonId);
+  const module = lesson ? DEMO_MODULES.find((candidate) => candidate.id === lesson.module_id) : undefined;
+
+  return module?.course_id === DEMO_HR_BASICS_COURSE.id
+    ? DEMO_HR_BASICS_ENROLLMENT.id
+    : DEMO_ENROLLMENT.id;
+}
+
 interface StoredLessonProgress {
   status: ProgressStatus;
   time_spent_seconds: number;
@@ -55,7 +64,7 @@ function restoreLessonProgress(): Record<string, LessonProgress> {
     Object.entries(stored.lessonProgress ?? {}).forEach(([lessonId, progress]) => {
       restored[lessonId] = {
         id: `lp-${lessonId}`,
-        enrollment_id: DEMO_ENROLLMENT.id,
+        enrollment_id: getEnrollmentIdForLesson(lessonId),
         lesson_id: lessonId,
         status: progress.status,
         time_spent_seconds: progress.time_spent_seconds || 0,
@@ -112,7 +121,7 @@ export function EducationProvider({ children }: { children: React.ReactNode }) {
           ...prev,
           [lessonId]: {
             id: `lp-${lessonId}`,
-            enrollment_id: DEMO_ENROLLMENT.id,
+            enrollment_id: getEnrollmentIdForLesson(lessonId),
             lesson_id: lessonId,
             status,
             time_spent_seconds: (existing?.time_spent_seconds || 0) + timeSpent,
@@ -153,6 +162,14 @@ export function EducationProvider({ children }: { children: React.ReactNode }) {
   );
 
   const currentEnrollment = useMemo<Enrollment | null>(() => {
+    const summary = getProgressSummary(DEMO_HR_BASICS_COURSE.id);
+    return {
+      ...DEMO_HR_BASICS_ENROLLMENT,
+      progress_percentage: summary.percentage,
+    };
+  }, [getProgressSummary]);
+
+  const orientationEnrollment = useMemo<Enrollment>(() => {
     const summary = getProgressSummary(DEMO_ORIENTATION_COURSE.id);
     return {
       ...DEMO_ENROLLMENT,
@@ -161,8 +178,8 @@ export function EducationProvider({ children }: { children: React.ReactNode }) {
   }, [getProgressSummary]);
 
   const getMyEnrollments = useCallback((): Enrollment[] => {
-    return currentEnrollment ? [currentEnrollment, DEMO_HR_BASICS_ENROLLMENT] : [DEMO_HR_BASICS_ENROLLMENT];
-  }, [currentEnrollment]);
+    return currentEnrollment ? [currentEnrollment, orientationEnrollment] : [orientationEnrollment];
+  }, [currentEnrollment, orientationEnrollment]);
 
   const getCourse = useCallback((courseId: UUID): Course | undefined => {
     if (courseId === DEMO_ORIENTATION_COURSE.id) {
