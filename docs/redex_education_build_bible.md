@@ -3559,3 +3559,57 @@ All four acceptance criteria were already met by prior work; this slice locks th
 
 ---
 
+## 2026-05-23 — Slice 8.2: Database Schema Migration Draft
+
+**Status**: ✅ Completed — draft migration file only. **NOT applied to remote yet** (pending training_modules collision reconciliation).
+
+**Linear ticket**: `Supabase: draft MVP training schema migration`.
+
+**Context**:
+Drafts the rest of the MVP schema on top of the two prior migrations (learner-side `20260522000100` + source library `20260522220557`). Migration is **not** applied to remote — it's a deliverable for review and a future targeted apply.
+
+**Orchestration**: Single pair agent (Codex CLI · gpt-5.5 high) with no Oracle review (pure SQL draft — TypeScript shape verification was the live work).
+
+**File touched**:
+- `supabase/migrations/20260523000100_create_mvp_complete_schema_and_rls.sql` (new) — 512 lines, 20.8 KB.
+
+**Tables added**:
+- **Learner/admin core**: `profiles` (with `org_id` per canonical `User` type, `manager_id` self-FK, role CHECK), `assessments`, `assessment_questions`, `assessment_attempts`, `assignments` (with exactly-one user-or-role CHECK), `acknowledgments`, `audit_logs` (CHECK with 14 AuditEventType values), `generated_content_reviews`.
+- **Course Foundry**: `module_versions` (status + 11-state `approval_state` CHECK matching `ModuleApprovalState`, `source_stale` advisory flag, `stale_since`), `source_change_events`.
+- **Reused/additive compatibility** for the existing `source_library_v1` shape rather than recreating colliding tables (`source_files` / `source_sections` / `module_source_bindings`).
+
+**Indexes**: 10 indexes covering common query patterns (role, manager hierarchy, source file lookup by Drive ID, current-version partial-unique, module-version by module+status, bindings by module_version, source change status+detected, assignments by assignee+status, attempts by lesson+time desc, audit logs by occurred_at desc and by event_type+occurred_at desc).
+
+**RLS posture**: Permissive demo-phase (any authenticated user can read/write all new tables), with a banner comment block warning that tightening is required before production. `audit_logs` is SELECT-only for authenticated; writes flow via service role.
+
+**Trigger**: standard `set_updated_at()` function + triggers on `profiles`, `module_versions`, `assessments`.
+
+**Verification**:
+- ✅ `supabase db diff --schema public` clean against shadow migration chain (no destructive surprises)
+- ✅ typecheck green (no client code changed)
+- ✅ lint 0/0
+- ✅ npm test: **426 passed, 1 skipped** (no test count change — purely additive SQL file)
+- ✅ build green
+
+**Acceptance criteria** (master roadmap):
+- ✅ Migration file exists (`20260523000100_create_mvp_complete_schema_and_rls.sql`)
+- ✅ Schema matches TypeScript types — with documented divergences (see below)
+- ✅ Build Bible updated
+
+**TypeScript ↔ schema divergences** (each flagged with `-- MISMATCH:` comment in the migration; reconciliation TODOs):
+1. **Source library tables reused**: Existing `source_files/source_sections/module_source_bindings` from `source_library_v1` migration retained; no recreation.
+2. **`profiles.org_id`** added because canonical `User` type requires it (not in roadmap spec).
+3. **`source_change_events.source_file_id` is `TEXT`**, not UUID FK, to match current code using stable string IDs (Drive file IDs).
+4. **`audit_logs.actor_user_id` is `TEXT`** per slice requirement for the `'system'` sentinel, despite the TypeScript alias being UUID.
+5. **`module_versions.module_id`** intentionally has NO FK to `training_modules` until that collision is resolved (Phase 8.3+).
+6. **UUID columns vs string-like mock IDs**: Current Zustand stores use string IDs like `'module-version-hr-basics-v1'`. Real writes require an adapter that mints UUIDs and maps to the mocked string IDs (Slice 8.3 task).
+
+**Known deferred work**:
+- **`supabase db push`** — NOT executed. User runs this manually after reconciling the training_modules shape against the existing remote project.
+- **`src/integrations/supabase/types.ts` regeneration** via `supabase gen types typescript --linked` — deferred until migration applies to a known-good schema state.
+- **RLS tightening** — full role-gated policies (admin-only writes, manager-scoped reads, learner-scoped attempts) requires a SECURITY DEFINER helper that reads `profiles.role` for the current user. Targeted as a follow-up after the migration applies.
+
+**Next**: Slice 8.3 — Replace Mock Reads With Supabase Reads. Priority order: profiles → courses/modules/lessons → assignments → progress → source binders. Each store becomes a thin adapter: reads from Supabase when env configured + auth present, falls back to mock data otherwise. Allows incremental wire-up without breaking the existing demo.
+
+---
+
