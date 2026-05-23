@@ -4,6 +4,7 @@ import type {
   CourseOutlineDraft,
   GeneratedModulePreview,
   LessonGenerationStatus,
+  LessonReviewItem,
   SelfCritiqueReport,
   SetupAnswers,
   SourceMaterial,
@@ -32,6 +33,18 @@ interface FoundryDraftState {
   critique: SelfCritiqueReport | null;
   /** Set self-critique report */
   setCritique: (report: SelfCritiqueReport) => void;
+  /** Side-by-side review state for generated lessons */
+  lessonReviews: LessonReviewItem[];
+  /** Overwrite lesson review state */
+  setLessonReviews: (items: LessonReviewItem[]) => void;
+  /** Clear lesson review state */
+  clearLessonReviews: () => void;
+  /** Mark one lesson review item approved by lesson/module indices */
+  approveLessonReview: (lessonIdx: number, moduleIdx: number) => void;
+  /** Mark one lesson review item as needing regeneration by lesson/module indices */
+  rejectLessonReview: (lessonIdx: number, moduleIdx: number) => void;
+  /** Computes true when any lesson has unsupported_claim AND is not approved. */
+  isPublishBlocked: () => boolean;
   /** Clear self-critique report */
   clearCritique: () => void;
   /** Mark one critique issue ignored and attach note */
@@ -74,7 +87,7 @@ interface FoundryDraftState {
 
 export const useFoundryDraftStore = create<FoundryDraftState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       currentDraft: null,
       sourceMaterial: null,
       setupAnswers: null,
@@ -82,6 +95,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
       outline_status: 'draft',
       generatedModule: null,
       critique: null,
+      lessonReviews: [],
       selectedLibraryFileIds: [],
       setBasics: (values) =>
         set({
@@ -92,6 +106,28 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
         }),
       clearDraft: () => set({ currentDraft: null }),
       setCritique: (report) => set({ critique: report }),
+      setLessonReviews: (items) => set({ lessonReviews: items }),
+      clearLessonReviews: () => set({ lessonReviews: [] }),
+      approveLessonReview: (lessonIdx, moduleIdx) =>
+        set((state) => ({
+          lessonReviews: state.lessonReviews.map((item) =>
+            item.lesson_index === lessonIdx && item.module_index === moduleIdx
+              ? { ...item, status: 'approved' }
+              : item
+          ),
+        })),
+      rejectLessonReview: (lessonIdx, moduleIdx) =>
+        set((state) => ({
+          lessonReviews: state.lessonReviews.map((item) =>
+            item.lesson_index === lessonIdx && item.module_index === moduleIdx
+              ? { ...item, status: 'needs_regeneration' }
+              : item
+          ),
+        })),
+      isPublishBlocked: () =>
+        get().lessonReviews.some(
+          (item) => item.has_unsupported_claim && item.status !== 'approved'
+        ),
       clearCritique: () => set({ critique: null }),
       ignoreIssue: (issueId, note) =>
         set((state) => {

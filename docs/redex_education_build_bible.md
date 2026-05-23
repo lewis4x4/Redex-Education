@@ -2780,3 +2780,63 @@ Wires the "Continue → Self-critique" button on ModuleGenerationPreviewPage. Th
 
 ---
 
+## 2026-05-22 — Slice 3.4: Side-by-Side Admin Review
+
+**Status**: ✅ Completed.
+
+**Master roadmap**: Phase 3 / Slice 3.4 (lines 1196–1240).
+**Linear ticket**: `Foundry: build side-by-side generated/source review`.
+
+**Context**:
+Wires "Continue → Side-by-side review" on SelfCritiqueReviewPage. Admin compares each generated lesson with its source material in a two-column layout. Per-lesson confidence indicator (high/medium/low/unsupported). Per-lesson approve / request regeneration actions. PTO Policy Overview lesson is explicitly tagged unsupported (matches the `[PLACEHOLDER]` content in the seeded `pto-policy.md` source) — publish stays blocked until that lesson is approved or its underlying source is resolved.
+
+**Orchestration**: 4 engineer sub-agents (A blocking → B || C parallel → D). Zero file conflicts.
+
+**Summary**:
+
+### Item A — Foundation
+- Canonical types: `LessonReviewStatus` (pending/approved/needs_regeneration), `LessonConfidenceLevel` (high/medium/low/unsupported), `SourceExcerpt`, `LessonReviewItem`, plus label maps
+- `foundryDraftStore` extended with `lessonReviews` slice + `setLessonReviews` / `clearLessonReviews` / `approveLessonReview(lessonIdx, moduleIdx)` / `rejectLessonReview(lessonIdx, moduleIdx)` / **`isPublishBlocked: () => boolean`** computed function (returns true when any item has has_unsupported_claim && status !== 'approved')
+- `mockLessonReviews.ts` (161 lines) — 8 review items matching the HR Basics module. PTO Policy Overview entry has `confidence: 'unsupported'` + `has_unsupported_claim: true` + an unsupported_note tying to the `[PLACEHOLDER]` content in pto-policy.md. Source excerpts cite real seeded Drive IDs with highlighted spans where the generated content was grounded.
+
+### Item B — Components
+- `SourceReferencePanel.tsx` (75) — Tier 1 card titled "Source reference". Per-excerpt: source title + section heading + scrollable section body. `highlighted_span` renders the substring with `<mark className="bg-yellow-100">`. `[PLACEHOLDER]` detection in body → AlertTriangle + amber-tinted accent.
+- `GeneratedSourceCompare.tsx` (82) — confidence badge at top (4 visual variants), red AlertOctagon banner with unsupported_note when `has_unsupported_claim`, then two-column grid: left "Generated content" (markdown/quiz/ack per lesson_type, reuses existing `GeneratedAssessmentPreview`), right `<SourceReferencePanel>`.
+- `ReviewActionBar.tsx` (59) — sticky-footer-friendly action row. Status badge left + actions right (Approve [disabled when approved], Request regeneration, Edit [disabled in this slice]).
+
+### Item C — Page + route + Critique wire
+- `SideBySideReviewPage.tsx` (204) — eyebrow STEP 7 + H1 "Side-by-side review". 500ms simulated loader when `lessonReviews=[]` then auto-populates MOCK_LESSON_REVIEWS. Top: back link + status summary chips. **🚫 Publish blocked banner** when `isPublishBlocked()` returns true. Two-pane layout: left sidebar lesson nav (with per-lesson status badge + confidence dot); right pane `<GeneratedSourceCompare>` + `<ReviewActionBar>`. `generatedContentFor(review)` helper looks up generatedModule.lessons by indices. Approve/Reject wired to store. Footer: "Continue → Resolve blockers" disabled (Slice 3.5).
+- `src/App.tsx` — new `SideBySideReviewRoute` + `<Route path="/admin/foundry/sidebyside">`
+- `SelfCritiqueReviewPage.tsx` — Continue button flipped from disabled to enabled with navigation
+- `docs/architecture.md` — new route row
+
+### Item D — Tests
+- **+18 net new tests** across 4 new + 3 extended files; total **199 → 217 passing**
+- Coverage: Statements **91.04%** (+0.49)
+- One small data-driven correction in tests: status summary expectation is `6 pending` (not 5) — matches actual MOCK_LESSON_REVIEWS shape
+
+**Verification**:
+- ✅ typecheck green, lint 0/0
+- ✅ npm test: 217/217 passing
+- ✅ build green
+- ✅ coverage 91.04% statements
+
+**Acceptance criteria** (master roadmap):
+- ✅ Generated/source comparison is clear (two-column layout, side-by-side per lesson)
+- ✅ Admin can approve individual lessons (ReviewActionBar Approve button per lesson)
+- ✅ Unsupported or missing source items are obvious (red AlertOctagon banner + unsupported confidence variant + PTO Policy is explicitly flagged)
+- ✅ Publish remains blocked until required items are resolved (isPublishBlocked + 🚫 red banner)
+- ✅ Build Bible updated
+
+**Known gaps (deferred)**:
+- Real AI generation/critique remains mocked
+- Manual editing of generated content (future)
+- Slice 3.5 — formal missing-source policy enforcement (extends the publish blocking semantics)
+- Real Drive source-section fetching: excerpts are mocked; production reads from `source_sections` table
+
+**Naming guardrails honored**: Foundry context.
+
+**Next**: Slice 3.5 — Placeholder and Missing Source Policy.
+
+---
+

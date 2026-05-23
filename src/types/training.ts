@@ -403,6 +403,22 @@ export type LessonGenerationStatus =
 
 export type CritiqueSeverity = 'low' | 'medium' | 'high';
 
+export type LessonReviewStatus = 'pending' | 'approved' | 'needs_regeneration';
+export type LessonConfidenceLevel = 'high' | 'medium' | 'low' | 'unsupported';
+
+export const REVIEW_STATUS_LABELS: Record<LessonReviewStatus, string> = {
+  pending: 'Pending review',
+  approved: 'Approved',
+  needs_regeneration: 'Needs regeneration',
+};
+
+export const CONFIDENCE_LABELS: Record<LessonConfidenceLevel, string> = {
+  high: 'High confidence',
+  medium: 'Medium confidence',
+  low: 'Low confidence',
+  unsupported: 'Unsupported',
+};
+
 export const CRITIQUE_SEVERITY_LABELS: Record<CritiqueSeverity, string> = {
   low: 'Low',
   medium: 'Medium',
@@ -454,6 +470,33 @@ export interface SelfCritiqueReport {
   issues: CritiqueIssue[];
   /** True when at least one high-severity issue exists AND none of them are ignored. */
   blocks_publish: boolean;
+}
+
+export interface SourceExcerpt {
+  /** Drive file ID this excerpt comes from. */
+  drive_file_id: string;
+  /** Source file title for display. */
+  source_title: string;
+  /** Section heading from the source file. */
+  section_heading: string;
+  /** Body text of the matched section (markdown). */
+  section_body: string;
+  /** What portion of the body was highlighted as the grounding for the generated lesson. */
+  highlighted_span?: { start: number; end: number };
+}
+
+export interface LessonReviewItem {
+  lesson_index: number;
+  module_index: number;
+  lesson_title: string;
+  confidence: LessonConfidenceLevel;
+  /** Auto-flagged when the generated body contains an unsupported claim. */
+  has_unsupported_claim: boolean;
+  /** Free text describing the unsupported claim if any. */
+  unsupported_note?: string;
+  status: LessonReviewStatus;
+  /** Source-section excerpts the generation drew from. */
+  source_excerpts: SourceExcerpt[];
 }
 
 export const LESSON_GENERATION_STATUS_LABELS: Record<LessonGenerationStatus, string> = {

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MOCK_GENERATED_MODULE } from '@/features/foundry/data/mockGeneratedModule'
 import { MOCK_GENERATED_OUTLINE } from '@/features/foundry/data/mockGeneratedOutline'
 import { MOCK_SELF_CRITIQUE } from '@/features/foundry/data/mockSelfCritique'
+import { MOCK_LESSON_REVIEWS } from '@/features/foundry/data/mockLessonReviews'
 
 function createStorageMock(): Storage {
   const store = new Map<string, string>()
@@ -50,6 +51,7 @@ describe('useFoundryDraftStore', () => {
       useFoundryDraftStore.getState().clearOutline()
       useFoundryDraftStore.getState().clearGeneratedModule()
       useFoundryDraftStore.getState().clearCritique()
+      useFoundryDraftStore.getState().clearLessonReviews()
       useFoundryDraftStore.getState().clearLibrarySelection()
     })
   })
@@ -394,6 +396,46 @@ describe('useFoundryDraftStore', () => {
     expect(restoredIssue?.ignored).toBe(false)
     expect(restoredIssue?.ignored_note).toBeUndefined()
     expect(critique?.blocks_publish).toBe(true)
+  })
+
+  it('starts with lessonReviews as an empty array', () => {
+    expect(useFoundryDraftStore.getState().lessonReviews).toEqual([])
+  })
+
+  it('setLessonReviews writes lesson review items', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setLessonReviews(MOCK_LESSON_REVIEWS)
+    })
+
+    expect(useFoundryDraftStore.getState().lessonReviews).toEqual(MOCK_LESSON_REVIEWS)
+  })
+
+  it('approveLessonReview marks the matching lesson review approved', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setLessonReviews(MOCK_LESSON_REVIEWS)
+      useFoundryDraftStore.getState().approveLessonReview(0, 1)
+    })
+
+    const updated = useFoundryDraftStore
+      .getState()
+      .lessonReviews.find((item) => item.lesson_index === 0 && item.module_index === 1)
+
+    expect(updated?.lesson_title).toBe('PTO Policy Overview')
+    expect(updated?.status).toBe('approved')
+  })
+
+  it('isPublishBlocked follows unsupported pending claims and clears after approval', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setLessonReviews(MOCK_LESSON_REVIEWS)
+    })
+
+    expect(useFoundryDraftStore.getState().isPublishBlocked()).toBe(true)
+
+    act(() => {
+      useFoundryDraftStore.getState().approveLessonReview(0, 1)
+    })
+
+    expect(useFoundryDraftStore.getState().isPublishBlocked()).toBe(false)
   })
 
   it('starts with selectedLibraryFileIds as an empty array', () => {

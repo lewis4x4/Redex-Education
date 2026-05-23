@@ -154,4 +154,12 @@ describe('Redex Education routes', () => {
 
     expect(await screen.findByRole('heading', { name: 'AI self-critique' })).toBeInTheDocument()
   })
+
+  it('renders SideBySideReviewPage at /admin/foundry/sidebyside', async () => {
+    vi.stubEnv('VITE_MOCK_AUTH', 'true')
+
+    renderAt('/admin/foundry/sidebyside')
+
+    expect(await screen.findByRole('heading', { name: 'Side-by-side review' })).toBeInTheDocument()
+  })
 })

@@ -1,5 +1,5 @@
-import { act, render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { MOCK_SELF_CRITIQUE } from '@/features/foundry/data/mockSelfCritique'
@@ -50,10 +50,19 @@ describe('SelfCritiqueReviewPage', () => {
     })
   })
 
+  function LocationProbe() {
+    const location = useLocation()
+
+    return <p data-testid="location-path">{location.pathname}</p>
+  }
+
   function renderPage() {
     return render(
-      <MemoryRouter>
-        <SelfCritiqueReviewPage />
+      <MemoryRouter initialEntries={['/admin/foundry/critique']}>
+        <Routes>
+          <Route path="/admin/foundry/critique" element={<SelfCritiqueReviewPage />} />
+          <Route path="*" element={<LocationProbe />} />
+        </Routes>
       </MemoryRouter>,
     )
   }
@@ -89,5 +98,17 @@ describe('SelfCritiqueReviewPage', () => {
     renderPage()
 
     expect(await screen.findByText('Publish blocked')).toBeInTheDocument()
+  })
+
+  it('enables Continue button and navigates to side-by-side review on click', async () => {
+    renderPage()
+
+    const continueButton = await screen.findByRole('button', { name: 'Continue → Side-by-side review' })
+
+    expect(continueButton).toBeEnabled()
+
+    fireEvent.click(continueButton)
+
+    expect(screen.getByTestId('location-path')).toHaveTextContent('/admin/foundry/sidebyside')
   })
 })

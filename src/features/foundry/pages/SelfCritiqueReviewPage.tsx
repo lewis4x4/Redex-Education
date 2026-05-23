@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,7 @@ import { MOCK_SELF_CRITIQUE } from '@/features/foundry/data/mockSelfCritique'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
 
 export function SelfCritiqueReviewPage() {
+  const navigate = useNavigate()
   const critique = useFoundryDraftStore((state) => state.critique)
   const setCritique = useFoundryDraftStore((state) => state.setCritique)
   const ignoreIssue = useFoundryDraftStore((state) => state.ignoreIssue)
@@ -118,7 +119,7 @@ export function SelfCritiqueReviewPage() {
         <Link to="/admin/foundry/source" className="text-sm font-medium text-slate-600 transition-colors hover:text-slate-900">
           Return to source binder
         </Link>
-        <Button variant="brand" disabled title="Coming in Slice 3.4">
+        <Button variant="brand" onClick={() => navigate('/admin/foundry/sidebyside')}>
           Continue → Side-by-side review
         </Button>
       </footer>
