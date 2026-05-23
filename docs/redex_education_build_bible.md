@@ -3827,3 +3827,60 @@ Slice 8.3 completed the redex-schema read layer and kept `VITE_DATA_SOURCE=mock`
 
 ---
 
+## 2026-05-23 — Slice 8.6: Profiles, Roles & Real RLS
+
+**Status**: ✅ Completed. Remote migration applied. Edge functions deployed. Real role-gated RLS replaces the prior placeholder policies.
+
+**Context**:
+Slice 8.6 hardens the redex-schema Supabase backend after Slices 8.3/8.4 wired real read/write adapters. Prior migrations left demo-phase authenticated-wide policies in place (`USING (true)` / broad authenticated access). This slice adds profile provisioning, role helper functions, JWT role claims, frontend role gates, and a minimal real sign-in surface while preserving mock-mode defaults.
+
+**Files touched**:
+- `supabase/migrations/20260523120000_real_rls_and_role_claims.sql` (new) — drops permissive placeholder policies, grants redex usage/table privileges to `authenticated`, creates SECURITY DEFINER role helpers, provisions profiles from `auth.users`, and installs role-gated policies across all 20 redex tables.
+- `supabase/functions/custom-access-token-hook/index.ts` (new) — verifies Supabase Auth Hook Standard Webhooks signatures, reads `redex.profiles.role` with the service-role client, and mirrors it into the JWT as `redex_role`.
+- `src/hooks/auth-context.ts`, `src/hooks/use-auth.tsx`, `src/hooks/useAuth.test.tsx` — auth context now exposes `role`; real mode reads `redex_role`; mock mode uses `VITE_MOCK_AUTH_ROLE` with `admin` default.
+- `src/components/auth/AuthGate.tsx`, `src/components/auth/AuthGate.test.tsx` — `requiredRole`, role checks, access-denied card, and `/sign-in` redirect.
+- `src/features/auth/pages/SignInPage.tsx`, `src/features/auth/pages/SignInPage.test.tsx` — minimal Supabase magic-link sign-in page.
+- `src/App.tsx`, `src/App.routes.test.tsx` — `/sign-in` route, `/admin/*` role gate, `/manager` role gate, and route smoke coverage.
+- `.env.example`, `src/env.d.ts`, `README.md` — documented/typed `VITE_MOCK_AUTH_ROLE`; README route/env notes updated.
+
+**Migration summary**:
+- Removed earlier placeholder policies from Slice 2.4, Source Library v1, and MVP schema migrations.
+- Added profile auto-create trigger on `auth.users` with deterministic bootstrap org id `00000000-0000-0000-0000-000000000001` and safe default role `learner`.
+- Added trigger guardrails so non-admin users cannot self-escalate profile `role`, `org_id`, or `manager_id`.
+- Added trigger guardrails so assigned learners can update only their own assignment `status`; Foundry authors/admins retain full assignment mutation through role policies.
+- RLS now enforces learner-owned progress/attempts/acknowledgments, manager team visibility, admin audit access, Foundry-only Source Binder internals, and published-content learner reads.
+
+**Operations performed against remote**:
+- ✅ `supabase db push --linked` — applied `20260523120000_real_rls_and_role_claims.sql` to Redex_App (`toghxeuhgkcrbrdxewdw`). Notices were expected/idempotent.
+- ✅ `supabase db query --linked "SELECT schemaname, tablename, policyname, qual FROM pg_policies WHERE schemaname = 'redex' AND qual = 'true';"` — returned `rows: []`.
+- ✅ Additional remote policy check for `qual = 'true'`, `with_check = 'true'`, or `auth.role()` placeholders — returned `rows: []`.
+- ✅ Remote policy count check showed policies present for all 20 redex tables.
+- ✅ `supabase functions deploy custom-access-token-hook --no-verify-jwt` — deployed.
+- ✅ `supabase functions deploy drive-sync parse-source-file` — redeployed existing Slice 8.5 edge-function schema-isolation changes.
+
+**Manual steps required**:
+- In Supabase Dashboard → Authentication → Hooks → Custom Access Token, configure the HTTP hook endpoint for `custom-access-token-hook`.
+- Generate/copy the Auth Hook secret and set it as an Edge Function secret before enabling the hook: `supabase secrets set CUSTOM_ACCESS_TOKEN_HOOK_SECRET="v1,whsec_<dashboard-generated-secret>"`.
+- After the first real admin signs in, elevate that profile manually: `update redex.profiles set role = 'admin' where email = '<admin email>';`.
+- Do not enable the hook without the matching `CUSTOM_ACCESS_TOKEN_HOOK_SECRET`; the deployed function intentionally returns 500 when the secret is missing and 401 when signatures do not verify.
+
+**Verification**:
+- ✅ `npm run typecheck -- --pretty false` — green.
+- ✅ `npm run lint` — 0 errors / 0 warnings.
+- ✅ `npm test -- --run` — **592 passed, 1 skipped, 103 test files** (**+10 tests** versus Slice 8.4 baseline of 582).
+- ✅ `npm run build` — green.
+- ✅ Focused affected tests before full suite — 40 passing.
+- ✅ Oracle review pass completed; follow-up fixes applied for Foundry profile/assignment visibility, role-assigned assignment visibility, learner assignment status updates, and Auth Hook signature verification.
+
+**Known scope deferred**:
+- No demo user seeding. Real users are created via Supabase Auth sign-in; roles are elevated/managed in `redex.profiles`.
+- No polished auth UX beyond the minimal magic-link page.
+- No Dashboard automation for enabling the Custom Access Token hook; current Supabase docs still route HTTP hook activation through Authentication → Hooks.
+- No org-management UI; the deterministic Redex bootstrap org id is documented in the migration.
+
+**Next**:
+- Slice 8.3 and Slice 8.4 are now unblocked end-to-end by real auth/profile/RLS foundations.
+- Remaining v2 Part 1 close-out items: AI Slices A–D + Slice 9.1.
+
+---
+

@@ -87,6 +87,7 @@ describe('Redex Education routes', () => {
       loading: false,
       session: null,
       user: null,
+      role: null,
     } as never)
 
     act(() => {
@@ -319,11 +320,26 @@ describe('Redex Education routes', () => {
     expect(screen.getByRole('button', { name: 'Sync from Drive' })).toBeInTheDocument()
   })
 
-  it('renders ManagerDashboardPage at /manager', async () => {
+  it('renders ManagerDashboardPage at /manager for manager roles', async () => {
+    useAuthMock.mockReturnValue({
+      loading: false,
+      session: { access_token: 'token' },
+      user: null,
+      role: 'manager',
+    } as never)
+
     renderAt('/manager')
 
     expect(await screen.findByRole('heading', { name: 'Team training progress' })).toBeInTheDocument()
     expect(screen.getByRole('row', { name: /Marcus Chen/i })).toBeInTheDocument()
+  })
+
+  it('renders SignInPage at /sign-in', async () => {
+    vi.stubEnv('VITE_MOCK_AUTH', 'true')
+
+    renderAt('/sign-in')
+
+    expect(await screen.findByRole('heading', { name: /Sign in to Redex Education/i })).toBeInTheDocument()
   })
 
   it('renders FoundryStartPage at /admin/foundry/start', async () => {

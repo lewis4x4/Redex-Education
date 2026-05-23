@@ -2,7 +2,7 @@
 
 Redex Academy (learner) + Redex AI Course Foundry (admin) — an AI-augmented training operating system for Redex employees.
 
-**Status:** Phases 0–7 complete (mock vertical) · Phase 8 backend in progress (Slices 8.1–8.3 and 8.5 done; 8.4/8.6 outstanding) · **531 tests passing, 1 skipped, 94 test files** · build green
+**Status:** Phases 0–7 complete (mock vertical) · Phase 8 backend in progress (Slices 8.1–8.6 done) · **verification current as of latest Build Bible entry** · build green
 
 Redex Education is building a premium internal learning platform for Redex teams. Learners get a guided Redex Academy experience with clear onboarding, structured module flow, and progress visibility. Admins get the foundation for an AI-augmented course foundry that turns raw operational knowledge into approved, interactive training. Real production auth and full Supabase-backed data flows are planned but intentionally deferred. Coverage baseline is re-measured against the current suite as part of each phase close-out; see [`docs/testing.md`](./docs/testing.md) for the latest run.
 
@@ -50,6 +50,7 @@ npm run dev
 | `VITE_SUPABASE_ANON_KEY` | When using real Supabase | Public anon JWT (RLS gates access) |
 | `VITE_DATA_SOURCE` | Defaults to `mock` | Set to `supabase` to route facade helpers through the redex-schema Supabase read layer and fire best-effort writes for MVP flows. Real end-to-end writes still require Slice 8.6 auth/RLS profiles. |
 | `VITE_MOCK_AUTH` | Defaults to `false` | When `true`, AuthGate bypasses session checks for demo/dev; production builds are blocked |
+| `VITE_MOCK_AUTH_ROLE` | Defaults to `admin` | Mock-mode role used by AuthGate required-role checks (`admin`, `foundry_author`, `manager`, or `learner`) |
 
 See [`.env.example`](./.env.example) for the template. `npm run build` rejects production builds when `VITE_MOCK_AUTH=true`.
 
@@ -104,7 +105,9 @@ Redex-Education/
 | `/learn` | Learner dashboard | Default landing |
 | `/learn/welcome` | First-day welcome | |
 | `/learn/player[/:moduleId]` | Module player | Unknown id → redirect `/learn` |
-| `/admin`, `/admin/*` | Admin surfaces | Behind `AuthGate` except `/manager` |
+| `/sign-in` | Minimal Supabase magic-link sign-in | Used when real auth is enabled and a protected route has no session |
+| `/admin`, `/admin/*` | Admin surfaces | Behind `AuthGate` (`admin` / `foundry_author`) |
+| `/manager` | Manager dashboard | Behind `AuthGate` (`manager` / `admin`) |
 | `*` | NotFoundPage | |
 
 This table is partial. See [Architecture §3](./docs/architecture.md#3-route-table) for the full route table (20+ routes across learner / admin / foundry / publishing / manager / audit / source-impact surfaces).
