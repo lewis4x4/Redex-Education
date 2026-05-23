@@ -26,7 +26,8 @@
 import type { Database } from './types';
 
 // Convenience helpers over the generated Supabase types.
-type Tables = Database['public']['Tables'];
+// Redex Education tables live in the `redex` schema (ADR 017).
+type Tables = Database['redex']['Tables'];
 
 /** Row shape for the `training_courses` table (when wired). */
 export type TrainingCourseRow = Tables extends { training_courses: { Row: infer R } }

@@ -41,5 +41,11 @@ export const supabase = createClient<Database>(
       persistSession: true,
       autoRefreshToken: true,
     },
+    // Redex Education tables live in the `redex` schema (see ADR 017).
+    // The shared Supabase project's `public` schema belongs to the
+    // installer/Victra system; we never read or write there.
+    db: {
+      schema: 'redex',
+    },
   },
 );

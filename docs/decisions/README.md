@@ -22,6 +22,7 @@ Architecture Decision Records capture the **why** behind significant choices. Ea
 | [014](./014-pgvector-for-source-embeddings.md) | pgvector for source embeddings | Accepted | Phase 13 / Slice 13.1 |
 | [015](./015-supabase-only-generation-pipeline.md) | Supabase-only generation pipeline for v1 | Accepted | AI Slice C |
 | [016](./016-single-redex-video-player-component.md) | Single RedexVideoPlayer component | Accepted | Phase 10 / Slice 10.6 |
+| [017](./017-redex-schema-isolation.md) | Redex schema isolation (`redex` Postgres schema) | Accepted | Slice 8.5 |
 | [000](./000-template.md) | ADR template | Template | N/A |
 
 ## How to add a new ADR

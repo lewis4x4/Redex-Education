@@ -348,7 +348,7 @@ Deno.serve(async (request) => {
     const accessToken = await getDriveAccessToken();
     const supabaseUrl = getRequiredEnv("SUPABASE_URL");
     const supabaseServiceRoleKey = getRequiredEnv("SUPABASE_SERVICE_ROLE_KEY");
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, { db: { schema: "redex" } });
 
     const { data: sourceFile, error: sourceFileError } = await supabase
       .from("source_files")
@@ -536,7 +536,7 @@ Deno.serve(async (request) => {
         );
 
         if (supabaseUrl && supabaseServiceRoleKey) {
-          const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+          const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, { db: { schema: "redex" } });
           await supabase
             .from("source_files")
             .update({

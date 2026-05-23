@@ -272,7 +272,7 @@ Deno.serve(async (request) => {
     const supabaseServiceRoleKey = getRequiredEnv("SUPABASE_SERVICE_ROLE_KEY");
     const targetFolderId = body.folder_id_override ??
       getRequiredEnv("GOOGLE_DRIVE_LIBRARY_FOLDER_ID");
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, { db: { schema: "redex" } });
 
     const driveFiles = await walkDriveFolder(
       targetFolderId,

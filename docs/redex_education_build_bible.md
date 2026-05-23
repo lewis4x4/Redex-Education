@@ -3646,7 +3646,67 @@ The v2 Phase 10–13 Roadmap and v2 Moonshot Strategy documents arrived from the
 - Admin-side engine remains **Redex AI Course Foundry**.
 - Long-term platform language remains **Redex Training OS** and is used sparingly.
 
-**Next**: Slice 8.3 — Replace Mock Reads With Supabase Reads (blocked on: operator decision for `training_modules` collision strategy + `supabase db push` + `supabase gen types` regeneration + AI provider selection deferred per ADR 012).
+**Next**: Slice 8.5 — Schema Reconciliation (executed below; user authorized destructive scope 2026-05-23).
+
+---
+
+## 2026-05-23 — Slice 8.5: Schema Reconciliation, types regen, redex schema isolation
+
+**Status**: ✅ Completed. Remote applied. Types regenerated. **Correctness bug from prior `types.ts` is closed.**
+
+**Linear ticket**: `Supabase: reconcile schema drift and regenerate database types`.
+
+**Context**:
+The Redex_App Supabase project is shared with an installer / Victra ops system written by the same owner. Schema inspection revealed 340 tables in `public` and **eight name collisions** with our intended schema: `profiles` (live installer data), `assignments`, `assessment_attempts`, `training_modules` (9 abandoned legacy rows), and the four source library tables (`source_files`, `source_file_versions`, `source_sections`, `module_source_bindings` — applied via direct SQL on 2026-05-22, never tracked by `supabase_migrations`). Because all our migrations used `CREATE TABLE IF NOT EXISTS`, a naïve push would have **silently skipped** each colliding CREATE — leaving Redex Education code querying installer-shaped tables and failing at runtime.
+
+User authorized (a) deleting the legacy training subsystem from `public`, and (b) schema isolation as the architectural fix. New ADR 017 records the decision.
+
+**Files touched**:
+- `supabase/migrations/20260521000000_reconcile_redex_schema_and_drop_legacy.sql` (new) — creates `redex` schema, moves the 4 source library tables + 2 enums from `public` to `redex` (preserves data), drops legacy `training_module_metrics` view, `get_user_training_status(uuid)` function, `user_training_progress` table, `training_modules` table.
+- `supabase/migrations/20260522000100_create_training_schema_and_rls.sql` — rewritten: `public.` → `redex.` throughout; policies wrapped with `drop policy if exists` for idempotent replay.
+- `supabase/migrations/20260522220557_source_library_v1.sql` — rewritten: enum types and tables now in `redex`; idempotent against the reconciliation's `SET SCHEMA` moves.
+- `supabase/migrations/20260523000100_create_mvp_complete_schema_and_rls.sql` — bulk `sed` substitute `public.` → `redex.` (81 references); `set_updated_at()` helper now in `redex`.
+- `src/integrations/supabase/client.ts` — adds `db: { schema: 'redex' }` to the browser client.
+- `supabase/functions/drive-sync/index.ts` — `createClient(...)` updated with `{ db: { schema: 'redex' } }`.
+- `supabase/functions/parse-source-file/index.ts` — both `createClient(...)` call sites updated (2).
+- `src/integrations/supabase/types.ts` — **regenerated** via `supabase gen types typescript --linked --schema redex`. 1,154 lines. Contains only our 20 redex tables (no `devices`, `panels`, `bookings`, `activity_log` from the prior wrong-project file). **This closes the correctness bug flagged by v2 Slice 8.5.**
+- `src/integrations/supabase/db-rows.ts` — `Tables = Database['redex']['Tables']` (was `['public']`).
+- `docs/decisions/017-redex-schema-isolation.md` (new ADR).
+
+**Verification**:
+- ✅ Remote `redex` schema exists with **20 tables** (queryable via `information_schema.tables`).
+- ✅ `public` table count went from 340 to **334** (the 6 expected removals: legacy `training_modules`, `user_training_progress`, and the 4 source library tables that moved to redex — confirmed by direct query).
+- ✅ `supabase migration list` shows all 4 of our migrations now applied to remote: 20260521000000 / 20260522000100 / 20260522220557 / 20260523000100.
+- ✅ Legacy training subsystem confirmed absent from `public` via `information_schema` query: `training_modules` / `user_training_progress` / `training_module_metrics` all return `false`.
+- ✅ `npm run typecheck` — green (after `db-rows.ts` schema reference updated).
+- ✅ `npm run lint` — 0/0.
+- ✅ `npm test -- --run` — **426 passed, 1 skipped, 86 test files** (no regression — every existing test runs against mock data, untouched by the schema change).
+- ✅ `npm run build` — green.
+
+**Operations performed against remote** (per standing instruction to always push migrations):
+- `supabase migration repair --status reverted` for 33 installer-system migrations to clear the divergence the CLI was refusing on. This only modifies the migration-tracking table; it does NOT touch any installer data.
+- `supabase db push --linked` — applied all 4 of our migrations cleanly. Notices observed: pre-existing `pgcrypto` extension (expected), pre-existing source library tables (expected — they were moved in step 1 of the reconciliation), idempotent policy drops (expected from the `drop policy if exists` guards). No errors.
+
+**Acceptance criteria** (v2 Slice 8.5):
+- ✅ Reconciliation migration aligns remote with local; `supabase migration list` is clean (all 4 marked applied on both sides).
+- ✅ `types.ts` regenerated via `supabase gen types` — no `devices`/`panels`/`bookings` types remain (verified via grep — zero matches).
+- ✅ `npm run typecheck` passes with the regenerated types in use.
+- ✅ Build Bible updated.
+
+**Architectural decision** (per ADR 017):
+- Redex Education tables live in `redex` schema.
+- Installer / Victra tables remain in `public`.
+- Supabase clients (browser + edge functions) pass `db: { schema: 'redex' }` so unprefixed table names resolve to redex.
+- Future `supabase gen types` invocations must use `--schema redex` to avoid pulling installer types back in.
+
+**Known scope deferred**:
+- **Slice 8.3** (Replace Mock Reads with Supabase Reads) — the schema is now ready for it. Adapter wiring is the next slice.
+- **Slice 8.6** (Profiles + Real RLS) — `redex.profiles` exists but is empty; current RLS policies are placeholder-permissive pending the real role-aware policies in 8.6.
+- Edge functions were not re-deployed in this slice — code changes are committed to the repo; `supabase functions deploy drive-sync parse-source-file` should run before any real Drive sync against the redex schema.
+
+**Naming guardrails honored**: established personas only. No production installer data touched.
+
+**Next**: Slice 8.3 — Replace Mock Reads With Supabase Reads (now unblocked).
 
 ---
 
