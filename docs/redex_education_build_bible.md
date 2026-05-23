@@ -2971,3 +2971,46 @@ Consolidates the missing-source policy that was emerging in scattered form acros
 
 ---
 
+## 2026-05-22 — Slice 5.1: HR Onboarding Source Markdown Fixture (Phase 5 begins)
+
+**Status**: ✅ Completed. Phase 5 (HR Onboarding Vertical Slice) begins.
+
+**Master roadmap**: Phase 5 / Slice 5.1.
+**Linear ticket**: `HR Prototype: create sample HR onboarding source markdown`.
+
+**Delivered**: `docs/sample-source/HR_ONBOARDING_SOURCE_SAMPLE.md` (175 lines) with explicit YAML frontmatter (`authority: authoritative`, `topic: hr_basics`, `sample_only: true`). The file establishes:
+
+**Sections that ship with approved sample content** (4):
+- Welcome to Redex
+- Who to contact for HR help (uses MOCK_MANAGER_USER's Sarah Chen as buddy)
+- Communication expectations
+- First-week expectations (5-day onboarding checklist)
+
+**Sections explicitly marked `[PLACEHOLDER — Redex must provide approved policy language]`** (5):
+- Payroll basics
+- Timekeeping expectations
+- PTO and time off
+- Required forms
+- Manager escalation path
+
+Each placeholder section includes a "drafted topics pending approved language" list to make obvious what real Redex policy needs to land — but no fictional policy content is invented (per the roadmap's "do not invent real Redex HR policy" rule).
+
+A footer "approval status" table makes the placeholder gates explicit at a glance.
+
+**Verification**:
+- ✅ File exists at the prescribed path
+- ✅ Source Binder parser detection signal: 6 `[PLACEHOLDER —` em-dash matches (5 placeholder section bodies + 1 intro reference) — exercised the Slice 2.3 PLACEHOLDER_TOKENS detection logic
+- ✅ The `[PLACEHOLDER — Redex must provide approved policy language]` exact phrasing matches the master roadmap's prescribed marker
+
+**Acceptance criteria** (master roadmap):
+- ✅ Sample source file exists
+- ✅ Placeholder sections are clearly marked (5 sections + footer table)
+- ✅ Source Binder parser detects placeholders (verified via parser detection signal)
+- ✅ Build Bible updated
+
+**Naming guardrails honored**: Sarah Chen (MOCK_MANAGER_USER) is the buddy; no other real Redex names invented.
+
+**Next**: Slice 5.2 — Generate HR Module Mock From Source. Translates this sample source into a `GeneratedModulePreview` shape (6 lessons per the roadmap spec) that flows through the existing Foundry preview/critique/side-by-side surfaces. The mocked AI now has a real-ish source to point at.
+
+---
+
