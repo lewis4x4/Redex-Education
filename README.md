@@ -48,7 +48,7 @@ npm run dev
 |---|---|---|
 | `VITE_SUPABASE_URL` | When using real Supabase | Project URL (e.g. `https://your-ref.supabase.co`) |
 | `VITE_SUPABASE_ANON_KEY` | When using real Supabase | Public anon JWT (RLS gates access) |
-| `VITE_DATA_SOURCE` | Defaults to `mock` | Set to `supabase` to route facade read helpers through the redex-schema Supabase query layer |
+| `VITE_DATA_SOURCE` | Defaults to `mock` | Set to `supabase` to route facade helpers through the redex-schema Supabase read layer and fire best-effort writes for MVP flows. Real end-to-end writes still require Slice 8.6 auth/RLS profiles. |
 | `VITE_MOCK_AUTH` | Defaults to `false` | When `true`, AuthGate bypasses session checks for demo/dev; production builds are blocked |
 
 See [`.env.example`](./.env.example) for the template. `npm run build` rejects production builds when `VITE_MOCK_AUTH=true`.

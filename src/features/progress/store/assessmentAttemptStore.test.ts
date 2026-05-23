@@ -1,4 +1,4 @@
-import { act } from '@testing-library/react'
+import { act, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { RecordAttemptInput } from './assessmentAttemptStore'
@@ -147,5 +147,61 @@ describe('useAssessmentAttemptStore', () => {
         answers: baseAttempt.answers,
       }),
     ])
+  })
+})
+
+describe('useAssessmentAttemptStore Supabase dispatch', () => {
+  async function loadStore(mode: 'mock' | 'supabase', insertAttempt = vi.fn()) {
+    vi.resetModules()
+    vi.doMock('@/lib/education/dataSource', () => ({ getDataSource: () => mode }))
+    vi.doMock('@/integrations/supabase/mutations', () => ({ insertAttempt }))
+
+    const { useAuditLogStore } = await import('@/features/audit/store/auditLogStore')
+    const { useAssessmentAttemptStore } = await import('./assessmentAttemptStore')
+
+    act(() => {
+      useAuditLogStore.getState().resetEvents()
+      useAssessmentAttemptStore.getState().resetAttempts()
+    })
+
+    return { useAssessmentAttemptStore, insertAttempt }
+  }
+
+  it('does not call insertAttempt in mock mode', async () => {
+    const insertAttempt = vi.fn().mockResolvedValue({})
+    const { useAssessmentAttemptStore } = await loadStore('mock', insertAttempt)
+
+    act(() => {
+      useAssessmentAttemptStore.getState().recordAttempt(baseAttempt)
+    })
+
+    expect(insertAttempt).not.toHaveBeenCalled()
+  })
+
+  it('calls insertAttempt in supabase mode after optimistic append', async () => {
+    const insertAttempt = vi.fn().mockResolvedValue({})
+    const { useAssessmentAttemptStore } = await loadStore('supabase', insertAttempt)
+
+    act(() => {
+      useAssessmentAttemptStore.getState().recordAttempt(baseAttempt)
+    })
+
+    expect(useAssessmentAttemptStore.getState().attempts).toHaveLength(1)
+    await waitFor(() => {
+      expect(insertAttempt).toHaveBeenCalledWith(expect.objectContaining({ lesson_id: baseAttempt.lesson_id }))
+    })
+  })
+
+  it('sets lastWriteError when attempt persistence fails', async () => {
+    const insertAttempt = vi.fn().mockRejectedValue(new Error('attempt rejected'))
+    const { useAssessmentAttemptStore } = await loadStore('supabase', insertAttempt)
+
+    act(() => {
+      useAssessmentAttemptStore.getState().recordAttempt(baseAttempt)
+    })
+
+    await vi.waitFor(() => {
+      expect(useAssessmentAttemptStore.getState().lastWriteError).toEqual(expect.objectContaining({ action: 'recordAttempt', message: 'attempt rejected' }))
+    })
   })
 })

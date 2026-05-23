@@ -1,4 +1,4 @@
-import { act } from '@testing-library/react'
+import { act, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { MOCK_ASSIGNMENTS } from '@/lib/education/mockAssignments'
@@ -148,5 +148,75 @@ describe('useAssignmentStore', () => {
     expect(useAssignmentStore.getState().assignments.map((assignment) => assignment.id)).toEqual(
       MOCK_ASSIGNMENTS.map((assignment) => assignment.id),
     )
+  })
+})
+
+describe('useAssignmentStore Supabase dispatch', () => {
+  async function loadStore(mode: 'mock' | 'supabase', insertAssignment = vi.fn(), updateAssignmentStatus = vi.fn()) {
+    vi.resetModules()
+    vi.doMock('@/lib/education/dataSource', () => ({ getDataSource: () => mode }))
+    vi.doMock('@/integrations/supabase/mutations', () => ({ insertAssignment, updateAssignmentStatus }))
+
+    const { useAuditLogStore } = await import('@/features/audit/store/auditLogStore')
+    const { usePublishedModulesStore } = await import('@/features/publishing/store/publishedModulesStore')
+    const { useAssignmentStore } = await import('./assignmentStore')
+
+    act(() => {
+      useAuditLogStore.getState().resetEvents()
+      usePublishedModulesStore.getState().resetPublishedModules()
+      useAssignmentStore.getState().resetAssignments()
+    })
+
+    return { useAssignmentStore, insertAssignment, updateAssignmentStatus }
+  }
+
+  it('does not call Supabase mutations in mock mode', async () => {
+    const insertAssignment = vi.fn().mockResolvedValue({})
+    const { useAssignmentStore } = await loadStore('mock', insertAssignment)
+
+    act(() => {
+      useAssignmentStore.getState().createAssignment({
+        module_version_id: 'module-version-hr-basics-v1',
+        assignee_user_id: MOCK_LEARNER_MARCUS.id,
+        assigned_by: MOCK_ADMIN_USER.id,
+      })
+    })
+
+    expect(insertAssignment).not.toHaveBeenCalled()
+  })
+
+  it('calls insertAssignment in supabase mode while keeping optimistic state', async () => {
+    const insertAssignment = vi.fn().mockResolvedValue({ id: 'persisted' })
+    const { useAssignmentStore } = await loadStore('supabase', insertAssignment)
+
+    act(() => {
+      useAssignmentStore.getState().createAssignment({
+        module_version_id: 'module-version-hr-basics-v1',
+        assignee_user_id: MOCK_LEARNER_MARCUS.id,
+        assigned_by: MOCK_ADMIN_USER.id,
+      })
+    })
+
+    expect(useAssignmentStore.getState().assignments).toHaveLength(4)
+    await waitFor(() => {
+      expect(insertAssignment).toHaveBeenCalledWith(expect.objectContaining({ assignee_user_id: MOCK_LEARNER_MARCUS.id }))
+    })
+  })
+
+  it('sets lastWriteError when supabase assignment persistence fails', async () => {
+    const insertAssignment = vi.fn().mockRejectedValue(new Error('RLS rejected'))
+    const { useAssignmentStore } = await loadStore('supabase', insertAssignment)
+
+    act(() => {
+      useAssignmentStore.getState().createAssignment({
+        module_version_id: 'module-version-hr-basics-v1',
+        assignee_user_id: MOCK_LEARNER_MARCUS.id,
+        assigned_by: MOCK_ADMIN_USER.id,
+      })
+    })
+
+    await vi.waitFor(() => {
+      expect(useAssignmentStore.getState().lastWriteError).toEqual(expect.objectContaining({ action: 'createAssignment', message: 'RLS rejected' }))
+    })
   })
 })

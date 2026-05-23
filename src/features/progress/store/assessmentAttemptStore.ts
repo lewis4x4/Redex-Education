@@ -2,8 +2,10 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
 import { useAuditLogStore } from '@/features/audit/store/auditLogStore'
+import { getDataSource } from '@/lib/education/dataSource'
 import { DEMO_HR_BASICS_LESSONS, DEMO_LESSONS } from '@/lib/education/demo-data'
 import { MOCK_ORG_PEOPLE } from '@/lib/education/mockOrgPeople'
+import { toWriteError, type WriteError } from '@/lib/education/writeErrors'
 import type { AssessmentAttempt } from '@/types/training'
 
 export interface RecordAttemptInput {
@@ -17,6 +19,8 @@ export interface RecordAttemptInput {
 
 interface AssessmentAttemptState {
   attempts: AssessmentAttempt[]
+  lastWriteError: WriteError | null
+  clearLastWriteError: () => void
   recordAttempt: (input: RecordAttemptInput) => AssessmentAttempt
   getAttemptsForLesson: (lessonId: AssessmentAttempt['lesson_id']) => AssessmentAttempt[]
   getLatestAttempt: (lessonId: AssessmentAttempt['lesson_id']) => AssessmentAttempt | undefined
@@ -105,10 +109,16 @@ function getLessonLabel(lessonId: string): string {
   return lesson ? `${lesson.title} · ${lesson.module_id === 'hr-basics-mod-001' ? 'HR Basics at Redex' : 'Redex Academy'}` : lessonId
 }
 
+function shouldPersistToSupabase(): boolean {
+  return getDataSource() === 'supabase'
+}
+
 export const useAssessmentAttemptStore = create<AssessmentAttemptState>()(
   persist(
     (set, get) => ({
       attempts: [],
+      lastWriteError: null,
+      clearLastWriteError: () => set({ lastWriteError: null }),
       recordAttempt: (input) => {
         const attempt: AssessmentAttempt = {
           id: createAttemptId(),
@@ -121,6 +131,13 @@ export const useAssessmentAttemptStore = create<AssessmentAttemptState>()(
         }
 
         set((state) => ({ attempts: [...state.attempts, attempt] }))
+
+        if (shouldPersistToSupabase()) {
+          void import('@/integrations/supabase/mutations')
+            .then(({ insertAttempt }) => insertAttempt(input))
+            .then(() => set({ lastWriteError: null }))
+            .catch((error: unknown) => set({ lastWriteError: toWriteError('recordAttempt', error) }))
+        }
 
         const actorUserId = getActorUserId(input)
         useAuditLogStore.getState().recordEvent({
@@ -146,7 +163,7 @@ export const useAssessmentAttemptStore = create<AssessmentAttemptState>()(
 
         return scores.length > 0 ? Math.max(...scores) : null
       },
-      resetAttempts: () => set({ attempts: [] }),
+      resetAttempts: () => set({ attempts: [], lastWriteError: null }),
     }),
     {
       name: 'redex-assessment-attempts-v1',

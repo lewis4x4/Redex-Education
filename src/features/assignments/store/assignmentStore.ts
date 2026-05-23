@@ -3,8 +3,10 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 
 import { useAuditLogStore } from '@/features/audit/store/auditLogStore'
 import { usePublishedModulesStore } from '@/features/publishing/store/publishedModulesStore'
+import { getDataSource } from '@/lib/education/dataSource'
 import { MOCK_ASSIGNMENTS } from '@/lib/education/mockAssignments'
 import { MOCK_ORG_PEOPLE } from '@/lib/education/mockOrgPeople'
+import { toWriteError, type WriteError } from '@/lib/education/writeErrors'
 import type { Assignment } from '@/types/training'
 
 export interface CreateAssignmentInput {
@@ -17,6 +19,8 @@ export interface CreateAssignmentInput {
 
 interface AssignmentState {
   assignments: Assignment[]
+  lastWriteError: WriteError | null
+  clearLastWriteError: () => void
   createAssignment: (input: CreateAssignmentInput) => Assignment
   updateAssignmentStatus: (id: Assignment['id'], status: Assignment['status']) => void
   getAssignmentsForUser: (userId: string) => Assignment[]
@@ -95,10 +99,16 @@ function getAssignmentEntityLabel(assignment: Assignment, verb: 'assigned' | 'co
   return `${assigneeLabel} ${verb} ${getModuleLabel(assignment.module_version_id)}`
 }
 
+function shouldPersistToSupabase(): boolean {
+  return getDataSource() === 'supabase'
+}
+
 export const useAssignmentStore = create<AssignmentState>()(
   persist(
     (set, get) => ({
       assignments: cloneSeedAssignments(),
+      lastWriteError: null,
+      clearLastWriteError: () => set({ lastWriteError: null }),
       createAssignment: (input) => {
         if (!usePublishedModulesStore.getState().isAssignable(input.module_version_id)) {
           throw new Error(`Cannot assign unpublished module version: ${input.module_version_id}`)
@@ -116,6 +126,14 @@ export const useAssignmentStore = create<AssignmentState>()(
         }
 
         set((state) => ({ assignments: [...state.assignments, assignment] }))
+
+        if (shouldPersistToSupabase()) {
+          void import('@/integrations/supabase/mutations')
+            .then(({ insertAssignment }) => insertAssignment({ ...input, id: assignment.id }))
+            .then(() => set({ lastWriteError: null }))
+            .catch((error: unknown) => set({ lastWriteError: toWriteError('createAssignment', error) }))
+        }
+
         useAuditLogStore.getState().recordEvent({
           event_type: 'assignment_created',
           actor_user_id: input.assigned_by,
@@ -137,6 +155,20 @@ export const useAssignmentStore = create<AssignmentState>()(
           ),
         }))
 
+        if (shouldPersistToSupabase()) {
+          void import('@/integrations/supabase/mutations')
+            .then(({ updateAssignmentStatus }) => updateAssignmentStatus({ id, status }))
+            .then((persisted) =>
+              set((state) => ({
+                assignments: state.assignments.map((assignment) =>
+                  assignment.id === id ? { ...assignment, ...persisted } : assignment,
+                ),
+                lastWriteError: null,
+              })),
+            )
+            .catch((error: unknown) => set({ lastWriteError: toWriteError('updateAssignmentStatus', error) }))
+        }
+
         if (existing && shouldRecordCompletion) {
           const actorUserId = existing.assignee_user_id ?? 'system'
           useAuditLogStore.getState().recordEvent({
@@ -154,7 +186,7 @@ export const useAssignmentStore = create<AssignmentState>()(
         get().assignments.filter((assignment) => assignment.assignee_user_id === userId),
       getAssignmentsForModule: (moduleVersionId) =>
         get().assignments.filter((assignment) => assignment.module_version_id === moduleVersionId),
-      resetAssignments: () => set({ assignments: cloneSeedAssignments() }),
+      resetAssignments: () => set({ assignments: cloneSeedAssignments(), lastWriteError: null }),
     }),
     {
       name: 'redex-assignments-v1',

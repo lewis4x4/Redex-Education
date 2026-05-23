@@ -16,6 +16,10 @@ export interface ModuleBasicsDraft {
   source_binder_version?: string;
   /** Optional assessment version retained when editing a forked published version. */
   assessment_version?: string;
+  /** Supabase training_courses.id returned after draft creation in supabase mode. */
+  persisted_course_id?: string;
+  /** Supabase training_modules.id returned after outline persistence in supabase mode. */
+  persisted_module_id?: string;
   /** Module title — required, 4-120 chars */
   title: string;
   /** 'standalone' or an existing course ID */

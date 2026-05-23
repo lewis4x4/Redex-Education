@@ -7,6 +7,7 @@ import type {
   ProgressStatus,
   UUID,
 } from '@/lib/education';
+import type { WriteError } from '@/lib/education/writeErrors';
 
 export interface EducationContextValue {
   // Core facade (from training-types interface)
@@ -19,6 +20,8 @@ export interface EducationContextValue {
 
   // Live derived
   currentEnrollment: Enrollment | null;
+  lastWriteError: WriteError | null;
+  clearLastWriteError(): void;
 
   // High-level actions used by UI
   completeLesson(lessonId: UUID): void;

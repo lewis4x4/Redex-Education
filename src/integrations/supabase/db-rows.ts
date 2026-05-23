@@ -20,6 +20,7 @@ import type {
   LessonType,
   Module,
   ModuleSourceBinding,
+  ModuleVersion,
   ProgressStatus,
   ResourceLink,
   Role,
@@ -94,6 +95,9 @@ export type ModuleSourceBindingRow = Tables extends {
   ? R
   : never
 
+/** Row shape for the `module_versions` table. */
+export type ModuleVersionRow = Tables extends { module_versions: { Row: infer R } } ? R : never
+
 const ROLES = ['admin', 'foundry_author', 'manager', 'learner'] as const
 const COURSE_STATUSES = ['draft', 'in_review', 'published', 'archived'] as const
 const COURSE_LEVELS = ['foundational', 'intermediate', 'advanced'] as const
@@ -117,6 +121,7 @@ const SOURCE_AUTHORITY_SOURCES = ['frontmatter', 'meta_md', 'default'] as const
 const SOURCE_PROCESSING_STATUSES = ['pending', 'processing', 'processed', 'failed'] as const
 const BINDING_KINDS = ['whole_file', 'section'] as const
 const BINDING_FLAG_REASONS = ['equal_authority_conflict', 'stale'] as const
+const MODULE_VERSION_STATUSES = ['draft', 'in_review', 'approved', 'published', 'archived'] as const
 const RESOURCE_TYPES = ['pdf', 'link', 'video', 'notion'] as const
 
 function isOneOf<const T extends readonly string[]>(value: unknown, allowed: T): value is T[number] {
@@ -434,6 +439,27 @@ export function mapModuleSourceBindingRow(row: ModuleSourceBindingRow): ModuleSo
     binding_kind: requiredEnum(row.binding_kind, BINDING_KINDS, context, 'binding_kind'),
     flagged_for_review: requiredBoolean(row.flagged_for_review, context, 'flagged_for_review'),
     flag_reason: flagReason,
+    created_at: requiredString(row.created_at, context, 'created_at'),
+  }
+}
+
+export function mapModuleVersionRow(row: ModuleVersionRow): ModuleVersion {
+  const context = `module_versions row ${String(row.id)}`
+
+  return {
+    id: requiredString(row.id, context, 'id'),
+    module_id: requiredString(row.module_id, context, 'module_id'),
+    module_title: requiredString(row.module_title, context, 'module_title'),
+    version_number: requiredNumber(row.version_number, context, 'version_number'),
+    status: requiredEnum(row.status, MODULE_VERSION_STATUSES, context, 'status') as ModuleVersion['status'],
+    published_at: optionalString(row.published_at),
+    published_by: optionalString(row.published_by),
+    approved_by: optionalString(row.approved_by),
+    source_binder_version: optionalString(row.source_binder_version),
+    assessment_version: optionalString(row.assessment_version),
+    source_stale: requiredBoolean(row.source_stale, context, 'source_stale'),
+    stale_since: optionalString(row.stale_since),
+    completed_count: row.completed_count ?? undefined,
     created_at: requiredString(row.created_at, context, 'created_at'),
   }
 }

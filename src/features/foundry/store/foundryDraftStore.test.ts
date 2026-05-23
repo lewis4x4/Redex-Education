@@ -802,3 +802,86 @@ describe('useFoundryDraftStore', () => {
     expect(parsed.state.selectedLibraryFileIds).toEqual([])
   })
 })
+
+describe('useFoundryDraftStore Supabase dispatch', () => {
+  async function loadStore(mode: 'mock' | 'supabase', createModuleDraft = vi.fn()) {
+    vi.resetModules()
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: createStorageMock(),
+    })
+    vi.doMock('@/lib/education/dataSource', () => ({ getDataSource: () => mode }))
+    vi.doMock('@/integrations/supabase/mutations', () => ({
+      createModuleDraft,
+      saveSourceMaterial: vi.fn().mockResolvedValue({}),
+      saveSetupAnswers: vi.fn().mockResolvedValue(undefined),
+      saveGeneratedOutline: vi.fn().mockResolvedValue([]),
+      saveGeneratedLessons: vi.fn().mockResolvedValue([]),
+      publishModuleVersion: vi.fn().mockResolvedValue({}),
+    }))
+
+    const { useAuditLogStore } = await import('@/features/audit/store/auditLogStore')
+    const { useModuleVersionsStore } = await import('@/features/publishing/store/moduleVersionsStore')
+    const { usePublishedModulesStore } = await import('@/features/publishing/store/publishedModulesStore')
+    const { useFoundryDraftStore } = await import('./foundryDraftStore')
+
+    act(() => {
+      useAuditLogStore.getState().resetEvents()
+      useModuleVersionsStore.getState().resetVersions()
+      usePublishedModulesStore.getState().resetPublishedModules()
+      useFoundryDraftStore.getState().resetFoundryDraft()
+    })
+
+    return { useFoundryDraftStore, createModuleDraft }
+  }
+
+  const basics = {
+    title: 'Supabase Safety',
+    parent_course_id: 'standalone',
+    audience: 'New hires',
+    criticality: 'required' as const,
+    training_type: 'safety' as const,
+    estimated_minutes: 20,
+  }
+
+  it('does not persist basics in mock mode', async () => {
+    const createModuleDraft = vi.fn().mockResolvedValue({ id: 'course-1' })
+    const { useFoundryDraftStore } = await loadStore('mock', createModuleDraft)
+
+    act(() => {
+      useFoundryDraftStore.getState().setBasics(basics)
+    })
+
+    expect(createModuleDraft).not.toHaveBeenCalled()
+  })
+
+  it('persists basics in supabase mode and records returned course id', async () => {
+    const createModuleDraft = vi.fn().mockResolvedValue({ id: 'course-1' })
+    const { useFoundryDraftStore } = await loadStore('supabase', createModuleDraft)
+
+    act(() => {
+      useFoundryDraftStore.getState().setBasics(basics)
+    })
+
+    expect(useFoundryDraftStore.getState().currentDraft?.title).toBe('Supabase Safety')
+    await vi.waitFor(() => {
+      expect(createModuleDraft).toHaveBeenCalledWith(expect.objectContaining({ title: 'Supabase Safety' }))
+    })
+    await vi.waitFor(() => {
+      expect(useFoundryDraftStore.getState().currentDraft?.persisted_course_id).toBe('course-1')
+    })
+  })
+
+  it('sets lastWriteError when basics persistence fails', async () => {
+    const createModuleDraft = vi.fn().mockRejectedValue(new Error('draft rejected'))
+    const { useFoundryDraftStore } = await loadStore('supabase', createModuleDraft)
+
+    act(() => {
+      useFoundryDraftStore.getState().setBasics(basics)
+    })
+
+    await vi.waitFor(() => {
+      expect(useFoundryDraftStore.getState().lastWriteError).toEqual(expect.objectContaining({ action: 'setBasics', message: 'draft rejected' }))
+    })
+  })
+})

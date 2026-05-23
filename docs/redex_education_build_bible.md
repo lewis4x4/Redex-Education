@@ -3761,3 +3761,69 @@ Slice 8.5 already moved Redex Education tables into the isolated `redex` schema 
 
 ---
 
+## 2026-05-23 — Slice 8.4: Write Flows to Supabase
+
+**Status**: ✅ Completed. Supabase write adapters are implemented behind mock-preserving, opt-in dispatch paths.
+
+**Context**:
+Slice 8.3 completed the redex-schema read layer and kept `VITE_DATA_SOURCE=mock` as the default. This slice adds write infrastructure for the MVP user flows while preserving the existing mock-mode app behavior. Because Slice 8.6 has not yet created real auth/profile rows or role-aware RLS policies, Supabase-mode writes are best-effort and may still fail with FK/RLS errors until the auth slice lands.
+
+**Files touched**:
+- `src/integrations/supabase/mutations/` (new) — write layer for `profiles`, `courses`, `foundry`, `assignments`, `progress`, plus `_idempotency.ts`, `_response.ts`, and barrel exports.
+- `src/integrations/supabase/mutations/*.test.ts` — mocked Supabase client coverage for happy/error paths, mapper-boundary returns, idempotency helpers, and setup-answer deferral.
+- `src/integrations/supabase/db-rows.ts` — added `ModuleVersionRow` and `mapModuleVersionRow` for publish writes returning canonical domain objects.
+- `src/lib/education/writeErrors.ts` (new) — shared `WriteError` shape and conversion helper for optimistic write failures.
+- `src/features/foundry/types.ts` — added optional Supabase persistence ids on `ModuleBasicsDraft` for course/module write handoff.
+- `src/features/foundry/store/foundryDraftStore.ts` — optimistic Supabase-mode persistence for draft creation, source material, setup answers, generated outline, generated lessons, and publish; mock mode remains unchanged and mutation imports are lazy to avoid client initialization.
+- `src/features/assignments/store/assignmentStore.ts` — optimistic assignment create/status writes with `lastWriteError` and lazy Supabase mutation imports.
+- `src/features/progress/store/assessmentAttemptStore.ts` — optimistic quiz attempt writes with `lastWriteError` and lazy Supabase mutation imports.
+- `src/contexts/EducationContext.tsx` / `src/contexts/education-context.ts` — Supabase-mode progress writes, localStorage demoted to offline cache, and `lastWriteError` exposure.
+- Store/context tests — Supabase-vs-mock dispatch coverage and optimistic-error assertions.
+- `README.md` — env note updated: `VITE_DATA_SOURCE=supabase` now routes reads and fires best-effort writes; real E2E writes require Slice 8.6.
+
+**Flows covered**:
+- ✅ Create module draft (`training_courses`, idempotent by `slug`).
+- ✅ Add source binder content (`source_files`, idempotent by stable client UUID/id).
+- ⚠️ Save setup answers — documented no-op because the live schema has no `training_courses.metadata`, `setup_answers`, or `module_versions.metadata` column.
+- ✅ Save generated outline (`training_modules`, deterministic client UUIDs).
+- ✅ Save generated lessons (`training_lessons`, upsert by id; lesson JSON content passed as-is).
+- ✅ Publish module (`module_versions`, idempotent on `(module_id, version_number)`).
+- ✅ Assign training (`assignments`, client-side UUID insert path).
+- ✅ Save learner progress (`user_training_progress`, upsert on `(enrollment_id, lesson_id)`).
+- ✅ Save quiz attempt (`assessment_attempts`, client-side UUID insert path).
+- ✅ Record acknowledgment (`acknowledgments`, upsert on `(enrollment_id, lesson_id)`).
+
+**Schema gaps discovered / handling**:
+- `training_courses` has no generic `metadata` or `setup_answers` JSONB column, and `module_versions` has no `metadata` column. `saveSetupAnswers()` is intentionally a documented async no-op until a later schema slice adds a target.
+- `redex.profiles.id` references `auth.users(id)`. `upsertProfile()` is implemented but documented to fail until Slice 8.6 creates the auth user/profile path.
+- Several mock ids are not UUIDs while Postgres columns are UUID. Mutation helpers normalize non-UUID client ids into deterministic UUIDs before writes, preserving mock ids in mock mode and avoiding invalid UUID payloads in Supabase mode.
+
+**Design decisions**:
+- Mutation modules return domain objects by mapping returned rows through `db-rows.ts` so callers see DB-normalized values.
+- Stores remain optimistic: local Zustand/localStorage state updates first, Supabase writes fire asynchronously only when `getDataSource() === 'supabase'`.
+- Mutation imports in stores/contexts are lazy dynamic imports so mock-mode tests/runtime never initialize the Supabase client or require env vars.
+- `localStorage` progress is still written as an offline cache, but Supabase mode ignores localStorage hydration so cached progress cannot override server truth on subsequent reads.
+- Insert-like retry-sensitive flows generate client-side UUIDs before insert; upsert flows use explicit `onConflict` where schema constraints exist.
+
+**Verification**:
+- ✅ `npm run typecheck` — green.
+- ✅ `npm run lint` — 0 errors / 0 warnings.
+- ✅ `npm test -- --run` — **582 passed, 1 skipped, 101 test files** (**+51 tests** versus the Slice 8.3 baseline of 531).
+- ✅ `npm run build` — green.
+
+**Known scope deferred**:
+- No real auth flow; Slice 8.6 remains the unblocker for end-to-end Supabase writes under real FK/RLS conditions.
+- No offline queue; direct best-effort writes only. Slice 12.4 owns offline queue semantics.
+- No seed data; redex remains empty unless the app writes rows.
+- Existing `useSourceLibrary.ts` remains unchanged per scope.
+- Setup answers need a schema target before they can be persisted.
+
+**Naming guardrails honored**:
+- Learner-facing brand remains **Redex Academy**.
+- Admin-side engine remains **Redex AI Course Foundry**.
+- Long-term platform language remains **Redex Training OS** and is used sparingly.
+
+**Next**: Slice 8.6 — Profiles + Real RLS.
+
+---
+

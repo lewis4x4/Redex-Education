@@ -4,6 +4,7 @@ import { MOCK_ADMIN_USER } from '@/lib/education';
 import type {
   CourseOutlineDraft,
   GeneratedModulePreview,
+  Lesson,
   LessonGenerationStatus,
   LessonReviewItem,
   PublishBlocker,
@@ -12,6 +13,9 @@ import type {
   SourceMaterial,
 } from '@/lib/education';
 import { useAuditLogStore } from '@/features/audit/store/auditLogStore';
+import { stableClientUUID } from '@/integrations/supabase/mutations/_idempotency';
+import { getDataSource } from '@/lib/education/dataSource';
+import { toWriteError, type WriteError } from '@/lib/education/writeErrors';
 import { inferModuleState } from '@/features/publishing/lib/moduleStates';
 import { useModuleVersionsStore } from '@/features/publishing/store/moduleVersionsStore';
 import { usePublishedModulesStore } from '@/features/publishing/store/publishedModulesStore';
@@ -95,6 +99,10 @@ function resolvePublishedVersionNumber(currentDraft: ModuleBasicsDraft | null, m
 }
 
 function resolveDraftModuleId(title: string, currentDraft?: ModuleBasicsDraft | null): string {
+  if (currentDraft?.persisted_module_id) {
+    return currentDraft.persisted_module_id;
+  }
+
   if (currentDraft?.module_id) {
     return currentDraft.module_id;
   }
@@ -104,6 +112,47 @@ function resolveDraftModuleId(title: string, currentDraft?: ModuleBasicsDraft | 
   }
 
   return `${slugifyModuleTitle(title)}-mod-001`;
+}
+
+function resolveCourseIdForWrite(currentDraft: ModuleBasicsDraft | null, fallbackTitle: string): string {
+  if (currentDraft?.persisted_course_id) {
+    return currentDraft.persisted_course_id;
+  }
+
+  if (currentDraft?.parent_course_id && currentDraft.parent_course_id !== 'standalone') {
+    return currentDraft.parent_course_id;
+  }
+
+  return slugifyModuleTitle(currentDraft?.title ?? fallbackTitle);
+}
+
+function generatedLessonContent(lesson: GeneratedModulePreview['lessons'][number]): Lesson['content'] {
+  if (lesson.lesson_type === 'quiz') {
+    return { type: 'quiz', questions: lesson.quiz_questions ?? [] };
+  }
+
+  if (lesson.lesson_type === 'acknowledgment') {
+    return { type: 'acknowledgment', statement_markdown: lesson.acknowledgment_text ?? lesson.body_markdown ?? '' };
+  }
+
+  return { type: lesson.lesson_type, body_markdown: lesson.body_markdown ?? '' } as Lesson['content'];
+}
+
+function generatedLessonsToDomain(preview: GeneratedModulePreview, moduleId: string): Lesson[] {
+  return preview.lessons.map((lesson) => ({
+    id: `${moduleId}-lesson-${lesson.module_index}-${lesson.lesson_index}`,
+    module_id: moduleId,
+    title: lesson.title,
+    lesson_type: lesson.lesson_type,
+    criticality: 'required',
+    order_index: lesson.lesson_index,
+    estimated_minutes: 5,
+    content: generatedLessonContent(lesson),
+  }));
+}
+
+function shouldPersistToSupabase(): boolean {
+  return getDataSource() === 'supabase';
 }
 
 function recordAuditEvent(input: Omit<AuditLog, 'id' | 'occurred_at' | 'actor_user_id' | 'actor_name'>) {
@@ -124,6 +173,9 @@ const resetPublishState = {
 interface FoundryDraftState {
   /** The current working draft, or null if none */
   currentDraft: ModuleBasicsDraft | null;
+  /** Last async Supabase write failure; mock mode never sets this. */
+  lastWriteError: WriteError | null;
+  clearLastWriteError: () => void;
   /** Save form values as the draft (sets updated_at) */
   setBasics: (values: ModuleBasicsFormValues) => void;
   /** Clear the working draft (e.g. on successful publish, or "Start over") */
@@ -212,6 +264,8 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
   persist(
     (set, get) => ({
       currentDraft: null,
+      lastWriteError: null,
+      clearLastWriteError: () => set({ lastWriteError: null }),
       sourceMaterial: null,
       setupAnswers: null,
       outline: null,
@@ -226,13 +280,29 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
         const wasNewDraft = get().currentDraft === null;
         const moduleId = resolveDraftModuleId(values.title);
 
+        const currentDraft = {
+          ...values,
+          updated_at: new Date().toISOString(),
+        };
+
         set({
-          currentDraft: {
-            ...values,
-            updated_at: new Date().toISOString(),
-          },
+          currentDraft,
           ...resetPublishState,
         });
+
+        if (shouldPersistToSupabase()) {
+          void import('@/integrations/supabase/mutations')
+            .then(({ createModuleDraft }) => createModuleDraft(currentDraft))
+            .then((course) =>
+              set((state) => ({
+                currentDraft: state.currentDraft
+                  ? { ...state.currentDraft, persisted_course_id: course.id, parent_course_id: course.id }
+                  : state.currentDraft,
+                lastWriteError: null,
+              })),
+            )
+            .catch((error: unknown) => set({ lastWriteError: toWriteError('setBasics', error) }));
+        }
 
         if (wasNewDraft) {
           recordAuditEvent({
@@ -243,11 +313,12 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
           });
         }
       },
-      clearDraft: () => set({ currentDraft: null, ...resetPublishState }),
+      clearDraft: () => set({ currentDraft: null, lastWriteError: null, ...resetPublishState }),
       resetPublishStatus: () => set(resetPublishState),
       resetFoundryDraft: () =>
         set({
           currentDraft: null,
+          lastWriteError: null,
           sourceMaterial: null,
           setupAnswers: null,
           outline: null,
@@ -260,6 +331,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
         }),
       seedDraftFromModuleVersion: (version) => {
         set({
+          lastWriteError: null,
           currentDraft: {
             id: version.id,
             module_id: version.module_id,
@@ -345,6 +417,19 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
         });
 
         set({ publishStatus: 'published', publishedAt: moduleVersion.published_at ?? new Date().toISOString() });
+
+        if (shouldPersistToSupabase()) {
+          void import('@/integrations/supabase/mutations')
+            .then(({ publishModuleVersion }) =>
+              publishModuleVersion({
+                course_id: resolveCourseIdForWrite(state.currentDraft, title),
+                module_id: moduleId,
+                approved_by: MOCK_ADMIN_USER.id,
+              }),
+            )
+            .then(() => set({ lastWriteError: null }))
+            .catch((error: unknown) => set({ lastWriteError: toWriteError('setPublished', error) }));
+        }
 
         if (!wasAlreadyPublished) {
           recordAuditEvent({
@@ -522,8 +607,21 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
           };
         }),
       setSourceMaterial: (material) => {
-        const wasMissingSource = get().sourceMaterial === null;
+        const state = get();
+        const wasMissingSource = state.sourceMaterial === null;
         set({ sourceMaterial: material, ...resetPublishState });
+
+        if (shouldPersistToSupabase()) {
+          void import('@/integrations/supabase/mutations')
+            .then(({ saveSourceMaterial }) =>
+              saveSourceMaterial({
+                course_id: resolveCourseIdForWrite(state.currentDraft, material.title),
+                material,
+              }),
+            )
+            .then(() => set({ lastWriteError: null }))
+            .catch((error: unknown) => set({ lastWriteError: toWriteError('setSourceMaterial', error) }));
+        }
 
         if (wasMissingSource) {
           recordAuditEvent({
@@ -536,22 +634,66 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
         }
       },
       clearSourceMaterial: () => set({ sourceMaterial: null, ...resetPublishState }),
-      setSetupAnswers: (input) =>
+      setSetupAnswers: (input) => {
+        const answers = {
+          ...input,
+          updated_at: new Date().toISOString(),
+        };
+
         set({
-          setupAnswers: {
-            ...input,
-            updated_at: new Date().toISOString(),
-          },
+          setupAnswers: answers,
           ...resetPublishState,
-        }),
+        });
+
+        if (shouldPersistToSupabase()) {
+          void import('@/integrations/supabase/mutations')
+            .then(({ saveSetupAnswers }) =>
+              saveSetupAnswers({
+                course_id: resolveCourseIdForWrite(get().currentDraft, 'setup-answers'),
+                answers,
+              }),
+            )
+            .then(() => set({ lastWriteError: null }))
+            .catch((error: unknown) => set({ lastWriteError: toWriteError('setSetupAnswers', error) }));
+        }
+      },
       clearSetupAnswers: () => set({ setupAnswers: null, ...resetPublishState }),
       setOutline: (draft) => {
-        const wasMissingOutline = get().outline === null;
-        set({
+        const state = get();
+        const wasMissingOutline = state.outline === null;
+        const courseId = resolveCourseIdForWrite(state.currentDraft, draft.course_title);
+        const firstPersistedModuleId = draft.modules[0]
+          ? stableClientUUID(`training_modules:${courseId}:0:${draft.modules[0].title}`)
+          : undefined;
+        set((currentState) => ({
+          currentDraft:
+            currentState.currentDraft && firstPersistedModuleId
+              ? { ...currentState.currentDraft, persisted_module_id: firstPersistedModuleId }
+              : currentState.currentDraft,
           outline: draft,
           outline_status: 'draft',
           ...resetPublishState,
-        });
+        }));
+
+        if (shouldPersistToSupabase()) {
+          void import('@/integrations/supabase/mutations')
+            .then(({ saveGeneratedOutline }) =>
+              saveGeneratedOutline({
+                course_id: courseId,
+                outline: draft,
+              }),
+            )
+            .then((modules) =>
+              set((currentState) => ({
+                currentDraft:
+                  currentState.currentDraft && modules[0]
+                    ? { ...currentState.currentDraft, persisted_module_id: modules[0].id }
+                    : currentState.currentDraft,
+                lastWriteError: null,
+              })),
+            )
+            .catch((error: unknown) => set({ lastWriteError: toWriteError('setOutline', error) }));
+        }
 
         if (wasMissingOutline) {
           const lessonCount = draft.modules.reduce((total, module) => total + module.lessons.length, 0);
@@ -593,8 +735,19 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
         }),
       regenerateOutlineStart: () => set({ outline_status: 'regenerating', ...resetPublishState }),
       setGeneratedModule: (preview) => {
-        const wasMissingModule = get().generatedModule === null;
+        const state = get();
+        const wasMissingModule = state.generatedModule === null;
         set({ generatedModule: preview, ...resetPublishState });
+
+        if (shouldPersistToSupabase()) {
+          const moduleId = resolveDraftModuleId(preview.module_title, state.currentDraft);
+          void import('@/integrations/supabase/mutations')
+            .then(({ saveGeneratedLessons }) =>
+              saveGeneratedLessons({ module_id: moduleId, lessons: generatedLessonsToDomain(preview, moduleId) }),
+            )
+            .then(() => set({ lastWriteError: null }))
+            .catch((error: unknown) => set({ lastWriteError: toWriteError('setGeneratedModule', error) }));
+        }
 
         if (wasMissingModule) {
           recordAuditEvent({
