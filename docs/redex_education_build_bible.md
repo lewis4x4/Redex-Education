@@ -3516,3 +3516,46 @@ The agent also fixed a pre-existing mock-generation loading edge case in `useMoc
 
 ---
 
+## 2026-05-23 — Slice 8.1: Supabase Environment and Client Setup
+
+**Status**: ✅ Completed — verification slice (most of the work was banked in Slice 2.4 + the audit P1 fixes).
+
+**Linear ticket**: `Supabase: configure environment and client`.
+
+**Context**:
+All four acceptance criteria were already met by prior work; this slice locks the contract with explicit tests and confirms readiness for Phase 8 / 8.2 (schema migration).
+
+**Already-banked infrastructure** (no changes needed):
+- `src/integrations/supabase/client.ts` (Slice 2.4 + audit P1 fixes) — reads `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` from `import.meta.env`; throws a clear dev error when either is missing unless `VITE_MOCK_AUTH=true`; warns via `console.warn` in mock-auth mode so a missing-env misconfiguration cannot deploy silently.
+- `.env.example` — committed template; all `.env*` files gitignored.
+- `src/env.d.ts` — `ImportMetaEnv` interface declares the typed `VITE_*` surface.
+- `docs/decisions/001-env-driven-supabase-client.md` (ADR 001) — records the env-driven pattern.
+- README env section documents `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` / `VITE_MOCK_AUTH`.
+
+**Files touched this slice**:
+- `src/integrations/supabase/client.test.ts` (new) — locks the env contract with three tests:
+  1. Throws clear error when env vars missing AND `VITE_MOCK_AUTH=false`.
+  2. Warns (does NOT throw) when env vars missing AND `VITE_MOCK_AUTH=true`.
+  3. Initializes cleanly when both env vars provided.
+- Each test uses `vi.resetModules()` + `vi.stubEnv()` to isolate the module-top-level env read.
+
+**Verification**:
+- ✅ typecheck green
+- ✅ lint 0/0
+- ✅ npm test: **426 passed, 1 skipped** (+3 vs Slice 7.4 baseline of 423)
+- ✅ build green
+
+**Acceptance criteria** (master roadmap):
+- ✅ Supabase client initializes only with env values (client.ts reads import.meta.env)
+- ✅ Missing env values produce clear dev error (throws unless mock-auth; new test locks this)
+- ✅ No secrets committed (.env* gitignored; .env.example only)
+- ✅ Build Bible updated
+
+**Known scope (intentional)**:
+- No `.env.example` changes — current template is complete for Phase 8 client work. Edge function env vars (`GOOGLE_DRIVE_LIBRARY_FOLDER_ID`, `ALLOWED_ORIGINS`, `GOOGLE_SERVICE_ACCOUNT_JSON`) live in Supabase secrets, not in the Vite `.env`.
+- No client-side schema/type changes — those land in 8.2 with the migration.
+
+**Next**: Slice 8.2 — Database Schema Migration Draft. Add the still-to-add tables (profiles, assessments, assessment_questions, assessment_attempts, assignments, acknowledgments, audit_logs, source_files, source_file_versions, source_sections, module_source_bindings, module_versions, source_change_events, generated_content_reviews). Roadmap notes the learner-side schema (`20260522000100_create_training_schema_and_rls.sql`) was already migrated in Slice 2.4 prep work — this slice adds the rest. Note: there's a known training_modules collision with the existing remote Supabase project (different shape than our local migration); 8.2 will need a reconciliation strategy before applying remotely.
+
+---
+
