@@ -29,6 +29,14 @@ Security posture moved from implicit defaults to explicit policy, making deploym
 
 This decision does not claim full production-hardening completeness: CSP widening for future third-party integrations (analytics, external fonts, payments) remains deferred until those tools are actually introduced.
 
+### Forthcoming extensions
+
+ADR 008 remains the canonical place to look for the CSP allowlist. Planned extensions arrive with their owning slices:
+
+- Slice 10.8 widens `img-src` for the Supabase Storage origin used by embedded source images.
+- Slice 10.6 widens `media-src` / `connect-src` for HeyGen video URLs and signed media playback.
+- AI Slice C adds any required AI provider endpoints after ADR 012 selects the provider-specific client implementation.
+
 It complements ADR 001 by aligning env-driven Supabase boundaries with deployment-layer network and header policy.
 
 ## References

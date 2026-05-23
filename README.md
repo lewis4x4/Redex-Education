@@ -2,9 +2,9 @@
 
 Redex Academy (learner) + Redex AI Course Foundry (admin) — an AI-augmented training operating system for Redex employees.
 
-**Status:** Phase 8 remediation complete · 50/50 tests passing · 81% statement coverage · Lint 0/0 · Build green
+**Status:** Phases 0–7 complete (mock vertical) · Phase 8 backend in progress (Slices 8.1–8.2 done; 8.3–8.6 outstanding) · **426 tests passing, 1 skipped, 86 test files** · build green
 
-Redex Education is building a premium internal learning platform for Redex teams. Learners get a guided Redex Academy experience with clear onboarding, structured module flow, and progress visibility. Admins get the foundation for an AI-augmented course foundry that turns raw operational knowledge into approved, interactive training. Real production auth and full Supabase-backed data flows are planned but intentionally deferred.
+Redex Education is building a premium internal learning platform for Redex teams. Learners get a guided Redex Academy experience with clear onboarding, structured module flow, and progress visibility. Admins get the foundation for an AI-augmented course foundry that turns raw operational knowledge into approved, interactive training. Real production auth and full Supabase-backed data flows are planned but intentionally deferred. Coverage baseline is re-measured against the current suite as part of each phase close-out; see [`docs/testing.md`](./docs/testing.md) for the latest run.
 
 ## 1) Project naming primer
 
@@ -38,7 +38,7 @@ npm run dev
 | `npm run preview` | Preview the production build |
 | `npm run typecheck` | TypeScript check only (no emit) |
 | `npm run lint` | ESLint check (currently 0 errors / 0 warnings) |
-| `npm test` | Run Vitest once (50/50 passing) |
+| `npm test` | Run Vitest once (426 passing, 1 skipped) |
 | `npm run test:watch` | Vitest watch mode |
 | `npm run test:coverage` | V8 coverage report |
 
@@ -83,7 +83,7 @@ Redex-Education/
 ├── src/                  # Application source
 │   ├── components/       # Shared UI/layout/auth components
 │   ├── contexts/         # Context providers and context types
-│   ├── features/         # Feature areas (learner, admin)
+│   ├── features/         # Feature areas (admin, assignments, audit, foundry, learner, manager, progress, publishing, source-binder)
 │   ├── hooks/            # Public hook seams (auth, education)
 │   ├── integrations/     # External boundaries (Supabase)
 │   ├── lib/              # Domain facade + utilities
@@ -103,10 +103,10 @@ Redex-Education/
 | `/learn` | Learner dashboard | Default landing |
 | `/learn/welcome` | First-day welcome | |
 | `/learn/player[/:moduleId]` | Module player | Unknown id → redirect `/learn` |
-| `/admin`, `/admin/*` | Admin placeholder | Behind `AuthGate` (Course Foundry shell) |
+| `/admin`, `/admin/*` | Admin surfaces | Behind `AuthGate` except `/manager` |
 | `*` | NotFoundPage | |
 
-See [Architecture](./docs/architecture.md) for the full route + provider stack.
+This table is partial. See [Architecture §3](./docs/architecture.md#3-route-table) for the full route table (20+ routes across learner / admin / foundry / publishing / manager / audit / source-impact surfaces).
 
 ## 7) Where to go next
 
@@ -116,5 +116,5 @@ See [Architecture](./docs/architecture.md) for the full route + provider stack.
 - Confused about names? → [Glossary](./docs/glossary.md)
 - Why was X done this way? → [Decisions (ADRs)](./docs/decisions/README.md)
 - What’s the current build state? → [Build Bible](./docs/redex_education_build_bible.md)
-- What’s coming next? → [Master roadmap](./docs/2025__redex-education__codex-linear-roadmap-handoff.md)
+- What’s coming next? → [Master roadmap v1](./docs/2025__redex-education__codex-linear-roadmap-handoff.md) for Phases 0–9.x; [Phase 10–13 Roadmap v2](./docs/Redex_Education_Phase10-13_Roadmap_v2_20260523.md) + [Moonshot Strategy v2](./docs/Redex_Education_Moonshot_Strategy_v2_20260523.md) for Phase 10+ (v2 supersedes v1 for Phase 10+)
 - Brand reference? → [Redex Brand Guide v1.0 (PDF)](./docs/Redex_Brand_Guide_v1.0.pdf)

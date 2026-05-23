@@ -1,3 +1,6 @@
+> **Status: Historical — Slice 0.2 was built and accepted.**
+> Acceptance criteria in this spec are now moot. Section 9 "Correction required" items may or may not have been addressed in subsequent slices — verify by `grep` if needed. `ExperienceToggle` specified here is not present in the current codebase. This file is preserved for archeological reference.
+
 # SLICE 0.2 — APP SHELL SPEC (Brand-Aligned)
 
 **Status:** ready for Codex · **Date:** 2026-05-22 · **Phase:** 0 — Foundation

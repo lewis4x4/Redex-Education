@@ -6,13 +6,13 @@ This file is the living build record for the Redex Education project.
 
 Codex must update this file after every Linear ticket / build slice.
 
-This is not the master roadmap. The master roadmap is:
+This is not the master roadmap. The historical v1 roadmap is:
 
 ```txt
-docs/REDEX_EDUCATION_CODEX_LINEAR_ROADMAP_HANDOFF.md
+docs/2025__redex-education__codex-linear-roadmap-handoff.md
 ```
 
-This Build Bible tracks what has actually been built, what decisions have been made, what is still open, and what must happen next.
+For Phase 10+ forward planning, use `docs/Redex_Education_Phase10-13_Roadmap_v2_20260523.md` with companion strategy `docs/Redex_Education_Moonshot_Strategy_v2_20260523.md`. This Build Bible tracks what has actually been built, what decisions have been made, what is still open, and what must happen next.
 
 ---
 
@@ -174,41 +174,34 @@ Redex Education
 
 ## Phase
 
-**Phase 2 — Admin Course Foundry Prototype**
+**Phase 8 — Supabase Integration (in progress).** Evidence: the completed-work log below records Phase 7 complete, Slice 8.1 complete, and Slice 8.2 complete; the Slice 8.2 entry was committed at `da7ddce`.
 
 ## Current Slice
 
-**Slice 2.3 — Source Upload / Paste Step** — COMPLETE. Next: **Slice 2.4 — Source Library & Drive Ingestion** (new slice; see roadmap).
+**Slice 9.2 — Docs & Build Bible Reconciliation (in progress).** Last completed slice: **Slice 8.2 — Database Schema Migration Draft** at commit `da7ddce`.
 
 ## Current Status
 
-Corrected 2026-05-22 by the CEO Co-Pilot architecture revision. This section had drifted — it still claimed "Phase 0 / Slice 0.1" while the completed-work log below records work through Slice 2.3.
+Honest current state as of 2026-05-23:
 
-Honest current state:
-
-- **Roadmap Phase 0 (Foundation)** — complete.
-- **Roadmap Phase 1 (Learner Experience)** — complete: welcome → dashboard → module player → scored quiz, with localStorage progress persistence.
-- **Roadmap Phase 2 (Admin Course Foundry)** — in progress: Slice 2.1 (Admin Dashboard), Slice 2.2 (Module Basics Start Flow), a pre-2.3 visual-fidelity pass, and Slice 2.3 (Source Binder paste/preview) all complete — 108 passing tests. **Next: the new Slice 2.4 (Source Library & Drive Ingestion).**
-- **Roadmap Phases 3–9** — not started. A new **Slice 2.4 (Source Library & Drive Ingestion)** has been inserted; the old Slice 2.4 (AI Setup Questions Wizard) is now **Slice 2.5**.
-- A Phase 8 Supabase migration (`20260522000100_create_training_schema_and_rls.sql`) was drafted early and covers the learner-side tables.
-
-**Phase-numbering note:** the git commits tagged `phase-0`…`phase-9` were a separate code-hardening/remediation sprint (hygiene, routing/auth, state, quiz math, brand, a11y, build/security, testing, docs) — they are **not** the roadmap's product phases. The roadmap's 10 phases (0–9) are the product plan; the project is at roadmap **Phase 2**.
+- **Roadmap Phases 0–7** — fully complete. The completed-work log below records the mock vertical through Phase 7: learner flow, Course Foundry prototype surfaces, Drive Source Library scaffolding, assignments, manager visibility, publishing/versioning, source-impact review, and audit log.
+- **Roadmap Phase 8** — partially complete. **Slice 8.1** (Supabase environment/client verification) and **Slice 8.2** (database schema migration draft) are complete; **Slices 8.3–8.6** remain outstanding per v2 Part 1 (`docs/Redex_Education_Phase10-13_Roadmap_v2_20260523.md`).
+- **Current verification baseline** — `npm test` reports **426 passing, 1 skipped, 86 test files** in the Slice 8.2 completed-work entry below; Slice 9.2 must preserve that count because it changes docs only.
+- **Forward gate** — v2 Part 1 is the hard gate before Phase 10+: Slices 8.3–8.6, AI Slices A–D, and Slice 9.1 must be accepted before Phase 10 starts (`docs/Redex_Education_Phase10-13_Roadmap_v2_20260523.md`).
 
 ---
 
 # 7. Master Roadmap Reference
 
-The master roadmap handoff should live here:
+The historical v1 master roadmap handoff lives here:
 
 ```txt
-docs/REDEX_EDUCATION_CODEX_LINEAR_ROADMAP_HANDOFF.md
+docs/2025__redex-education__codex-linear-roadmap-handoff.md
 ```
 
-This Build Bible should not replace the roadmap.
+**v1 roadmap is historical for Phase 10+.** Phases 0–9.x in v1 remain the controlling spec for completed/current close-out work. The active forward-looking roadmap is `docs/Redex_Education_Phase10-13_Roadmap_v2_20260523.md` with companion strategy `docs/Redex_Education_Moonshot_Strategy_v2_20260523.md`.
 
-The roadmap explains what to build.
-
-This Build Bible records what has been built.
+This Build Bible should not replace the roadmap. The roadmap explains what to build. This Build Bible records what has been built.
 
 ---
 
@@ -242,29 +235,7 @@ This Build Bible records what has been built.
 
 ## Current Work
 
-**Multi-agent orchestration in full swing** (CEO Co-Pilot mode — "do not stop" directive active).
-
-**Progress since last update:**
-- Slice 0.2 App Shell foundation complete:
-  - `TopNav` now contains the exact "Learner experience" / "Admin experience" toggle with red active state (matches v3 mockup pixel-for-pixel).
-  - `AppShell` + `BreadcrumbBar` implemented.
-  - Experience switching is fully functional from the header.
-- Slice 1.1 (First-day Welcome) implemented:
-  - `LearnerWelcomePage` built to closely match the provided UI mockup (Marcus greeting, CEO video placeholder, 4-step progress, benefits, red CTA).
-- Clean cutover from old CEU prototype → official Redex Academy direction.
-- Build passes cleanly.
-
-**Agents still running:**
-- Plan agent (Slice 0.2 detailed execution plan)
-- Explorer agent (codebase audit)
-- Additional implementers and types agent active in background.
-
-**Current Slice**: Slice 0.2 + Slice 1.1 + early Slice 1.2 complete in working form.
-
-Major addition:
-- Core domain types integrated (`src/types/training.ts`) — LearnerProfile, Course, Module, Lesson, Progress, Enrollment, Foundry generation shapes, etc. (inspired by the excellent modeling produced by the types agent).
-
-Continuous non-stop execution in progress.
+Slice 9.2 — Docs & Build Bible Reconciliation is in progress. The next code slice is Slice 8.3 — Replace Mock Reads With Supabase Reads; v2 Part 1 remains the hard Finish-Line gate before Phase 10+. Slice 9.1 — real HR-approved content — is a parallel people-process track and must start in lockstep with Slice 8.3 so backend wiring is not blocked by missing approved source material (`docs/Redex_Education_Phase10-13_Roadmap_v2_20260523.md`).
 
 ---
 
@@ -323,10 +294,10 @@ RESOLVED (2026-05-22) — Redex Brand Guide v1.0.
 
 The "After Slice 0.1" gap list was stale — app shell, learner screens, and the admin dashboard now all exist. Real current gaps:
 
+- **`src/integrations/supabase/types.ts` is generated from an unrelated project** (contains `devices`, `panels`, `bookings`, `activity_log` — none of which are ours). Every typed Supabase query against this file is currently type-unsafe. **CORRECTNESS BUG — not cosmetic.** Resolution: Slice 8.5 — Schema Reconciliation & Regenerate Types. Must be resolved before any Slice 8.3 (mock-read replacement) code is trusted in production. Audit reference: v2 roadmap Part 1, lines 125–145 (`docs/Redex_Education_Phase10-13_Roadmap_v2_20260523.md`).
 - **Course Foundry loop incomplete** — Slice 2.3 (Source Binder paste path) is complete; setup questions, outline, generation, self-critique, side-by-side review, and publish (Slices 2.5–3.5) are not started. The core loop (raw knowledge → approved training) does not exist end to end yet.
 - **Drive Source Library not built** — no Google Drive integration; the new Slice 2.4 covers it and is the next build target.
 - **Foundry/source-binder data model not migrated** — `source_files`, `source_file_versions`, `source_sections`, `module_source_bindings`, `module_versions`, `source_change_events`, and `profiles` (roles) all still needed (roadmap Slice 8.2).
-- **`src/integrations/supabase/types.ts` is wrong** — it is a generated types file from an unrelated project (devices, panels, bookings). It must be regenerated against the real schema. Treat as a correctness bug.
 - **No `profiles`/role table** — blocks admin-only RLS on every Foundry table.
 - **`LessonContentRenderer` is partial** — only 3 of 6 lesson types implemented (checklist, acknowledgment, scenario are stubs).
 - **Nexa Bold brand font absent** — specified in the brand guide but not in the repo; the typographic identity is unshipped.
@@ -3610,6 +3581,72 @@ Drafts the rest of the MVP schema on top of the two prior migrations (learner-si
 - **RLS tightening** — full role-gated policies (admin-only writes, manager-scoped reads, learner-scoped attempts) requires a SECURITY DEFINER helper that reads `profiles.role` for the current user. Targeted as a follow-up after the migration applies.
 
 **Next**: Slice 8.3 — Replace Mock Reads With Supabase Reads. Priority order: profiles → courses/modules/lessons → assignments → progress → source binders. Each store becomes a thin adapter: reads from Supabase when env configured + auth present, falls back to mock data otherwise. Allows incremental wire-up without breaking the existing demo.
+
+---
+
+## 2026-05-23 — Slice 9.2: Docs & Build Bible Reconciliation
+
+**Status**: ✅ Completed — docs-only state-of-truth reconciliation.
+
+**Linear ticket**: `Docs: reconcile Build Bible and v2 roadmap handoff`.
+
+**Context**:
+The v2 Phase 10–13 Roadmap and v2 Moonshot Strategy documents arrived from the user. A two-round five-lens analyst panel (pedagogy / competitive benchmark / product+UX / technical+AI architecture / business+ROI) stress-tested the prior plan and a candidate 8-agent swarm doc. v2 supersedes the Phase 10+ sketch in v1. Three parallel audit agents (Build Bible / Roadmap / Supporting docs) identified state-of-truth drift across the documentation set.
+
+**Files touched**:
+- `docs/redex_education_build_bible.md` — corrected front matter, Sections 6/7/9, known gaps, and appended this entry.
+- `README.md` — corrected current status/test count, feature areas, route-table scope note, and v2 roadmap links.
+- `docs/testing.md` — corrected current suite inventory, marked coverage baseline stale, extended mock seams, and added forthcoming v2 testing categories.
+- `docs/glossary.md` — added v2 vocabulary and extended `LessonType` with `practical`, `hotspot_diagram`, and `drag_to_order`.
+- `docs/architecture.md` — added store layer, missing routes, multi-store persistence, and CSP future gap.
+- `docs/design-bar.md` — corrected `SourceBinderInputPage`, added new page deltas, and captured v2 design constraints.
+- `docs/Redex_Education_Phase10-13_Roadmap_v2_20260523.md` — promoted v2 roadmap into `docs/` unchanged.
+- `docs/Redex_Education_Moonshot_Strategy_v2_20260523.md` — promoted v2 strategy into `docs/` unchanged.
+- `docs/2025__redex-education__codex-linear-roadmap-handoff.md` — added historical Phase 10+ banner only.
+- `docs/Redex_Education_Platform_Build_Blueprint_v1.md` — added partial-supersession banner only.
+- `docs/SLICE_0.2_APP_SHELL_SPEC.md` — added historical banner only.
+- `docs/decisions/008-netlify-security-headers-and-vendor-chunks.md` — added forthcoming CSP extensions.
+- `docs/decisions/009-vitest-rtl-jsdom-mock-seams.md` — removed stale fixed test-count claim.
+- `docs/decisions/011-zustand-store-pattern.md` through `docs/decisions/016-single-redex-video-player-component.md` — added ADRs 011–016.
+- `docs/decisions/README.md` — indexed ADRs 011–016.
+
+**Key v2 changes captured here**:
+1. Part 1 (Slices 8.3–8.6 + AI Slices A–D + 9.1) is now a hard gate before Phase 10.
+2. Cost telemetry must precede real AI.
+3. Section-level partial regeneration is a first-class job type.
+4. One unified competency-tagged item bank (Slice 11.2).
+5. Single `RedexVideoPlayer` component (Slice 10.6).
+6. `src/integrations/supabase/types.ts` is from an unrelated project — **CORRECTNESS BUG**, not deferred cleanup (Slice 8.5).
+7. `localStorage` is demoted to offline-cache-only; server-side becomes source of truth (Slice 8.4).
+8. RLS placeholder-open policies are banned (Slice 8.6).
+9. Cloudflare deferred — Supabase-only for v1 (reverses Build Blueprint §3.3/§3.4).
+10. Recognition surface ships at/after pilot (Slice 11.6).
+11. Leaderboards / streaks / XP / badge walls explicitly rejected for life of product.
+
+**Verification**:
+- ✅ v2 roadmap copy verified by `cmp` and first-five-line read.
+- ✅ v2 Moonshot Strategy copy verified by `cmp` and first-five-line read.
+- ✅ `npm run typecheck` — green.
+- ✅ `npm run lint` — 0/0.
+- ✅ `npm test -- --run` — 426 passed, 1 skipped, 86 test files.
+- ✅ `npm run build` — green.
+
+**Acceptance criteria** (Slice 9.2 in v2):
+- ✅ Build Bible, README, and `docs/architecture.md` agree on phase/status/test counts.
+- ✅ `docs/glossary.md` updated for new v2 vocabulary.
+- ✅ v2 roadmap and Moonshot Strategy promoted into `docs/`.
+- ✅ v1 roadmap historical banner added.
+
+**Known scope deferred**:
+- Slice 8.5 is not executed here: schema reconciliation, remote `training_modules` collision strategy, `supabase db push`, and `supabase gen types` regeneration remain separate blocked work.
+- Slice 9.1 is not executed here: real HR-approved content remains a people/process track.
+
+**Naming guardrails honored**:
+- Learner-facing brand remains **Redex Academy**.
+- Admin-side engine remains **Redex AI Course Foundry**.
+- Long-term platform language remains **Redex Training OS** and is used sparingly.
+
+**Next**: Slice 8.3 — Replace Mock Reads With Supabase Reads (blocked on: operator decision for `training_modules` collision strategy + `supabase db push` + `supabase gen types` regeneration + AI provider selection deferred per ADR 012).
 
 ---
 

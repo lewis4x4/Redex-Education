@@ -1,3 +1,10 @@
+> **Status (2026-05-23): Historical for Phase 10+.**
+> Phases 0–9.x in this document are the controlling spec.
+> Phase 10+ work is governed by `docs/Redex_Education_Phase10-13_Roadmap_v2_20260523.md` (with companion `docs/Redex_Education_Moonshot_Strategy_v2_20260523.md`).
+> v2 introduces Part 1 (Finish-Line gate), the Pilot gate before Phase 13, and explicit non-negotiables (no leaderboards / streaks-as-mechanic / badge walls / syntax highlighting / content tabs / multi-tenant).
+> v2 also corrects: `src/integrations/supabase/types.ts` is from an unrelated project (Slice 8.5); cost telemetry must precede real AI (AI Slice C); section-level regeneration is first-class; one unified item bank (Slice 11.2); one `RedexVideoPlayer` component (Slice 10.6).
+> See ADR 015 (Supabase-only generation pipeline) and ADR 016 (single video player).
+
 # REDEX EDUCATION — CODEX + LINEAR ROADMAP HANDOFF
 
 ## Purpose of This File

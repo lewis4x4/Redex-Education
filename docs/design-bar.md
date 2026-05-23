@@ -39,7 +39,7 @@ Every Redex Education page should feel like it belongs to the same premium produ
 - **Hero archetype** (Welcome, post-completion celebration): Eyebrow + big headline + emoji + subhead + visual journey + media moment + CTA + footer reassurance.
 - **Operational archetype** (Learner Dashboard, Admin Dashboard): Eyebrow + medium headline + first-name greeting + subhead + featured card (next action) + supporting cards (status, help, metrics).
 - **Form archetype** (FoundryStartPage, future setup wizard): Eyebrow + medium headline + subhead + form card with structured fields.
-- **Detail archetype** (FoundrySourceStubPage, future module detail): Eyebrow + medium headline + content card + action footer.
+- **Detail archetype** (SourceBinderInputPage, future module detail): Eyebrow + medium headline + content card + action footer.
 - **Immersive archetype** (ModulePlayer): Minimal chrome; content takes the screen.
 
 ## 7. Personalization standards
@@ -78,8 +78,22 @@ Small text under primary CTAs or at page bottom to provide security, privacy, or
 - Don't use more than 2 levels of card nesting.
 - Don't use generic placeholder copy ("Lorem ipsum", "Placeholder", "TODO").
 - Don't use generic emoji decoration; emoji must mean something.
+- **Recognition gamification**: no badge walls, point counts, streaks-as-mechanic, progress-to-next-badge, or leaderboards. Rejected for life of product. Recognition is dignified, manager-originated, and manager co-signed for peer-originated. Treat it like a Stripe receipt: clean, factual, dignified.
+- **Certification moments**: weight, not confetti. No animations beyond a calm transition.
+- **Redex Coach panel**: calm, not chatty or childish.
+- **Lesson renderers**: authored, not dumped. Every renderer holds this bar.
 
-## 12. Per-page delta list
+## 12. v2 Design Constraints (effective 2026-05-23)
+
+These constraints come from `docs/Redex_Education_Phase10-13_Roadmap_v2_20260523.md` and `docs/Redex_Education_Moonshot_Strategy_v2_20260523.md`.
+
+- Recognition ships at/after pilot and stays manager-originated, factual, and restrained. It is not a gamification system.
+- The certification ladder should feel earned and serious. Avoid confetti, level-up language, XP counters, and progress-to-badge loops.
+- Redex Coach is a source-grounded work aid. Its UI should feel calm, cited, and operational rather than chatty or childish.
+- Lesson renderers for checklist, scenario, hotspot/diagram, drag-to-order, video, practical, and text lessons must feel authored. Do not dump raw generated content into generic cards.
+- Video and assessment moments should support competence, not spectacle: inline checkpoints, clear feedback, timestamped return paths, and no punitive novelty mechanics.
+
+## 13. Per-page delta list
 
 ### `src/features/learner/pages/LearnerDashboardPage.tsx`
 - [ ] **CRITICAL**: Add eyebrow above headline: "YOUR LEARNING DASHBOARD" in `text-sm font-semibold uppercase tracking-[3px] text-redex-red`.
@@ -96,11 +110,36 @@ Small text under primary CTAs or at page bottom to provide security, privacy, or
 - [ ] **CRITICAL**: Upgrade the assignment summary footer (currently a plain text line) to a Tier 1 card, as it contains important metrics.
 - [ ] **RECOMMENDED**: Ensure card depth tiers are consistent (AdminMetricCard and CourseStatusList are Tier 1).
 
+### `src/features/assignments/pages/AssignmentAdminPage.tsx`
+- **Tier rating:** Tier 1 operational.
+- [ ] **RECOMMENDED**: Solid form/table structure; keep density restrained and ensure due-date/status badges use semantic tokens rather than raw color emphasis.
+- [ ] **OPTIONAL**: Add a small footer reassurance that assignment changes are audited.
+
+### `src/features/audit/pages/AuditLogPage.tsx`
+- **Tier rating:** Tier 1 operational ledger.
+- [ ] **RECOMMENDED**: Correct surface for dense records; preserve scanability with muted metadata and avoid turning severity/status into a red-heavy table.
+- [ ] **OPTIONAL**: Add an empty-state explanation for filtered views with no events.
+
+### `src/features/manager/pages/ManagerDashboardPage.tsx`
+- **Tier rating:** Tier 2 coaching dashboard.
+- [ ] **RECOMMENDED**: Manager view should read as operational coaching, not surveillance. Keep team-risk cards factual and restrained.
+- [ ] **OPTIONAL**: Add a footer reassurance that progress reflects current assigned training only.
+
+### `src/features/publishing/pages/ModuleVersionHistoryPage.tsx`
+- **Tier rating:** Tier 1 audit ledger.
+- [ ] **RECOMMENDED**: Version history should feel like a clean audit ledger. Prioritize version number, status, approver, and source-stale state over decorative styling.
+- [ ] **OPTIONAL**: Use a compact timeline rhythm if table density starts to obscure version relationships.
+
+### `src/features/source-binder/pages/SourceImpactReviewPage.tsx`
+- **Tier rating:** Tier 2 trust-critical review.
+- [ ] **CRITICAL**: Source impact is trust-critical. Changed sections, affected modules, and regeneration scope must be visually distinct without alarmist red fills.
+- [ ] **RECOMMENDED**: Keep partial-regeneration actions tied to affected sections so the design reinforces v2's section-level regeneration rule.
+
 ### `src/features/foundry/pages/FoundryStartPage.tsx`
 - [ ] **CRITICAL**: Update eyebrow to match brand red eyebrow style (`text-sm font-semibold uppercase tracking-[3px] text-redex-red`).
 - [ ] **OPTIONAL**: Add "Your draft is saved automatically" footer reassurance near the form actions.
 
-### `src/features/foundry/pages/FoundrySourceStubPage.tsx`
+### `src/features/source-binder/pages/SourceBinderInputPage.tsx`
 - [ ] **CRITICAL**: Update eyebrow to match brand red eyebrow style (`text-sm font-semibold uppercase tracking-[3px] text-redex-red`).
 - [ ] **RECOMMENDED**: Promote the "Working draft" card to a Tier 2 Featured card (add slightly more shadow, generous padding).
 

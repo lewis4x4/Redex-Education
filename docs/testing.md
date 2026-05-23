@@ -124,51 +124,45 @@ it('updates state when moving from in_progress to completed', () => {
 | `useAuth()` hook | `vi.mock('@/hooks/useAuth')` + `vi.mocked(useAuth).mockReturnValue(...)` | `AuthGate.test.tsx`, `App.routes.test.tsx` |
 | `useEducation()` hook | `vi.mock('@/hooks/useEducation', () => ({ useEducation: () => ({ ... }) }))` (or `vi.fn()` return mocks) | `App.routes.test.tsx` |
 | `VITE_MOCK_AUTH` env | `vi.stubEnv('VITE_MOCK_AUTH', 'true' \| 'false')` + `vi.unstubAllEnvs()` | `AuthGate.test.tsx`, `App.routes.test.tsx` |
-| Persisted state | `localStorage.setItem(key, JSON.stringify(value))` before `renderHook` | `EducationContext.test.tsx` hydration tests |
+| Module-top-level env reads | `vi.stubEnv(...)` + `vi.resetModules()` before dynamic import | `src/integrations/supabase/client.test.ts` |
+| Persisted provider state | `localStorage.setItem(key, JSON.stringify(value))` before `renderHook` | `EducationContext.test.tsx` hydration tests |
+| Zustand store reset | `beforeEach(() => useFoundryDraftStore.getState().reset())` or the store-specific reset action (`resetAssignments`, `resetEvents`, etc.) | Every Zustand store with a reset action |
+| Zustand persist round trip | Write to store, reload the module with `vi.resetModules()`, then verify restored state from the `redex-*-v1` key | Store persistence tests under `src/features/**/store/*.test.ts` |
+| Cross-store side effects | Trigger the source store action and assert both the source state and target store state | `assignmentStore.createAssignment` writes to `auditLogStore` |
+| Fake generation timers | `vi.useFakeTimers()` + `vi.advanceTimersByTime(...)` | `src/features/foundry/lib/useMockGenerationDelay.test.ts` |
 | StrictMode double-mount | Wrap provider with `<StrictMode>` in hook wrapper | `EducationContext.test.tsx` StrictMode safety tests |
 
 ## 9) What's tested today
 
-| File | Count | Surface |
-|---|---:|---|
-| `src/test/smoke.test.ts` | 4 | Infrastructure smoke (arithmetic, DOM globals, jest-dom, storage reset) |
-| `src/components/auth/AuthGate.test.tsx` | 5 | All three AuthGate branches + custom fallback + authenticated path |
-| `src/contexts/EducationContext.test.tsx` | 12 | Hydration, idempotency, scoping, persistence, StrictMode safety |
-| `src/App.routes.test.tsx` | 5 | Root redirect, unknown-module redirect, valid module route, 404, admin wiring |
-| `src/features/learner/components/ModulePlayer.test.tsx` | 12 | Empty/fallback, quiz lock logic, sidebar lock/unlock, progress UI, callbacks, a11y |
-| `src/features/learner/components/Quiz.test.tsx` | 12 | Threshold boundary, 0-question path, `correct_index` filtering, retake flow, remount reset, keyboard/a11y, callback invariants |
+Current Slice 9.2 baseline: **426 passing, 1 skipped, 86 test files**. Test files are co-located under `src/**/*.test.ts`, `src/**/*.test.tsx`, and `supabase/functions/**/*.test.ts`; the authoritative per-slice count lives in the latest completed-work entry in the [Build Bible](./redex_education_build_bible.md).
 
-**Total: 50 tests across 6 files.**
+This guide intentionally avoids a per-file inventory table because that table drifted as Phases 5–8 expanded the suite. For area discovery, use the repo tree: learner, foundry, assignments, manager, publishing, source-binder, audit, auth/layout, Supabase client, and Supabase function parser tests all have active coverage.
 
-## 10) Coverage baseline (Phase 8 — 2026-05-22)
+## 10) Coverage baseline (stale — re-measure required)
 
-- Statements: **81.02%**
-- Branches: **89.96%**
-- Functions: **67.92%**
-- Lines: **81.02%**
+<!-- TODO: re-run coverage and update; see Slice 9.2 close-out -->
 
-Per-surface highlights:
-- `AuthGate.tsx` — 100%
-- `Quiz.tsx` — 98.86%
-- `EducationContext.tsx` — 96.12%
-- `ModulePlayer.tsx` — 92.03%
-- `App.tsx` — 88.75%
-- all `layout/*` components — 100%
+The old Phase 8 remediation baseline (81.02% statements / 89.96% branches / 67.92% functions / 81.02% lines) is stale because the suite has grown from 50 tests across 6 files to 426 passing tests across 86 files. No coverage threshold is enforced today. Re-measure coverage against the current suite at the next phase close-out and record the result in the [Build Bible](./redex_education_build_bible.md).
 
-No coverage thresholds are enforced today; this is the baseline from Phase 8 in the [Build Bible](./redex_education_build_bible.md).
+## 11) v2 testing additions (forthcoming)
 
-## 11) What's NOT tested (and why)
+These categories are introduced by the v2 roadmap and are not yet in the current scope:
 
-- `LessonContentRenderer.tsx` (12.12%) — covered transitively by ModulePlayer/Quiz tests; no direct suite yet
-- `LearnerWelcomePage.tsx` (4.44%) — primarily presentational; currently covered transitively by route tests
-- `useAuth.ts` / `use-auth.tsx` / `auth-context.ts` (0%) — covered via AuthGate mock seam; direct provider lifecycle tests deferred
-- `src/integrations/supabase/client.ts` (0%) — env-driven boundary; deferred until Supabase reads land
-- `src/types/training.ts` (0%) — type declarations only (no runtime execution)
+- **Eval harness in CI** — AI Slice D adds prompt/grounding evals that block regressions in source grounding and refusal correctness.
+- **Coach guardrail tests** — Slice 13.2 covers source-grounded Redex Coach behavior, citation requirements, and off-source refusal behavior.
+- **Item-bank attempt tests** — Slice 11.2 adds the unified competency-tagged item bank and item-attempt records.
+- **Assessment-attempt cross-surface tests** — item bank → video checkpoint / quiz / spaced booster flows must prove attempts share the same retrieval and competency semantics.
 
-## 12) When to write a new test
+## 12) What's NOT tested (and why)
+
+- Current direct coverage gaps should be re-audited after the next coverage run; the old file-by-file percentages are stale.
+- `src/integrations/supabase/types.ts` remains generated from the wrong project and is excluded from coverage; Slice 8.5 regenerates it before typed Supabase queries are trusted.
+- Real Supabase read/write integration tests are deferred until Slices 8.3–8.6 wire production-shaped data and role policies.
+
+## 13) When to write a new test
 
 1. **Bug fix → regression test always.** Write the test that fails before the fix and passes after.
 2. **New component → at least one render test.** Prefer including at least one user interaction.
-3. **New hook → at least one `renderHook` test.** Cover the primary use case.
+3. **New hook/store → at least one `renderHook` or store action test.** Cover the primary use case plus reset/persistence if state survives reload.
 
 If unsure, choose the boundary most likely to catch a real regression first. For route/provider context, align with patterns in [Architecture](./architecture.md).

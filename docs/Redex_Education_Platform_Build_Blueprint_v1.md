@@ -1,3 +1,11 @@
+> **Status (2026-05-23): Partially superseded by v2.**
+> This document remains the foundational vision and product framing. However, four sections are architecturally superseded:
+> 1. **§3.3 / §3.4 — Cloudflare Workers / Queues / R2 / KV:** v1 generation pipeline is Supabase-only (`pg_cron`-driven worker + Supabase Storage). See ADR 015 and v2 AI Slice C.
+> 2. **§4 — Data model (`courses`, `modules`, `lessons`, `content_blocks`, `quizzes`, `questions`):** the actual schema uses `training_modules`, `training_lessons`, `module_source_bindings`, etc. See `supabase/migrations/` and `src/types/training.ts`. Any code authored against §4 will generate wrong queries.
+> 3. **§11 — Gamification (XP, levels, streaks, badge walls):** explicitly rejected by v2 Moonshot Strategy §8 for life of product. Recognition is the sanctioned form — manager-originated, dignified, no counts.
+> 4. **§3.5 — Role model (admin/trainer/learner):** v2 adds `manager` as a first-class role (see Slice 8.6).
+> The strategic framing in §1, §2, §5–§10 still applies. v2 documents control all forward planning.
+
 # Redex Education — Build Blueprint (Architecture Reference)
 
 **Product:** Redex Education — AI-powered training platform at education.redexops.com

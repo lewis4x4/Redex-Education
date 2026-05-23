@@ -32,7 +32,7 @@ This pattern depends directly on ADR 005’s hook/provider split.
 
 ## Consequences
 
-Phase 8 landed 50 passing tests with an objective baseline (~81% statements, ~90% branches) and gave contributors stable workflows (`npm test`, watch mode, coverage). The seam strategy reduces brittle integration setup while still validating critical behavior branches.
+Test counts are tracked in the Build Bible's completed-work log; see the latest slice entry rather than treating this ADR as a live inventory. The adopted stack gave contributors stable workflows (`npm test`, watch mode, coverage). The seam strategy reduces brittle integration setup while still validating critical behavior branches.
 
 The tradeoff is that provider internals and some integration edges remain indirectly covered until future slices justify deeper suites. Still, this decision established durable test scaffolding and made future regression prevention practical.
 
