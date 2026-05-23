@@ -3710,3 +3710,54 @@ User authorized (a) deleting the legacy training subsystem from `public`, and (b
 
 ---
 
+## 2026-05-23 — Slice 8.3: Replace Mock Reads With Supabase Reads
+
+**Status**: ✅ Completed. Supabase read adapters are wired behind the existing education facade helpers; mock mode remains the default runtime/test path.
+
+**Linear ticket**: `Supabase: replace mock reads with redex-schema read adapters`.
+
+**Context**:
+Slice 8.5 already moved Redex Education tables into the isolated `redex` schema and regenerated `src/integrations/supabase/types.ts`. This slice adds the read boundary needed by v2 Slice 8.3 without seeding data and without rewriting `EducationContext.tsx`. The remote redex schema is still empty, so `VITE_DATA_SOURCE=supabase` returns empty real query results until seeding lands; `VITE_DATA_SOURCE=mock` preserves the existing demo experience.
+
+**Files touched**:
+- `.env.example` — added `VITE_DATA_SOURCE=mock` with opt-in Supabase-read guidance.
+- `README.md` — added `VITE_DATA_SOURCE` env docs and updated current test count.
+- `src/env.d.ts` — typed `VITE_DATA_SOURCE`.
+- `src/integrations/supabase/db-rows.ts` — added row aliases and pure row→domain mappers for profiles, courses/modules/lessons, enrollments/progress, assignments, assessment attempts, source files/versions/sections, and module-source bindings.
+- `src/integrations/supabase/db-rows.test.ts` — mapper happy-path, invalid enum-like value, and missing-required-field coverage.
+- `src/integrations/supabase/queries/` — new Supabase query layer (`profiles`, `courses`, `assignments`, `progress`, `source_library`, and barrel) with domain return types only.
+- `src/integrations/supabase/queries/*.test.ts` — query happy/error coverage with mocked Supabase client and mapper-boundary assertions.
+- `src/lib/education/dataSource.ts` — `mock | supabase` dispatcher from `import.meta.env.VITE_DATA_SOURCE`.
+- `src/lib/education/supabaseDataProvider.ts` — dynamic-import Supabase provider to avoid initializing the Supabase client on mock-mode imports.
+- `src/lib/education/{profiles,courses,assignments,progress,sources}.ts` — public per-domain dispatch helpers that route to mock data by default or Supabase when opted in.
+- `src/lib/education/index.ts` — re-exported the new helper surface while preserving demo constants and mock exports.
+- `src/lib/education/dataSource.test.ts` and `src/lib/education/dataSourceDispatch.test.ts` — env selection and helper routing coverage.
+
+**Verification**:
+- ✅ `npm run typecheck -- --pretty false` — green.
+- ✅ `npm run lint` — 0 errors / 0 warnings.
+- ✅ `npm test -- --run` — **531 passed, 1 skipped, 94 test files** (**+105 tests** versus the prior 426 baseline).
+- ✅ `npm run build` — green.
+
+**Acceptance criteria** (v2 Slice 8.3):
+- ✅ Learner/admin/course/assignment/progress/source read paths now have Supabase query functions returning domain models.
+- ✅ Row→domain mapping stays at the integration boundary (`src/integrations/supabase/db-rows.ts`).
+- ✅ Runtime demo seed data remains in mock-mode paths; no seed data removed while the redex schema is empty.
+- ✅ Facade helper surface is additive and mock-preserving; `EducationContext.tsx` remains untouched.
+- ✅ Build Bible updated.
+
+**Known scope deferred**:
+- No data seeding. Supabase mode returns empty arrays/nulls until a seed/import slice populates `redex`.
+- `EducationContext.tsx` still owns localStorage-backed mock progress; server write flows are Slice 8.4.
+- Existing `useSourceLibrary.ts` remains unchanged per scope; the new `queries/source_library.ts` formalizes the query it can call in a follow-up.
+- Real auth/RLS hardening remains Slice 8.6.
+
+**Naming guardrails honored**:
+- Learner-facing brand remains **Redex Academy**.
+- Admin-side engine remains **Redex AI Course Foundry**.
+- Long-term platform language remains **Redex Training OS** and is used sparingly.
+
+**Next**: Slice 8.4 — Write Flows to Supabase.
+
+---
+

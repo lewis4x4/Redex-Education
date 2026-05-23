@@ -143,7 +143,15 @@ export {
   MOCK_HR_ONBOARDING_ASSIGNMENT_COMPLETED,
 } from './mockAssignments'
 
-export { MOCK_MANAGER_REPORTS, getDirectReports } from './mockManagerReports'
+export { MOCK_MANAGER_REPORTS } from './mockManagerReports'
+
+export { getDataSource } from './dataSource'
+export type { DataSource } from './dataSource'
+export { getProfileByUserId, getAllProfiles, getDirectReports } from './profiles'
+export { getCourses, getCourseById, getModulesForCourse, getLessonsForModule } from './courses'
+export { getAssignmentsForUser, getAssignmentsForModule } from './assignments'
+export { getProgressForUser, getEnrollmentsForUser, getAttemptsForLesson } from './progress'
+export { getSourceFiles, getSourceFileVersions, getSourceSections, getModuleSourceBindings } from './sources'
 
 export {
   AUDIT_EVENT_TYPES,

@@ -2,7 +2,7 @@
 
 Redex Academy (learner) + Redex AI Course Foundry (admin) — an AI-augmented training operating system for Redex employees.
 
-**Status:** Phases 0–7 complete (mock vertical) · Phase 8 backend in progress (Slices 8.1–8.2 done; 8.3–8.6 outstanding) · **426 tests passing, 1 skipped, 86 test files** · build green
+**Status:** Phases 0–7 complete (mock vertical) · Phase 8 backend in progress (Slices 8.1–8.3 and 8.5 done; 8.4/8.6 outstanding) · **531 tests passing, 1 skipped, 94 test files** · build green
 
 Redex Education is building a premium internal learning platform for Redex teams. Learners get a guided Redex Academy experience with clear onboarding, structured module flow, and progress visibility. Admins get the foundation for an AI-augmented course foundry that turns raw operational knowledge into approved, interactive training. Real production auth and full Supabase-backed data flows are planned but intentionally deferred. Coverage baseline is re-measured against the current suite as part of each phase close-out; see [`docs/testing.md`](./docs/testing.md) for the latest run.
 
@@ -38,7 +38,7 @@ npm run dev
 | `npm run preview` | Preview the production build |
 | `npm run typecheck` | TypeScript check only (no emit) |
 | `npm run lint` | ESLint check (currently 0 errors / 0 warnings) |
-| `npm test` | Run Vitest once (426 passing, 1 skipped) |
+| `npm test` | Run Vitest once (531 passing, 1 skipped) |
 | `npm run test:watch` | Vitest watch mode |
 | `npm run test:coverage` | V8 coverage report |
 
@@ -48,6 +48,7 @@ npm run dev
 |---|---|---|
 | `VITE_SUPABASE_URL` | When using real Supabase | Project URL (e.g. `https://your-ref.supabase.co`) |
 | `VITE_SUPABASE_ANON_KEY` | When using real Supabase | Public anon JWT (RLS gates access) |
+| `VITE_DATA_SOURCE` | Defaults to `mock` | Set to `supabase` to route facade read helpers through the redex-schema Supabase query layer |
 | `VITE_MOCK_AUTH` | Defaults to `false` | When `true`, AuthGate bypasses session checks for demo/dev; production builds are blocked |
 
 See [`.env.example`](./.env.example) for the template. `npm run build` rejects production builds when `VITE_MOCK_AUTH=true`.
