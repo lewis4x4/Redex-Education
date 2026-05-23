@@ -26,6 +26,9 @@
 export type UUID = string;
 export type ISODateTime = string;
 
+/** System role for a user — drives RLS + UI access. */
+export type Role = 'admin' | 'foundry_author' | 'manager' | 'learner';
+
 // ============================================================
 // ENUMS
 // ============================================================
@@ -60,6 +63,9 @@ export type LessonType =
   | 'reflection_prompt';
 
 export type Criticality = 'required' | 'recommended' | 'optional' | 'bonus';
+
+/** Alias retained for roadmap terminology compatibility. */
+export type CriticalityLevel = Criticality;
 
 /**
  * Pedagogical stakes selected during Foundry setup-question intake.
@@ -165,6 +171,16 @@ export type EnrollmentStatus = 'invited' | 'active' | 'completed' | 'dropped';
 // (UI consumes these. Row types live in db-rows.ts and are mapped to these.)
 // ============================================================
 
+export interface User {
+  id: UUID;
+  org_id: UUID;
+  email: string;
+  display_name: string;
+  role: Role;
+  created_at: ISODateTime;
+  updated_at: ISODateTime;
+}
+
 export interface LearnerProfile {
   id: UUID;
   user_id: UUID;
@@ -212,6 +228,20 @@ export interface Lesson {
   estimated_minutes: number;
   content: LessonContent;
   resources?: ResourceLink[];
+}
+
+export interface AssessmentQuestion {
+  id: UUID;
+  prompt: string;
+  options: string[];
+  correct_index: number;
+}
+
+export interface Assessment {
+  id: UUID;
+  lesson_id: UUID;
+  passing_threshold: number;
+  questions: AssessmentQuestion[];
 }
 
 // ============================================================
@@ -377,6 +407,23 @@ export interface LessonProgress {
   time_spent_seconds: number;
   completed_at?: ISODateTime;
   acknowledgment_id?: UUID;
+}
+
+/** Alias retained for roadmap terminology compatibility. */
+export type ProgressRecord = LessonProgress;
+
+/**
+ * Individual assessment attempt record — Slice 6.2 progress tracking.
+ */
+export interface AssessmentAttempt {
+  id: UUID;
+  enrollment_id: UUID;
+  lesson_id: UUID;
+  attempted_at: ISODateTime;
+  score_percent: number;
+  passed: boolean;
+  /** Answers keyed by question id. */
+  answers: Record<string, number>;
 }
 
 // ============================================================
@@ -562,6 +609,30 @@ export interface GeneratedModulePreview {
  * The Foundry uses these as the unit of source grounding: each generated
  * lesson should be traceable back to one or more sections.
  */
+/**
+ * Logical grouping of source files used for module generation.
+ */
+export interface SourceBinder {
+  id: UUID;
+  org_id: UUID;
+  title: string;
+  version_number: number;
+  created_by: UUID;
+  created_at: ISODateTime;
+}
+
+/**
+ * Canonical source document record representing parsed content from a file revision.
+ */
+export interface SourceDocument {
+  id: UUID;
+  source_file_id: UUID;
+  source_file_version_id: UUID;
+  title: string;
+  sections: SourceSection[];
+  created_at: ISODateTime;
+}
+
 export interface SourceSection {
   id: UUID;
   /** Heading level (1=H1, 2=H2, 3=H3). Sections without a heading get level 0. */
@@ -608,6 +679,18 @@ export interface SourceFileVersion {
   created_at: ISODateTime;
 }
 
+/**
+ * Reference from a generated lesson/claim back to a specific source file + section + revision.
+ * This is what powers source grounding (Slice 3.4) and version-impact detection (Slice 7.3).
+ */
+export interface SourceReference {
+  source_file_id: UUID;
+  source_file_version_id: UUID;
+  source_section_id?: UUID;
+  /** Optional excerpt highlighted as the grounding for the claim. */
+  highlighted_text?: string;
+}
+
 export interface ModuleSourceBinding {
   id: UUID;
   module_id: string;
@@ -617,6 +700,88 @@ export interface ModuleSourceBinding {
   binding_kind: 'whole_file' | 'section';
   flagged_for_review: boolean;
   flag_reason?: 'equal_authority_conflict' | 'stale' | null;
+  created_at: ISODateTime;
+}
+
+/**
+ * Publish-state lifecycle for a module version (Slice 7.2 — module versioning).
+ */
+export interface ModuleVersion {
+  id: UUID;
+  module_id: UUID;
+  version_number: number;
+  status: 'draft' | 'in_review' | 'approved' | 'published' | 'archived';
+  published_at?: ISODateTime;
+  published_by?: UUID;
+  /** Source binder version this module version was generated from. */
+  source_binder_version?: UUID;
+  created_at: ISODateTime;
+}
+
+/**
+ * Detected source change event — Slice 7.3 source impact detection.
+ */
+export interface SourceChangeEvent {
+  id: UUID;
+  source_file_id: UUID;
+  old_source_file_version_id?: UUID;
+  new_source_file_version_id: UUID;
+  detected_at: ISODateTime;
+  /** Sections that changed between old and new versions. */
+  changed_section_ids: UUID[];
+  /** Module versions impacted by the change. */
+  impacted_module_version_ids: UUID[];
+  /** Resolution status. */
+  status: 'pending' | 'regenerating' | 'resolved' | 'ignored';
+}
+
+/**
+ * Admin review record for AI-generated content — broader review surface (covers outline/lesson/assessment reviews).
+ */
+export interface GeneratedContentReview {
+  id: UUID;
+  module_version_id: UUID;
+  reviewer_id: UUID;
+  review_type: 'outline' | 'lesson' | 'assessment' | 'side_by_side';
+  status: 'pending' | 'approved' | 'rejected';
+  notes?: string;
+  reviewed_at?: ISODateTime;
+  created_at: ISODateTime;
+}
+
+/**
+ * Training assignment record — Slice 6.1 admin assignment flow.
+ */
+export interface Assignment {
+  id: UUID;
+  module_version_id: UUID;
+  /** Assignee — single user OR a group/role. */
+  assignee_user_id?: UUID;
+  assignee_role?: Role;
+  assigned_by: UUID;
+  assigned_at: ISODateTime;
+  due_at?: ISODateTime;
+  status: 'pending' | 'in_progress' | 'completed' | 'overdue';
+}
+
+/**
+ * Audit log entry — Slice 7.4 audit log UI.
+ */
+export interface AuditLog {
+  id: UUID;
+  actor_id?: UUID;
+  action: string;
+  entity_type:
+    | 'module'
+    | 'module_version'
+    | 'source_file'
+    | 'assignment'
+    | 'enrollment'
+    | 'assessment_attempt'
+    | 'critique'
+    | 'review';
+  entity_id: UUID;
+  metadata?: Record<string, unknown>;
   created_at: ISODateTime;
 }
 

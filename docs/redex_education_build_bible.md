@@ -2901,3 +2901,37 @@ Consolidates the missing-source policy that was emerging in scattered form acros
 
 ---
 
+## 2026-05-22 — Slice 4.1: Training Domain Types (Phase 4 begins)
+
+**Status**: ✅ Completed. Retrospective gap-fill — most types already canonical from Phases 2-3.
+
+**Master roadmap**: Phase 4 / Slice 4.1.
+**Linear ticket**: `Data: define core training domain types`.
+
+**Audit** of the roadmap's 25 required types against `src/types/training.ts`:
+- ✅ Already canonical (9): `Course`, `Module`, `Lesson`, `LessonType`, `SourceSection`, `SourceFile`, `SourceFileVersion`, `SourceAuthorityLevel`, `ModuleSourceBinding`
+- ⚠️ Partially covered — normalized via aliases (2): `Acknowledgment` (already as `AcknowledgmentLessonContent`), `ProgressRecord` (added `type ProgressRecord = LessonProgress`)
+- ❌ Missing — added in this slice (14): `User`, `Role`, `Assessment`, `AssessmentQuestion`, `CriticalityLevel`, `SourceBinder`, `SourceDocument`, `SourceReference`, `ModuleVersion`, `SourceChangeEvent`, `GeneratedContentReview`, `Assignment`, `AssessmentAttempt`, `AuditLog`
+
+**Files touched**:
+- `src/types/training.ts` (+165 lines) — added the 14 missing types + 1 alias with JSDoc explaining each type's eventual home (which later slice will use it)
+- `src/lib/education/index.ts` (+58 / -51) — facade re-exports reordered alphabetically + expanded
+
+**Verification**:
+- ✅ `npm run typecheck` — green (types are additive)
+- ✅ `npm run lint` — 0/0
+- ✅ `npm test` — 236/236 passing (no test changes; types compile-only)
+- ✅ `npm run build` — green
+
+**Acceptance criteria** (master roadmap):
+- ✅ Shared types exist (all 25 required types now in canonical training.ts)
+- ✅ Mock data uses shared types (already true from Phases 2-3 work)
+- ✅ No duplicate scattered type definitions (verified during audit)
+- ✅ Build Bible updated
+
+**Naming guardrails honored**. No UI surfaces touched.
+
+**Next**: Slice 4.2 — Local Mock Data Store. Like 4.1, this is largely retrospective: `mockAdmin.ts`, `mockGeneratedOutline.ts`, `mockGeneratedModule.ts`, `mockSelfCritique.ts`, `mockLessonReviews.ts`, `mockMissingSource.ts`, `mockAdmin.ts`, and the demo learner/orientation data already exist. The slice consolidates them, adds `mockUsers.ts` + `mockAssignments.ts` for upcoming Phase 6 work, and verifies the foundry flow's draft state already works (yes — `useFoundryDraftStore` has been functional since Slice 2.2).
+
+---
+
