@@ -3204,3 +3204,49 @@ Slice 4.2 seeded `MOCK_ASSIGNMENTS` (Marcus / Ana / Devon) and the canonical `As
 
 ---
 
+## 2026-05-22 — Slice 6.2: Progress Tracking State
+
+**Status**: ✅ Completed. Phase 6 / Slice 6.2.
+
+**Linear ticket**: `Progress: implement local learner progress tracking`.
+
+**Context**:
+Lesson-level progress was already persisted in `EducationContext` (localStorage key `redex-education-progress-v1`) from earlier phases. The two gaps were (a) **quiz attempts**: `Quiz.onComplete(score, passed)` propagated to ModulePlayer's local `quizResults` and was lost on retake — no `AssessmentAttempt` records ever persisted — and (b) **completion loop**: Marcus's assignment never flipped to `completed` when he finished HR Basics. This slice closes both gaps without refactoring the existing `EducationContext`.
+
+**Orchestration**: Read-only explore probe (Claude Code · sonnet:high) → single pair agent (Codex CLI · gpt-5.5 high) with an internal Oracle review pass that caught two real defects (no-gradeable quiz auto-attempt persistence + sidebar back-button bypass of assignment completion). Both were fixed before verification.
+
+**Files touched**:
+- `src/features/progress/store/assessmentAttemptStore.ts` (new) — Zustand + `persist` (localStorage key `redex-assessment-attempts-v1`); state `attempts: AssessmentAttempt[]`; actions: `recordAttempt`, `getAttemptsForLesson`, `getLatestAttempt`, `getAttemptCount`, `getBestScore`, `resetAttempts`. Empty initial state (no seeds).
+- `src/features/progress/lib/moduleProgress.ts` (new) — pure `computeModuleProgress({ moduleId, lessons, lessonProgress, attempts })` returning `{completed_lessons, total_lessons, percentage, last_activity_at?, completed_at?}`. No new type added to `training.ts` — inline shape kept slice scope tight.
+- `src/lib/education/moduleVersions.ts` (new) — `MODULE_TO_VERSION_MAP` (HR Basics module → `module-version-hr-basics-v1`).
+- `src/features/learner/components/Quiz.tsx` — `onComplete` signature widened to `(score, passed, answers: Record<string, number>) => void`. Local `answers` state is now passed through on submit. Render-time guard added: malformed/ungradeable quizzes no longer auto-create failed attempts.
+- `src/features/learner/components/LessonContentRenderer.tsx` — threads `answers` through the quiz callback chain.
+- `src/features/learner/components/ModulePlayer.tsx` — new optional prop `onQuizAttempt?: (lessonId, { score, passed, answers }) => void`; fires on every submit (pass AND fail). Module completion now also pre-fires the completion callback if the user navigates back via the sidebar after the final lesson completes (defends against the Oracle-flagged bypass).
+- `src/App.tsx` — `LearnerPlayerRoute` wiring: `onQuizAttempt` writes to `assessmentAttemptStore.recordAttempt({ enrollment_id, ... })`; `onCompleteModule` resolves the active assignment via `MODULE_TO_VERSION_MAP` and calls `assignmentStore.updateAssignmentStatus(id, 'completed')` (idempotent — guarded by `status !== 'completed'`).
+- Tests: assessmentAttemptStore (10 cases), Quiz signature update + new `answers` payload coverage, ModulePlayer `onQuizAttempt` pass/fail coverage, route smoke for assignment completion path.
+
+**Verification**:
+- ✅ typecheck green
+- ✅ lint 0/0
+- ✅ npm test: **300 passed, 1 skipped** (+12 vs Slice 6.1 baseline of 288)
+- ✅ build green
+
+**Acceptance criteria** (master roadmap):
+- ✅ Lesson completion state stored locally (already shipped — preserved)
+- ✅ Module progress percentage updates (already shipped — preserved; new pure `computeModuleProgress` helper available for future surfaces)
+- ✅ **Quiz attempt is stored** (every submit appends an `AssessmentAttempt` record to the new store — retakes accumulate history; latest/count/best-score selectors covered)
+- ✅ Completion timestamp stored (lesson level via `EducationContext.completed_at`; assignment level via `assignmentStore` flipping to `completed`)
+- ✅ Build Bible updated
+
+**Known scope deferred**:
+- `MODULE_TO_VERSION_MAP` only maps HR Basics today. When more modules ship, the map (or a richer module→version resolver) grows.
+- Attempt history is local-only — Phase 8 Supabase wiring persists upstream.
+- No retake count surfaced to the learner UI yet (data is captured, surface is up to Phase 7 polish or 6.3 manager dashboard).
+- `EducationContext` is intentionally not refactored into Zustand — its existing localStorage + StrictMode-safe shape passes 12 tests and works.
+
+**Naming guardrails honored**: HR Basics, Marcus, established personas.
+
+**Next**: Slice 6.3 — Manager Team Training Dashboard. Sarah Chen (manager) sees her team's progress — who's complete, incomplete, overdue, failed — with filter-by-status and per-learner detail. Pulls from assignmentStore + assessmentAttemptStore + EducationContext.
+
+---
+

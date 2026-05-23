@@ -1,9 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import App from '@/App'
 import { useEducation, useMyProgress } from '@/hooks/useEducation'
 import { useAuth } from '@/hooks/useAuth'
+import { useAssignmentStore } from '@/features/assignments/store/assignmentStore'
+import { useAssessmentAttemptStore } from '@/features/progress/store/assessmentAttemptStore'
+import { MOCK_HR_ONBOARDING_ASSIGNMENT } from '@/lib/education'
 
 vi.mock('@/hooks/useEducation', () => ({
   useEducation: vi.fn(),
@@ -55,6 +59,16 @@ describe('Redex Education routes', () => {
         return undefined
       },
       getLessonsForModule: () => [],
+      getMyEnrollments: () => [
+        {
+          id: 'enroll-marcus-hr-basics-001',
+          user_id: 'user-marcus',
+          course_id: 'course-hr-basics-001',
+          status: 'active',
+          progress_percentage: 0,
+          started_at: '2026-05-23T00:00:00.000Z',
+        },
+      ],
       getLessonStatus: () => 'not_started',
       recordLessonProgress: vi.fn(),
     } as never)
@@ -72,6 +86,11 @@ describe('Redex Education routes', () => {
       session: null,
       user: null,
     } as never)
+
+    act(() => {
+      useAssignmentStore.getState().resetAssignments()
+      useAssessmentAttemptStore.getState().resetAttempts()
+    })
   })
 
   afterEach(() => {
@@ -110,6 +129,140 @@ describe('Redex Education routes', () => {
 
     expect(screen.getByText('HR Basics at Redex')).toBeInTheDocument()
     expect(screen.getByText(/No lessons in this module yet/i)).toBeInTheDocument()
+  })
+
+  it('persists quiz attempts from the module player route with enrollment and answers', async () => {
+    const user = userEvent.setup()
+
+    useEducationMock.mockReturnValue({
+      getModule: () => ({
+        id: 'hr-basics-mod-001',
+        course_id: 'course-hr-basics-001',
+        title: 'HR Basics at Redex',
+        order_index: 1,
+        criticality: 'required',
+        estimated_minutes: 20,
+      }),
+      getLessonsForModule: () => [
+        {
+          id: 'hr-basics-lesson-route-quiz',
+          module_id: 'hr-basics-mod-001',
+          title: 'Route Quiz Lesson',
+          lesson_type: 'quiz',
+          criticality: 'required',
+          order_index: 1,
+          estimated_minutes: 1,
+          content: {
+            type: 'quiz',
+            passing_threshold: 80,
+            allow_retakes: true,
+            questions: [
+              {
+                id: 'route-q-1',
+                question: 'Which answer should be persisted?',
+                options: ['Correct answer', 'Wrong answer'],
+                correct_index: 0,
+              },
+            ],
+          },
+        },
+      ],
+      getMyEnrollments: () => [
+        {
+          id: 'enroll-marcus-hr-basics-001',
+          user_id: 'user-marcus',
+          course_id: 'course-hr-basics-001',
+          status: 'active',
+          progress_percentage: 0,
+          started_at: '2026-05-23T00:00:00.000Z',
+        },
+      ],
+      getLessonStatus: () => 'not_started',
+      recordLessonProgress: vi.fn(),
+    } as never)
+
+    renderAt('/learn/player/hr-basics-mod-001')
+
+    await user.click(screen.getByRole('radio', { name: 'Correct answer' }))
+    await user.click(screen.getByRole('button', { name: 'Submit Quiz' }))
+
+    await waitFor(() => {
+      expect(useAssessmentAttemptStore.getState().attempts).toEqual([
+        expect.objectContaining({
+          enrollment_id: 'enroll-marcus-hr-basics-001',
+          lesson_id: 'hr-basics-lesson-route-quiz',
+          score_percent: 100,
+          passed: true,
+          answers: { 'route-q-1': 0 },
+        }),
+      ])
+    })
+  })
+
+  it('marks Marcus HR Basics assignment completed when using sidebar back after module completion', async () => {
+    const user = userEvent.setup()
+    const recordLessonProgress = vi.fn()
+
+    useEducationMock.mockReturnValue({
+      getModule: () => ({
+        id: 'hr-basics-mod-001',
+        course_id: 'course-hr-basics-001',
+        title: 'HR Basics at Redex',
+        order_index: 1,
+        criticality: 'required',
+        estimated_minutes: 20,
+      }),
+      getLessonsForModule: () => [
+        {
+          id: 'hr-basics-lesson-route-test',
+          module_id: 'hr-basics-mod-001',
+          title: 'Route Test Lesson',
+          lesson_type: 'text',
+          criticality: 'required',
+          order_index: 1,
+          estimated_minutes: 1,
+          content: { type: 'text', body_markdown: 'Route test content' },
+        },
+      ],
+      getMyEnrollments: () => [
+        {
+          id: 'enroll-marcus-hr-basics-001',
+          user_id: 'user-marcus',
+          course_id: 'course-hr-basics-001',
+          status: 'active',
+          progress_percentage: 0,
+          started_at: '2026-05-23T00:00:00.000Z',
+        },
+      ],
+      getLessonStatus: () => 'not_started',
+      recordLessonProgress,
+    } as never)
+
+    act(() => {
+      useAssignmentStore.setState({
+        assignments: [{ ...MOCK_HR_ONBOARDING_ASSIGNMENT, status: 'in_progress' }],
+      })
+    })
+
+    renderAt('/learn/player/hr-basics-mod-001')
+
+    await user.click(screen.getByRole('button', { name: /complete module/i }))
+    expect(recordLessonProgress).toHaveBeenCalledWith('hr-basics-lesson-route-test', 'completed')
+    expect(
+      useAssignmentStore
+        .getState()
+        .assignments.find((assignment) => assignment.id === 'assignment-hr-basics-marcus')?.status,
+    ).toBe('completed')
+
+    const sidebarBackButton = screen.getAllByRole('button', { name: /back to dashboard/i }).at(0)
+    expect(sidebarBackButton).toBeDefined()
+    await user.click(sidebarBackButton!)
+
+    expect(
+      useAssignmentStore
+        .getState()
+        .assignments.find((assignment) => assignment.id === 'assignment-hr-basics-marcus')?.status,
+    ).toBe('completed')
   })
 
   it('renders NotFoundPage for unknown paths', () => {

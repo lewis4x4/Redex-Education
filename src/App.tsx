@@ -6,8 +6,11 @@ import { NotFoundPage } from '@/components/layout/NotFoundPage'
 import { RouteLoadingFallback } from '@/components/layout/RouteLoadingFallback'
 import { LearnerDashboardPage } from '@/features/learner/pages/LearnerDashboardPage'
 import { LearnerWelcomePage } from '@/features/learner/pages/LearnerWelcomePage'
+import { useAssignmentStore } from '@/features/assignments/store/assignmentStore'
 import { ModulePlayer } from '@/features/learner/components/ModulePlayer'
+import { useAssessmentAttemptStore } from '@/features/progress/store/assessmentAttemptStore'
 import { useEducation } from '@/hooks/useEducation'
+import { getModuleVersionId } from '@/lib/education/moduleVersions'
 import type { ProgressStatus } from '@/lib/education'
 
 const AdminDashboardPage = lazy(() =>
@@ -88,6 +91,9 @@ function LearnerModuleRoute() {
   const { moduleId = 'hr-basics-mod-001' } = useParams<{ moduleId?: string }>()
   const navigate = useNavigate()
   const education = useEducation()
+  const recordAttempt = useAssessmentAttemptStore((state) => state.recordAttempt)
+  const assignments = useAssignmentStore((state) => state.assignments)
+  const updateAssignmentStatus = useAssignmentStore((state) => state.updateAssignmentStatus)
 
   const routeModule = education.getModule(moduleId)
 
@@ -96,12 +102,31 @@ function LearnerModuleRoute() {
   }
 
   const moduleLessons = education.getLessonsForModule(moduleId)
+  const moduleEnrollment = education.getMyEnrollments().find((enrollment) => enrollment.course_id === routeModule.course_id)
 
   // Live completed lesson ids from the Education Progress Context (localStorage backed)
   // Passed to ModulePlayer so its sidebar + progress bar reflect real persisted state on entry/return.
   const completedLessonIds = moduleLessons
     .filter((lesson) => education.getLessonStatus(lesson.id) === 'completed')
     .map((lesson) => lesson.id)
+
+  const completeActiveAssignment = () => {
+    const moduleVersionId = getModuleVersionId(routeModule.id)
+    const activeAssignment = moduleVersionId
+      ? assignments.find(
+          (assignment) =>
+            assignment.module_version_id === moduleVersionId &&
+            assignment.assignee_user_id === moduleEnrollment?.user_id &&
+            assignment.status !== 'completed',
+        )
+      : undefined
+
+    if (activeAssignment) {
+      updateAssignmentStatus(activeAssignment.id, 'completed')
+    }
+  }
+
+  const completedLessonIdSet = new Set(completedLessonIds)
 
   return (
     <AppShell breadcrumb="Learner flow › Module Player" playerMode>
@@ -112,8 +137,33 @@ function LearnerModuleRoute() {
         completedLessonIds={completedLessonIds}
         onProgressUpdate={(lessonId: string, status: ProgressStatus) => {
           education.recordLessonProgress(lessonId, status)
+
+          const isCompletingModule =
+            status === 'completed' &&
+            moduleLessons.length > 0 &&
+            moduleLessons.every((lesson) => completedLessonIdSet.has(lesson.id) || lesson.id === lessonId)
+
+          if (isCompletingModule) {
+            completeActiveAssignment()
+          }
         }}
-        onCompleteModule={() => navigate('/learn')}
+        onQuizAttempt={(lessonId, attempt) => {
+          if (!moduleEnrollment) {
+            return
+          }
+
+          recordAttempt({
+            enrollment_id: moduleEnrollment.id,
+            lesson_id: lessonId,
+            score_percent: attempt.score,
+            passed: attempt.passed,
+            answers: attempt.answers,
+          })
+        }}
+        onCompleteModule={() => {
+          completeActiveAssignment()
+          navigate('/learn')
+        }}
         onExit={() => navigate('/learn')}
       />
     </AppShell>

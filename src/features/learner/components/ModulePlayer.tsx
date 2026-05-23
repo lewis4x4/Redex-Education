@@ -9,6 +9,10 @@ interface ModulePlayerProps {
   lessons: Lesson[];
   initialLessonId?: string;
   onProgressUpdate?: (lessonId: string, status: ProgressStatus) => void;
+  onQuizAttempt?: (
+    lessonId: string,
+    attempt: { score: number; passed: boolean; answers: Record<string, number> },
+  ) => void;
   onCompleteModule?: () => void;
   onExit?: () => void;
   /** Seed the player's completed lesson UI from persisted EducationContext progress (enables correct state on return from dashboard) */
@@ -29,6 +33,7 @@ export function ModulePlayer({
   lessons,
   initialLessonId,
   onProgressUpdate,
+  onQuizAttempt,
   onCompleteModule,
   onExit,
   completedLessonIds = [],
@@ -106,6 +111,15 @@ export function ModulePlayer({
   const quizHasPassed = currentQuizResult?.passed === true;
   const isQuizLocked = isQuizLesson && !quizHasPassed && !completedLessons.has(currentLesson.id);
 
+  const handleDashboardExit = () => {
+    if (isModuleComplete) {
+      onCompleteModule?.();
+      return;
+    }
+
+    onExit?.();
+  };
+
   const isLessonNavigable = (index: number) => {
     const targetLesson = lessons[index];
 
@@ -147,7 +161,7 @@ export function ModulePlayer({
       {/* Sidebar - Lesson Outline */}
       <div className="w-full max-h-72 border-b bg-slate-50 p-4 overflow-y-auto md:max-h-none md:w-72 md:border-b-0 md:border-r">
         <div className="mb-4">
-          <button onClick={onExit} className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900">
+          <button onClick={handleDashboardExit} className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900">
             <ArrowLeft className="w-4 h-4" /> Back to Dashboard
           </button>
         </div>
@@ -276,7 +290,9 @@ export function ModulePlayer({
               markLessonCompleted(currentLesson.id);
               advanceAfterCompletion();
             }}
-            onQuizComplete={(score, passed) => {
+            onQuizComplete={(score, passed, answers) => {
+              onQuizAttempt?.(currentLesson.id, { score, passed, answers });
+
               // Record result for gating + completion UI
               setQuizResults((prev) => ({
                 ...prev,

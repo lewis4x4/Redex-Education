@@ -12,7 +12,7 @@ vi.mock('./LessonContentRenderer', () => ({
   }: {
     lesson: Lesson;
     onAcknowledge?: () => void;
-    onQuizComplete?: (score: number, passed: boolean) => void;
+    onQuizComplete?: (score: number, passed: boolean, answers: Record<string, number>) => void;
   }) => (
     <div data-testid="lesson-content-renderer">
       Rendering {lesson.id}
@@ -20,7 +20,10 @@ vi.mock('./LessonContentRenderer', () => ({
         <button type="button" onClick={onAcknowledge}>Acknowledge lesson</button>
       )}
       {lesson.content.type === 'quiz' && (
-        <button type="button" onClick={() => onQuizComplete?.(100, true)}>Complete quiz pass</button>
+        <>
+          <button type="button" onClick={() => onQuizComplete?.(100, true, { Q1: 0, Q2: 1 })}>Complete quiz pass</button>
+          <button type="button" onClick={() => onQuizComplete?.(50, false, { Q1: 1, Q2: 1 })}>Complete quiz fail</button>
+        </>
       )}
     </div>
   ),
@@ -222,9 +225,10 @@ describe('Redex Academy learner module player', () => {
     expect(onProgressUpdate).toHaveBeenCalledTimes(1);
   });
 
-  it('shows completion with the calculated final quiz score after a passing quiz', async () => {
+  it('fires onQuizAttempt and shows completion after a passing quiz', async () => {
     const user = userEvent.setup();
     const onProgressUpdate = vi.fn();
+    const onQuizAttempt = vi.fn();
     const quizLesson = makeLesson({
       id: 'lesson-final-quiz',
       title: 'Final Quiz',
@@ -241,15 +245,56 @@ describe('Redex Academy learner module player', () => {
         module={makeModule('hr-basics-mod-001')}
         lessons={[quizLesson]}
         onProgressUpdate={onProgressUpdate}
+        onQuizAttempt={onQuizAttempt}
       />
     );
 
     await user.click(screen.getByRole('button', { name: /complete quiz pass/i }));
 
+    expect(onQuizAttempt).toHaveBeenCalledWith('lesson-final-quiz', {
+      score: 100,
+      passed: true,
+      answers: { Q1: 0, Q2: 1 },
+    });
     expect(onProgressUpdate).toHaveBeenCalledWith('lesson-final-quiz', 'completed');
     expect(screen.getByRole('heading', { name: /you've completed redex academy test module/i })).toBeInTheDocument();
     expect(screen.getByText('100%')).toBeInTheDocument();
     expect(screen.getByText('Passed')).toBeInTheDocument();
+  });
+
+  it('fires onQuizAttempt for a failed quiz without marking the lesson complete', async () => {
+    const user = userEvent.setup();
+    const onProgressUpdate = vi.fn();
+    const onQuizAttempt = vi.fn();
+    const quizLesson = makeLesson({
+      id: 'lesson-final-quiz',
+      title: 'Final Quiz',
+      content: {
+        type: 'quiz',
+        passing_threshold: 80,
+        allow_retakes: true,
+        questions: [],
+      },
+    });
+
+    render(
+      <ModulePlayer
+        module={makeModule('hr-basics-mod-001')}
+        lessons={[quizLesson]}
+        onProgressUpdate={onProgressUpdate}
+        onQuizAttempt={onQuizAttempt}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /complete quiz fail/i }));
+
+    expect(onQuizAttempt).toHaveBeenCalledWith('lesson-final-quiz', {
+      score: 50,
+      passed: false,
+      answers: { Q1: 1, Q2: 1 },
+    });
+    expect(onProgressUpdate).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /pass quiz to continue/i })).toBeDisabled();
   });
 
   it('marks acknowledgment lessons complete and advances after acknowledge callback', async () => {

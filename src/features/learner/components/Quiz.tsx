@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo, useRef, type KeyboardEvent } from 'react';
+import { useState, useMemo, type KeyboardEvent } from 'react';
 import type { Lesson, QuizLessonContent } from '@/lib/education';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, RotateCcw, Award } from 'lucide-react';
 
 interface QuizProps {
   lesson: Lesson;
-  onComplete?: (score: number, passed: boolean) => void;
+  onComplete?: (score: number, passed: boolean, answers: Record<string, number>) => void;
 }
 
 const DEFAULT_PASSING_THRESHOLD = 80;
@@ -16,7 +16,7 @@ const DEFAULT_PASSING_THRESHOLD = 80;
  * - Single-select multiple choice + True/False support (via options + correct_index)
  * - Local state management for selections, submit, scoring + per-question feedback
  * - Clean Redex visual language: #ED1B24 red accents (brand), rounded white cards, crisp typography
- * - Calls onComplete(scorePercent, passed) when submitted (consumer can persist progress)
+ * - Calls onComplete(scorePercent, passed, answers) when submitted (consumer can persist progress)
  * - Retake supported; fully self-contained and reusable
  */
 export function Quiz({ lesson, onComplete }: QuizProps) {
@@ -42,7 +42,6 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [score, setScore] = useState(0);
   const [hasPassed, setHasPassed] = useState(false);
-  const hasNotifiedEmptyQuiz = useRef(false);
 
   const hasNoGradeableQuestions = gradeableQuestions.length === 0;
   // Require answers for every visible question to avoid submit confusion when some prompts are ungraded.
@@ -67,13 +66,6 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
 
     return { score: pct, correctCount, total, rawFraction };
   };
-
-  useEffect(() => {
-    if (hasNoGradeableQuestions && !hasNotifiedEmptyQuiz.current) {
-      hasNotifiedEmptyQuiz.current = true;
-      onComplete?.(0, false);
-    }
-  }, [hasNoGradeableQuestions, onComplete]);
 
   const handleSelect = (questionId: string, optionIndex: number) => {
     if (isSubmitted) return;
@@ -119,7 +111,7 @@ export function Quiz({ lesson, onComplete }: QuizProps) {
     const passed = results.rawFraction >= passingThreshold / 100;
     setHasPassed(passed);
     setIsSubmitted(true);
-    onComplete?.(results.score, passed);
+    onComplete?.(results.score, passed, answers);
   };
 
   const handleRetake = () => {

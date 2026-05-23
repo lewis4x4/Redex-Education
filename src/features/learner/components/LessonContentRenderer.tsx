@@ -9,7 +9,7 @@ import { Quiz } from './Quiz';
 
 interface Props {
   lesson: Lesson;
-  onQuizComplete?: (score: number, passed: boolean) => void;
+  onQuizComplete?: (score: number, passed: boolean, answers: Record<string, number>) => void;
   onAcknowledge?: () => void;
 }
 

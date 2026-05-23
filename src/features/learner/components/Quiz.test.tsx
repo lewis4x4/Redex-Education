@@ -58,7 +58,7 @@ describe('Redex Academy learner quiz — Passing threshold boundary', () => {
     await user.click(screen.getByRole('radio', { name: 'Q4-A' }))
     await user.click(screen.getByRole('button', { name: 'Submit Quiz' }))
 
-    expect(onComplete).toHaveBeenCalledWith(75, false)
+    expect(onComplete).toHaveBeenCalledWith(75, false, { Q1: 0, Q2: 1, Q3: 2, Q4: 0 })
     expect(screen.getByText('RETAKE TO PASS')).toBeInTheDocument()
     expect(screen.queryByText('PASSED')).not.toBeInTheDocument()
   })
@@ -83,13 +83,13 @@ describe('Redex Academy learner quiz — Passing threshold boundary', () => {
     await user.click(screen.getByRole('radio', { name: 'Q4-D' }))
     await user.click(screen.getByRole('button', { name: 'Submit Quiz' }))
 
-    expect(onComplete).toHaveBeenCalledWith(100, true)
+    expect(onComplete).toHaveBeenCalledWith(100, true, { Q1: 0, Q2: 1, Q3: 2, Q4: 3 })
     expect(screen.getByText('PASSED')).toBeInTheDocument()
   })
 })
 
 describe('Redex Academy learner quiz — 0-question authoring error', () => {
-  it('renders Quiz unavailable and only notifies once for no gradeable questions', () => {
+  it('renders Quiz unavailable without firing a learner completion attempt', () => {
     const onComplete = vi.fn()
     const lesson = makeQuizLesson({
       questions: [
@@ -103,11 +103,10 @@ describe('Redex Academy learner quiz — 0-question authoring error', () => {
     const { rerender } = render(<Quiz lesson={lesson} onComplete={onComplete} />)
 
     expect(screen.getByRole('heading', { name: 'Quiz unavailable' })).toBeInTheDocument()
-    expect(onComplete).toHaveBeenCalledTimes(1)
-    expect(onComplete).toHaveBeenCalledWith(0, false)
+    expect(onComplete).not.toHaveBeenCalled()
 
     rerender(<Quiz lesson={lesson} onComplete={onComplete} />)
-    expect(onComplete).toHaveBeenCalledTimes(1)
+    expect(onComplete).not.toHaveBeenCalled()
   })
 })
 
@@ -134,7 +133,7 @@ describe('Redex Academy learner quiz — Invalid correct_index filtering', () =>
     await user.click(screen.getByRole('radio', { name: 'Q4-A' }))
     await user.click(screen.getByRole('button', { name: 'Submit Quiz' }))
 
-    expect(onComplete).toHaveBeenCalledWith(100, true)
+    expect(onComplete).toHaveBeenCalledWith(100, true, { Q1: 0, Q2: 0, Q3: 1, Q4: 0 })
   })
 })
 
@@ -285,6 +284,23 @@ describe('Redex Academy learner quiz — Keyboard accessibility', () => {
 })
 
 describe('Redex Academy learner quiz — onComplete invariants', () => {
+  it('includes selected option indices keyed by question id in the completion payload', async () => {
+    const user = userEvent.setup()
+    const onComplete = vi.fn()
+    const lesson = makeQuizLesson({
+      questions: [makeQuestion('Q1', 0), makeQuestion('Q2', 1), makeQuestion('Q3', 2)],
+    })
+
+    render(<Quiz lesson={lesson} onComplete={onComplete} />)
+
+    await user.click(screen.getByRole('radio', { name: 'Q1-B' }))
+    await user.click(screen.getByRole('radio', { name: 'Q2-C' }))
+    await user.click(screen.getByRole('radio', { name: 'Q3-D' }))
+    await user.click(screen.getByRole('button', { name: 'Submit Quiz' }))
+
+    expect(onComplete).toHaveBeenCalledWith(0, false, { Q1: 1, Q2: 2, Q3: 3 })
+  })
+
   it('fires exactly once per submit and not on retake', async () => {
     const user = userEvent.setup()
     const onComplete = vi.fn()
