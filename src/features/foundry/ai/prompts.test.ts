@@ -26,6 +26,7 @@ const EXPECTED_PROMPT_VERSIONS = {
   self_critique: 'v1',
   regenerate_with_fixes: 'v1',
   regenerate_section: 'v1',
+  entailment_check: 'v1',
 } as const satisfies Record<PromptKey, string>
 
 const EXPECTED_PROMPT_KEYS = Object.keys(EXPECTED_PROMPT_VERSIONS) as PromptKey[]
@@ -92,7 +93,7 @@ describe('PROMPT_REGISTRY', () => {
   })
 
   it('locks the registry count', () => {
-    expect(listPrompts()).toHaveLength(16)
-    expect(listPrompts().length).toMatchInlineSnapshot(`16`)
+    expect(listPrompts()).toHaveLength(17)
+    expect(listPrompts().length).toMatchInlineSnapshot(`17`)
   })
 })

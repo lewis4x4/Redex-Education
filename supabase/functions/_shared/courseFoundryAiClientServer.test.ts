@@ -95,6 +95,42 @@ if (typeof Deno !== "undefined") {
     }
   });
 
+  Deno.test("server AI client checks entailment with mocked provider output", async () => {
+    const originalFetch = globalThis.fetch;
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    Deno.env.set("AI_PROVIDER", "anthropic");
+    Deno.env.set("AI_PROVIDER_API_KEY", "test-key");
+    Deno.env.set("AI_MODEL", "claude-test");
+    globalThis.fetch = ((url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init });
+      return Promise.resolve(new Response(JSON.stringify({
+        content: [{ type: "text", text: JSON.stringify({
+          entailed: false,
+          confidence: "high",
+          reasoning: "The claim adds a response deadline not present in the source.",
+        }) }],
+        usage: { input_tokens: 500, output_tokens: 50 },
+      }), { status: 200 }));
+    }) as typeof fetch;
+
+    try {
+      const result = await createCourseFoundryAiClientServer().checkEntailment({
+        claim: "Employees must respond within one hour.",
+        sourceSection: { id: "section-1", heading: "Communications", body: "Employees should use business hours for routine messages." },
+      });
+
+      assertEquals(result.output.entailed, false);
+      assertEquals(result.output.confidence, "high");
+      assertEquals(result.prompt_version, "entailment_check@v1");
+      assert(String(calls[0]?.init?.body).includes("temperature"), "entailment calls should request deterministic judging");
+    } finally {
+      globalThis.fetch = originalFetch;
+      Deno.env.delete("AI_PROVIDER");
+      Deno.env.delete("AI_PROVIDER_API_KEY");
+      Deno.env.delete("AI_MODEL");
+    }
+  });
+
   Deno.test("server AI client throws clearly when provider key is missing", async () => {
     Deno.env.set("AI_PROVIDER", "anthropic");
     Deno.env.delete("AI_PROVIDER_API_KEY");

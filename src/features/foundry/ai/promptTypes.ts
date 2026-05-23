@@ -25,6 +25,7 @@ export type PromptKey =
   | 'self_critique'
   | 'regenerate_with_fixes'
   | 'regenerate_section'
+  | 'entailment_check'
 
 /**
  * A complete prompt definition. Stored in the registry and referenced

@@ -299,6 +299,23 @@ const PROMPT_HISTORY = {
       ],
     }),
   ],
+  entailment_check: [
+    prompt('entailment_check', 'v1', {
+      description:
+        'Judge whether one cited source section entails one generated claim without adding outside knowledge.',
+      system: [
+        REDEX_POLICY_GUARDRAIL,
+        JSON_OUTPUT_RULE,
+        'You are a strict grounding judge. Decide whether the supplied source section ENTAILS the generated claim. Use only the section text. Return entailed=false when the claim adds policy, timing, people, obligations, exceptions, or certainty not present in the source. Provide one concise sentence of reasoning.',
+      ].join('\n\n'),
+      userTemplate:
+        'Does this source section entail the claim? Return EntailmentCheckOutput.\n\nClaim:\n{{claim}}\n\nSource section:\n{{sourceSection}}',
+      requiredVariables: ['claim', 'sourceSection'],
+      outputSchemaName: 'EntailmentCheckOutput',
+      requiresCitations: false,
+      enforcedRules: ['No outside knowledge', 'Strict entailment only'],
+    }),
+  ],
 } as const satisfies Record<PromptKey, readonly PromptDefinition[]>
 
 const latestPrompt = (key: PromptKey): PromptDefinition => {

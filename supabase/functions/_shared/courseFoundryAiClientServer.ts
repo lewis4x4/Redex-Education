@@ -23,7 +23,8 @@ type PromptKey =
   | "assessment_generation"
   | "self_critique"
   | "regenerate_with_fixes"
-  | "regenerate_section";
+  | "regenerate_section"
+  | "entailment_check";
 
 interface PromptDefinition {
   id: { key: PromptKey; version: "v1" };
@@ -80,6 +81,17 @@ export interface RegenerateSectionInput {
   sources: unknown;
 }
 
+export interface EntailmentCheckInput {
+  claim: string;
+  sourceSection: { id: string; heading: string; body: string };
+}
+
+export interface EntailmentCheckOutput {
+  entailed: boolean;
+  confidence: "high" | "low";
+  reasoning: string;
+}
+
 const JSON_OUTPUT_RULE = "Return only valid JSON matching the requested schema. Do not wrap the JSON in markdown fences.";
 const REDEX_POLICY_GUARDRAIL = "You generate Redex Education training drafts only from supplied Redex source material. Do not invent Redex policy.";
 
@@ -118,6 +130,11 @@ const PROMPTS: Record<PromptKey, PromptDefinition> = {
     id: { key: "regenerate_section", version: "v1" },
     system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nRegenerate only lessons bound to the target source section. Do not alter unrelated lessons.`,
     user: "Regenerate the target source section and return RegenerateSectionOutput.\n\nInput JSON:\n{{input}}",
+  },
+  entailment_check: {
+    id: { key: "entailment_check", version: "v1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nYou are a strict grounding judge. Decide whether the source section ENTAILS the generated claim. Use only the section text. Return entailed=false when the claim adds policy, timing, people, obligations, exceptions, or certainty not present in the source. Provide one concise sentence of reasoning.`,
+    user: "Does the source section below ENTAIL the claim? Return EntailmentCheckOutput.\n\nInput JSON:\n{{input}}",
   },
 };
 
@@ -283,6 +300,12 @@ export const RegenerateSectionOutputSchema = z.object({
   newReviewItems: z.array(LessonReviewItemSchema),
 });
 
+export const EntailmentCheckOutputSchema = z.object({
+  entailed: z.boolean(),
+  confidence: z.enum(["high", "low"]),
+  reasoning: z.string(),
+});
+
 type AnthropicResponse = {
   content?: Array<{ type?: string; text?: string }>;
   usage?: { input_tokens?: number; output_tokens?: number };
@@ -373,7 +396,8 @@ async function callAnthropic(prompt: PromptDefinition, input: unknown): Promise<
     },
     body: JSON.stringify({
       model,
-      max_tokens: Number(Deno.env.get("AI_MAX_TOKENS") ?? 4096),
+      max_tokens: prompt.id.key === "entailment_check" ? 256 : Number(Deno.env.get("AI_MAX_TOKENS") ?? 4096),
+      temperature: prompt.id.key === "entailment_check" ? 0 : undefined,
       system: prompt.system,
       messages: [{ role: "user", content: userPrompt }],
     }),
@@ -426,6 +450,7 @@ async function callOpenAi(prompt: PromptDefinition, input: unknown): Promise<{ t
         { role: "user", content: userPrompt },
       ],
       text: { format: { type: "json_object" } },
+      temperature: prompt.id.key === "entailment_check" ? 0 : undefined,
     }),
   });
   const payload = await readJsonResponse<OpenAiResponse>(response);
@@ -477,6 +502,7 @@ export interface CourseFoundryAiClientServer {
   critiqueModule(input: CritiqueModuleInput): Promise<CostedAiResult<z.infer<typeof CritiqueModuleOutputSchema>>>;
   regenerateWithFixes(input: RegenerateWithFixesInput): Promise<CostedAiResult<z.infer<typeof RegenerateWithFixesOutputSchema>>>;
   regenerateSection(input: RegenerateSectionInput): Promise<CostedAiResult<z.infer<typeof RegenerateSectionOutputSchema>>>;
+  checkEntailment(input: EntailmentCheckInput): Promise<CostedAiResult<EntailmentCheckOutput>>;
 }
 
 export function createCourseFoundryAiClientServer(): CourseFoundryAiClientServer {
@@ -501,6 +527,9 @@ export function createCourseFoundryAiClientServer(): CourseFoundryAiClientServer
     },
     regenerateSection(input) {
       return invokeProvider("regenerate_section", input, RegenerateSectionOutputSchema);
+    },
+    async checkEntailment(input) {
+      return invokeProvider("entailment_check", input, EntailmentCheckOutputSchema);
     },
   };
 }

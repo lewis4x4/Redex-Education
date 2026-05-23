@@ -1,14 +1,25 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   createCourseFoundryAiClientServer,
   ProviderNotConfiguredError,
   type CostedAiResult,
 } from "../_shared/courseFoundryAiClientServer.ts";
+import {
+  writeSourceBindings,
+  type CitedClaim,
+  type GeneratedModulePreview,
+  type SourceBindingWriteResult,
+  type SourceSection,
+  type UnsupportedClaimReport,
+} from "../_shared/sourceBindingsWriter.ts";
+
+type RedexSupabaseClient = SupabaseClient<any, "public", "redex", any, any>;
 
 const STAGES = [
   "parse",
   "outline",
   "generate_lessons",
+  "source_binding",
   "generate_assessments",
   "self_critique",
   "assemble",
@@ -107,7 +118,7 @@ function baseInput(job: GenerationJobRow): Record<string, unknown> {
 
 function relevantStages(job: GenerationJobRow): StageName[] {
   if (job.job_type === "section") {
-    return ["parse", "generate_lessons", "self_critique", "assemble"];
+    return ["parse", "generate_lessons", "source_binding", "self_critique", "assemble"];
   }
 
   switch (operationFor(job)) {
@@ -116,15 +127,15 @@ function relevantStages(job: GenerationJobRow): StageName[] {
     case "generateOutline":
       return ["parse", "outline", "assemble"];
     case "generateLessons":
-      return ["generate_lessons", "assemble"];
+      return ["generate_lessons", "source_binding", "assemble"];
     case "generateAssessment":
       return ["generate_assessments", "assemble"];
     case "critiqueModule":
       return ["self_critique", "assemble"];
     case "regenerateWithFixes":
-      return ["generate_lessons", "self_critique", "assemble"];
+      return ["generate_lessons", "source_binding", "self_critique", "assemble"];
     case "regenerateSection":
-      return ["parse", "generate_lessons", "self_critique", "assemble"];
+      return ["parse", "generate_lessons", "source_binding", "self_critique", "assemble"];
     default:
       return [...STAGES];
   }
@@ -203,22 +214,38 @@ function stageOutputKey(stage: StageName): string {
   return stage;
 }
 
+function isGeneratedModulePreview(value: unknown): value is GeneratedModulePreview {
+  return isRecord(value) && Array.isArray(value.lessons) && typeof value.module_title === "string";
+}
+
+function boundGeneratedModule(outputs: Record<string, unknown>): unknown {
+  const sourceBinding = outputs.source_binding;
+
+  if (isRecord(sourceBinding) && isGeneratedModulePreview(sourceBinding.generated_module)) {
+    return sourceBinding.generated_module;
+  }
+
+  return outputs.generate_lessons;
+}
+
 function finalOutput(job: GenerationJobRow, outputs: Record<string, unknown>): unknown {
+  const generatedModule = boundGeneratedModule(outputs);
+
   switch (operationFor(job)) {
     case "analyzeSource":
       return outputs.parse;
     case "generateOutline":
       return outputs.outline;
     case "generateLessons":
-      return outputs.generate_lessons;
+      return generatedModule;
     case "generateAssessment":
       return outputs.generate_assessments;
     case "critiqueModule":
       return outputs.self_critique;
     case "regenerateWithFixes":
-      return outputs.generate_lessons;
+      return generatedModule;
     case "regenerateSection":
-      return outputs.generate_lessons;
+      return generatedModule;
     default:
       return {
         module_id: job.module_id,
@@ -226,14 +253,245 @@ function finalOutput(job: GenerationJobRow, outputs: Record<string, unknown>): u
         target_section_id: job.target_section_id,
         parse: outputs.parse ?? null,
         outline: outputs.outline ?? null,
-        lessons: outputs.generate_lessons ?? null,
+        lessons: generatedModule ?? null,
+        source_binding: outputs.source_binding ?? null,
         assessments: outputs.generate_assessments ?? null,
         self_critique: outputs.self_critique ?? null,
       };
   }
 }
 
-async function runAiStage(job: GenerationJobRow, stage: StageName): Promise<CostedAiResult<unknown>> {
+function sourceSectionsFromValue(value: unknown): SourceSection[] {
+  if (Array.isArray(value)) {
+    return value.flatMap(sourceSectionsFromValue);
+  }
+
+  if (!isRecord(value)) {
+    return [];
+  }
+
+  const ownSection = typeof value.id === "string" && typeof value.body === "string" && typeof value.heading === "string"
+    ? [value as unknown as SourceSection]
+    : [];
+  const nestedSections = Array.isArray(value.sections) ? sourceSectionsFromValue(value.sections) : [];
+  const sourceSections = Array.isArray(value.sourceSections) ? sourceSectionsFromValue(value.sourceSections) : [];
+  const snakeSourceSections = Array.isArray(value.source_sections) ? sourceSectionsFromValue(value.source_sections) : [];
+
+  return [...ownSection, ...nestedSections, ...sourceSections, ...snakeSourceSections];
+}
+
+function markerText(reasons: string[]): string {
+  return uniqueStrings(reasons).map((reason) => `[NEEDS_REVIEW: ${reason}]`).join(" ");
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values)];
+}
+
+function unsupportedReportsByLesson(reports: UnsupportedClaimReport[]): Map<string, UnsupportedClaimReport[]> {
+  const byLesson = new Map<string, UnsupportedClaimReport[]>();
+
+  for (const report of reports) {
+    const key = `${report.module_index}:${report.lesson_index}`;
+    byLesson.set(key, [...(byLesson.get(key) ?? []), report]);
+  }
+
+  return byLesson;
+}
+
+function annotateGeneratedModule(
+  module: GeneratedModulePreview,
+  unsupportedClaims: UnsupportedClaimReport[],
+  entailmentFailures: CitedClaim[],
+  placeholderLessonKeys: Set<string>,
+): GeneratedModulePreview {
+  const unsupportedByLesson = unsupportedReportsByLesson(unsupportedClaims);
+  const failedByLesson = unsupportedReportsByLesson(entailmentFailures.map((claim) => ({ ...claim, reason: "missing_citation" })));
+
+  return {
+    ...module,
+    lessons: module.lessons.map((lesson) => {
+      const key = `${lesson.module_index}:${lesson.lesson_index}`;
+      const lessonUnsupported = unsupportedByLesson.get(key) ?? [];
+      const lessonFailures = failedByLesson.get(key) ?? [];
+      const reasons = [
+        ...lessonUnsupported.map((report) => report.reason),
+        ...lessonFailures.map(() => "entailment_failed"),
+        ...(placeholderLessonKeys.has(key) ? ["source_placeholder"] : []),
+      ];
+
+      if (reasons.length === 0) {
+        return lesson;
+      }
+
+      const marker = markerText(reasons);
+      const nextStatus = placeholderLessonKeys.has(key) ? "missing_source" : "unsupported_claim";
+      const annotatedBody = lesson.body_markdown && lessonFailures[0]?.claim && lesson.body_markdown.includes(lessonFailures[0].claim)
+        ? lesson.body_markdown.replace(lessonFailures[0].claim, `${lessonFailures[0].claim} [NEEDS_REVIEW: entailment_failed]`)
+        : lesson.body_markdown;
+
+      return {
+        ...lesson,
+        body_markdown: annotatedBody,
+        status: nextStatus,
+        status_note: [lesson.status_note, marker].filter(Boolean).join(" "),
+      };
+    }),
+  };
+}
+
+function assessmentModulePreview(output: unknown): GeneratedModulePreview | null {
+  if (!isRecord(output) || !Array.isArray(output.questions)) {
+    return null;
+  }
+
+  return {
+    module_title: "Generated assessment",
+    generated_at: new Date().toISOString(),
+    is_complete: true,
+    lessons: [{
+      lesson_index: 0,
+      module_index: 0,
+      title: "Generated assessment questions",
+      lesson_type: "quiz",
+      quiz_questions: output.questions
+        .filter((question): question is { id: string; question: string; options: string[] } =>
+          isRecord(question) && typeof question.id === "string" && typeof question.question === "string" && Array.isArray(question.options) && question.options.every((option) => typeof option === "string")
+        ),
+      status: "draft",
+    }],
+  };
+}
+
+function publishBlockersFor(params: {
+  result: SourceBindingWriteResult;
+  entailmentFailures: CitedClaim[];
+}): Array<Record<string, unknown>> {
+  const blockers: Array<Record<string, unknown>> = [];
+
+  for (const report of params.result.unsupportedClaims) {
+    blockers.push({
+      id: `unsupported-${report.module_index}-${report.lesson_index}-${blockers.length}`,
+      source: "lesson_unsupported_claim",
+      severity: "blocker",
+      location: report.lesson_title,
+      summary: "Generated claim is missing a resolvable source citation.",
+      detail: report.claim,
+    });
+  }
+
+  for (const claim of params.entailmentFailures) {
+    blockers.push({
+      id: `entailment-${claim.module_index}-${claim.lesson_index}-${blockers.length}`,
+      source: "lesson_unsupported_claim",
+      severity: "blocker",
+      location: claim.lesson_title,
+      summary: "Cited section did not entail the generated claim.",
+      detail: claim.claim,
+    });
+  }
+
+  for (const sectionId of params.result.placeholderSectionIds) {
+    blockers.push({
+      id: `placeholder-${sectionId}`,
+      source: "source_placeholder",
+      severity: "blocker",
+      location: sectionId,
+      summary: "Cited source section contains placeholder content.",
+      detail: "Replace the source section with approved language before publish.",
+    });
+  }
+
+  return blockers;
+}
+
+async function runSourceBindingStage(
+  job: GenerationJobRow,
+  supabase: RedexSupabaseClient,
+): Promise<CostedAiResult<unknown>> {
+  const aiClient = createCourseFoundryAiClientServer();
+  const input = baseInput(job);
+  const outputs = outputPayload(job);
+  const generatedModule = boundGeneratedModule(outputs);
+
+  if (!isGeneratedModulePreview(generatedModule)) {
+    throw new EdgeFunctionError("missing_generated_module", "source_binding requires generate_lessons output.", 500);
+  }
+
+  const result = await writeSourceBindings({
+    supabase,
+    moduleId: job.module_id,
+    generatedModule,
+    sourceSections: sourceSectionsFromValue(input.sources ?? input.sourceSections ?? input.source_sections ?? {}),
+  });
+  const sectionById = new Map(result.resolvedSourceSections.map((section) => [section.id, section]));
+  const entailmentResults: Array<Record<string, unknown>> = [];
+  const entailmentFailures: CitedClaim[] = [];
+  let entailmentCost = 0;
+  let estimatedEntailmentCost = 0;
+
+  for (const claim of result.claims) {
+    for (const sectionId of claim.section_ids) {
+      const section = sectionById.get(sectionId);
+
+      if (!section) {
+        continue;
+      }
+
+      const entailment = await aiClient.checkEntailment({
+        claim: claim.claim,
+        sourceSection: { id: section.id, heading: section.heading, body: section.body },
+      });
+      entailmentCost += entailment.cost_cents;
+      estimatedEntailmentCost += entailment.estimated_cost_cents;
+      entailmentResults.push({
+        ...claim,
+        source_section_id: section.id,
+        entailed: entailment.output.entailed,
+        confidence: entailment.output.confidence,
+        reasoning: entailment.output.reasoning,
+        cost_cents: entailment.cost_cents,
+      });
+
+      if (!entailment.output.entailed) {
+        entailmentFailures.push(claim);
+      }
+    }
+  }
+
+  const placeholderLessonKeys = new Set<string>();
+  for (const claim of result.claims) {
+    if (claim.section_ids.some((sectionId) => result.placeholderSectionIds.includes(sectionId))) {
+      placeholderLessonKeys.add(`${claim.module_index}:${claim.lesson_index}`);
+    }
+  }
+
+  const annotatedModule = annotateGeneratedModule(
+    generatedModule,
+    result.unsupportedClaims,
+    entailmentFailures,
+    placeholderLessonKeys,
+  );
+
+  return {
+    output: {
+      writtenCount: result.writtenCount,
+      flaggedConflicts: result.flaggedConflicts,
+      unsupportedClaims: result.unsupportedClaims,
+      placeholderSectionIds: result.placeholderSectionIds,
+      has_placeholders: result.placeholderSectionIds.length > 0,
+      publish_blockers: publishBlockersFor({ result, entailmentFailures }),
+      entailment_results: entailmentResults,
+      generated_module: annotatedModule,
+    },
+    cost_cents: entailmentCost,
+    estimated_cost_cents: estimatedEntailmentCost,
+    model_used: job.model_used ?? "source-binding",
+    prompt_version: "source_binding@v1",
+  };
+}
+
+async function runAiStage(job: GenerationJobRow, stage: StageName, supabase: RedexSupabaseClient): Promise<CostedAiResult<unknown>> {
   const aiClient = createCourseFoundryAiClientServer();
   const input = baseInput(job);
   const outputs = outputPayload(job);
@@ -271,14 +529,42 @@ async function runAiStage(job: GenerationJobRow, stage: StageName): Promise<Cost
         sources: input.sources ?? {},
         targetSectionId: job.target_section_id,
       });
-    case "generate_assessments":
-      return aiClient.generateAssessment({
-        module: input.module ?? outputs.generate_lessons ?? {},
+    case "source_binding":
+      return runSourceBindingStage(job, supabase);
+    case "generate_assessments": {
+      const assessment = await aiClient.generateAssessment({
+        module: input.module ?? boundGeneratedModule(outputs) ?? {},
         sources: input.sources ?? {},
       });
+      const assessmentModule = assessmentModulePreview(assessment.output);
+
+      if (!assessmentModule) {
+        return assessment;
+      }
+
+      const assessmentBinding = await writeSourceBindings({
+        supabase,
+        moduleId: job.module_id,
+        generatedModule: assessmentModule,
+        sourceSections: sourceSectionsFromValue(input.sources ?? input.sourceSections ?? input.source_sections ?? {}),
+      });
+
+      return {
+        ...assessment,
+        output: {
+          ...assessment.output,
+          source_binding: {
+            writtenCount: assessmentBinding.writtenCount,
+            flaggedConflicts: assessmentBinding.flaggedConflicts,
+            unsupportedClaims: assessmentBinding.unsupportedClaims,
+            placeholderSectionIds: assessmentBinding.placeholderSectionIds,
+          },
+        },
+      };
+    }
     case "self_critique":
       return aiClient.critiqueModule({
-        module: input.module ?? outputs.generate_lessons ?? {},
+        module: input.module ?? boundGeneratedModule(outputs) ?? {},
         sources: input.sources ?? {},
         assessments: input.assessments ?? outputs.generate_assessments ?? null,
       });
@@ -375,7 +661,7 @@ Deno.serve(async (request) => {
     }
 
     try {
-      const result = await runAiStage(job, stage);
+      const result = await runAiStage(job, stage, supabase);
       const completedAt = new Date().toISOString();
       const nextOutputs = { ...outputs, [stageOutputKey(stage)]: result.output };
       const nextCostBreakdown = { ...costBreakdown, [stage]: result.cost_cents };

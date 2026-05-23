@@ -13,6 +13,7 @@
     "typecheck": "tsc -b --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
+    "eval": "vitest run src/features/foundry/ai/evals --reporter=verbose",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },

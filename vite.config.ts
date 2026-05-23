@@ -30,6 +30,7 @@ const config: import('vite').UserConfig & { test: import('vitest').InlineConfig 
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    include: ['src/**/*.{test,spec}.{ts,tsx}', 'src/features/foundry/ai/evals/*.eval.ts'],
     css: false,
     coverage: {
       provider: 'v8',

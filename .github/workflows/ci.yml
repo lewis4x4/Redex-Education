@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test -- --run
+
+      - name: Build
+        run: npm run build
+
+      - name: Deno edge checks
+        run: deno check supabase/functions/_shared/sourceBindingsWriter.ts supabase/functions/_shared/courseFoundryAiClientServer.ts supabase/functions/generation-worker/index.ts
+
+      - name: Deno edge tests
+        run: deno test --allow-env --allow-net=esm.sh --allow-read=supabase/functions/generation-worker/index.ts supabase/functions/_shared/courseFoundryAiClientServer.test.ts supabase/functions/_shared/sourceBindingsWriter.test.ts supabase/functions/generation-worker/index.test.ts
+
+      - name: Eval harness
+        run: npm run eval

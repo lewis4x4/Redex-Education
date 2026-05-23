@@ -4027,3 +4027,58 @@ Slice C turns the Slice B real AI stub into a durable server-side generation job
 
 ---
 
+## 2026-05-23 — AI Slice D: Real Generation Wiring, Source Bindings & Eval Harness
+
+**Status**: ✅ Completed. Source binding writer, entailment judge, worker integration, eval CI hook, and generation-worker redeploy are complete. No DB migration was added; the existing `redex.module_source_bindings` table is reused.
+
+**Files touched**:
+- `supabase/functions/_shared/sourceBindingsWriter.ts` — parses `[source: <section_id>]` citations from generated lesson/question text, resolves UUID ids or `source_sections.slug` tokens, ranks by authority, upserts `module_source_bindings`, flags explicit equal-authority conflicts, reports unsupported/orphaned claims, and detects placeholders.
+- `supabase/functions/_shared/courseFoundryAiClientServer.ts` — adds `entailment_check@v1` and `checkEntailment()`.
+- `supabase/functions/generation-worker/index.ts` — adds `source_binding` stage, lesson entailment checks, publish blockers, annotated generated-module output, and assessment question binding during assessment generation.
+- `src/features/foundry/ai/evals/*` — mock-default eval harness; `EVAL_USE_REAL_AI=true` opt-in is supported for operator-run real evals.
+- `src/features/foundry/ai/{promptTypes.ts,prompts.ts,prompts.test.ts}` — registers the 17th prompt, `entailment_check`.
+- `src/features/foundry/ai/mockAiClient.ts` and `src/features/foundry/data/mockGeneratedModule.ts` — source-absent refusal fixture and source-cited mock lesson/question content.
+- `.github/workflows/ci.yml`, `package.json`, `vite.config.ts`, `deno.lock` — CI/eval/test wiring.
+- New Deno tests: `sourceBindingsWriter.test.ts`, `generation-worker/index.test.ts`; server AI test extended.
+
+**Migration changes**: None. `generation_jobs.stage_map` is extended in worker code through `ensureStageMap()`, so existing jobs receive `source_binding` without a migration. `supabase db push --linked` was not run.
+
+**Eval thresholds + current scores** (`npm run eval`, mock default):
+- ✅ Grounding rate — threshold ≥95%, actual **100%**.
+- ✅ Placeholder-detection recall — threshold ≥90%, actual **100%**.
+- ✅ JSON-schema validity — threshold 100%, actual **100%**.
+- ✅ Refusal correctness — threshold ≥99%, actual **100%**.
+
+**Verification**:
+- ✅ `npm run typecheck -- --pretty false` — green.
+- ✅ `npm run lint` — 0 errors / 0 warnings.
+- ✅ `npm test -- --run` — **619 passed, 110 test files** (**+4 Vitest tests** versus AI Slice C's 615 baseline).
+- ✅ `npm run eval` — **4 passed**, all thresholds above.
+- ✅ Deno check for source writer, server AI client, and worker — green.
+- ✅ Deno tests — **10 passed** (**+7 Deno tests** versus Slice C's 3-test Deno baseline).
+- ✅ `npm run build` — green.
+- ✅ Oracle review pass completed; follow-ups applied for slug citation fallback, equal-authority conflict over-flagging, CI Deno coverage, and assessment question binding.
+- ✅ `supabase functions deploy generation-worker --no-verify-jwt` — deployed to Redex_App (`toghxeuhgkcrbrdxewdw`).
+
+**Deploy results**:
+- `generation-worker` redeployed successfully with JWT verification disabled for cron/service-role invocation.
+- Supabase CLI noted an available upgrade (`v2.101.0`; installed `v2.98.2`), but deploy succeeded.
+
+**Manual operator steps required**:
+1. Default CI evals use `mockAiClient` and require no provider secret.
+2. To run cost-controlled real eval mode locally, set real Supabase/provider environment first, then run:
+   ```bash
+   EVAL_USE_REAL_AI=true npm run eval
+   ```
+   Do not enable real eval mode in CI unless an operator explicitly accepts provider cost and has seeded representative source data.
+3. Future real provider prompts should cite actual `redex.source_sections.id` UUIDs or stable `slug` values; UUID ids are preferred.
+
+**Known scope / remaining risks**:
+- `module_source_bindings` remains module/section-level because the existing table has no persisted claim/question identity columns. The worker now parses lesson/question claims and writes source-section rows, but true per-claim granularity needs a future additive schema.
+- Assessment question binding depends on assessment outputs containing `[source: ...]` citations; uncited assessment text is reported unsupported when passed through binding.
+- Entailment checks are only as reliable as the configured provider and source-section text; human review remains required for failed/low-confidence claims.
+
+**Next**: Part 1 finish line acceptance. Pilot prep begins (Phase 10 starts pending pilot acceptance).
+
+---
+

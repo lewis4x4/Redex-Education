@@ -126,7 +126,26 @@ export const mockAiClient: CourseFoundryAiClient = {
     return validateAiOutput(GenerateOutlineOutputSchema, cloneJson(MOCK_GENERATED_OUTLINE));
   },
 
-  async generateLessons() {
+  async generateLessons(input) {
+    if (input.sources.id === 'source-absent-eval') {
+      return validateAiOutput(GenerateLessonsOutputSchema, {
+        module_title: MOCK_GENERATED_MODULE.module_title,
+        lessons: [
+          {
+            lesson_index: 0,
+            module_index: 0,
+            title: 'Missing source blocker',
+            lesson_type: 'text',
+            body_markdown: '',
+            status: 'missing_source',
+            status_note: 'Missing source: generation refused instead of fabricating Redex policy.',
+          },
+        ],
+        generated_at: new Date().toISOString(),
+        is_complete: false,
+      });
+    }
+
     return validateAiOutput(GenerateLessonsOutputSchema, cloneJson(MOCK_GENERATED_MODULE));
   },
 
