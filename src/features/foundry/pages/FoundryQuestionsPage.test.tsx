@@ -78,7 +78,7 @@ describe('FoundryQuestionsPage', () => {
     expect(screen.getByRole('form', { name: /setup questions wizard/i })).toBeInTheDocument()
   })
 
-  it('submits wizard values, writes setupAnswers to store, shows toast, and enables continue button', async () => {
+  it('submits wizard values, writes setupAnswers to store, shows toast, and navigates to outline', async () => {
     const user = userEvent.setup()
     renderWithRoutes()
 
@@ -111,10 +111,6 @@ describe('FoundryQuestionsPage', () => {
     expect(useFoundryDraftStore.getState().setupAnswers?.updated_at).toEqual(expect.any(String))
     expect(toastSuccessMock).toHaveBeenCalledWith('Setup answers saved')
 
-    const continueButton = await screen.findByRole('button', { name: /continue.*outline preview/i })
-    expect(continueButton).toBeEnabled()
-
-    await user.click(continueButton)
     expect(await screen.findByText('Outline route reached')).toBeInTheDocument()
   })
 })

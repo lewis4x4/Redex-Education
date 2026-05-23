@@ -3110,3 +3110,50 @@ Slice 5.2 registered HR Basics in `DEMO_MODULES` but the learner-side flow still
 
 ---
 
+## 2026-05-22 — Slice 5.4: End-to-End HR Admin Foundry Flow
+
+**Status**: ✅ Completed.
+
+**Master roadmap**: Phase 5 / Slice 5.4.
+**Linear ticket**: `HR Prototype: complete end-to-end admin Course Foundry flow`.
+
+**Context**:
+Phase 3 built each Foundry page in isolation. This slice closes the remaining gaps so an admin can walk the full chain start → source → questions → outline → preview → critique → side-by-side → blockers → **publish** → confirmation, all targeting HR Basics, with publish gated by blockers that resolve against real HR Basics mock data.
+
+**Orchestration**: Read-only explore probe (Claude Code · sonnet:high) for a page-by-page inventory of current state → single pair agent (Codex CLI · gpt-5.5 high) for implementation + tests. No parallelization — publish lifecycle, reactive store wiring, navigation chain, and tests were tightly coupled.
+
+**Files touched**:
+- `src/features/foundry/store/foundryDraftStore.ts` — added `publishStatus: 'draft' | 'ready_to_publish' | 'published'`, `publishedAt`, `setPublished()` (gated on `getPublishBlockers().length === 0`), `resetPublishStatus()`, `resetFoundryDraft()`; publish state resets when draft/review/source/critique/library inputs change.
+- `src/features/foundry/pages/PublishBlockersPage.tsx` — converted from `getState()` snapshot to hook selectors (reactive); Publish button enables when `blockers.length === 0 && publishStatus !== 'published'`; on click calls `setPublished()` and `navigate('/admin/foundry/published')`.
+- `src/features/foundry/pages/PublishConfirmationPage.tsx` (new) — `/admin/foundry/published`: module title (HR Basics canonical default), humanized `publishedAt`, primary "Return to admin dashboard" + secondary "Start a new module" (calls `resetFoundryDraft()`).
+- `src/App.tsx` — added lazy-loaded `PublishConfirmationPage` route at `/admin/foundry/published` (preserves bundle-size reductions from Phase 4 audit).
+- `src/features/source-binder/pages/SourceLibraryPage.tsx` — footer "Back to source binder" CTA navigates to `/admin/foundry/source` (closed the library dead-end).
+- `src/features/foundry/pages/FoundryQuestionsPage.tsx` — QuestionWizard `onSubmit` navigates directly to `/admin/foundry/outline` after saving answers (eliminated the two-step click).
+- `src/features/foundry/data/mockSelfCritique.ts` — high-severity issues realigned from "PTO Policy Overview" (not in outline) to "Payroll and Timekeeping Basics" + "First-Week Expectations".
+- `src/features/foundry/data/mockMissingSource.ts` — `MOCK_PUBLISH_BLOCKERS` fallback rewritten to reference HR Basics (lesson_unsupported_claim on Payroll/Timekeeping + source_placeholder on a `[PLACEHOLDER]` section from `HR_ONBOARDING_SOURCE_SAMPLE.md`).
+- Tests: `src/App.routes.foundryFlow.test.tsx` (new) — end-to-end chain walk through to `/admin/foundry/published`. Plus updates to `App.routes.test.tsx`, `PublishBlockersPage.test.tsx`, `PublishConfirmationPage.test.tsx` (new), `FoundryQuestionsPage.test.tsx`, `SourceLibraryPage.test.tsx`, `foundryDraftStore.test.ts`.
+
+**Verification**:
+- ✅ typecheck green
+- ✅ lint 0/0
+- ✅ npm test: **269 passed, 1 skipped** (+12 vs Slice 5.3 baseline of 257)
+- ✅ build green (no app-entry bundle regression)
+
+**Acceptance criteria** (master roadmap):
+- ✅ Admin can complete the mocked Foundry flow (E2E test proves the chain reaches `/admin/foundry/published`)
+- ✅ Missing-source blockers appear for placeholder sections (HR Basics blocker fallback + reactive `getPublishBlockers()` from `MOCK_LESSON_REVIEWS`)
+- ✅ Publish is blocked until blockers are marked resolved or replaced (button disabled while `blockers.length > 0`)
+- ✅ Published status appears after approval (`PublishConfirmationPage` + store `publishStatus === 'published'` + `publishedAt`)
+- ✅ Build Bible updated
+
+**Known scope deferred**:
+- Direct deep-link to `/admin/foundry/published` renders the confirmation page even without a `published` store state. Acceptable for the mocked-flow phase; Phase 7 (Publishing/Versioning/Audit) will gate the route on `publishStatus === 'published'`.
+- No publish action persisted to backend — store-only. Phase 8 Supabase wiring replaces.
+- No published-module surface on the admin dashboard yet — confirmation screen is terminal for this slice.
+
+**Naming guardrails honored**: HR Basics canonical; no invented Redex policy text — placeholder lessons keep their `[PLACEHOLDER]` markers from `HR_ONBOARDING_SOURCE_SAMPLE.md`.
+
+**Next**: Phase 6 / Slice 6.1 — Assignment Model and Admin Assignment UI. Admin can assign the published HR Basics module to Marcus (or a new-hire audience group) with a due date; learner dashboard reflects the assigned module. Mock-data backed; Supabase wire-up still deferred to Phase 8.
+
+---
+

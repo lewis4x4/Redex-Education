@@ -56,8 +56,10 @@ describe('useFoundryDraftStore', () => {
     })
   })
 
-  it('starts with no current draft', () => {
+  it('starts with no current draft and draft publish state', () => {
     expect(useFoundryDraftStore.getState().currentDraft).toBeNull()
+    expect(useFoundryDraftStore.getState().publishStatus).toBe('draft')
+    expect(useFoundryDraftStore.getState().publishedAt).toBeNull()
   })
 
   it('setBasics stores form values and sets updated_at timestamp', () => {
@@ -483,6 +485,83 @@ describe('useFoundryDraftStore', () => {
         }),
       ]),
     )
+  })
+
+  it('setPublished is blocked while publish blockers remain', () => {
+    let didPublish = true
+
+    act(() => {
+      useFoundryDraftStore.getState().setLessonReviews(MOCK_LESSON_REVIEWS)
+      didPublish = useFoundryDraftStore.getState().setPublished()
+    })
+
+    expect(didPublish).toBe(false)
+    expect(useFoundryDraftStore.getState().publishStatus).toBe('draft')
+    expect(useFoundryDraftStore.getState().publishedAt).toBeNull()
+  })
+
+  it('setPublished marks clear drafts published and records timestamp', () => {
+    let didPublish = false
+
+    act(() => {
+      useFoundryDraftStore.getState().setBasics({
+        title: 'HR Basics at Redex',
+        parent_course_id: 'standalone',
+        audience: 'New hires',
+        criticality: 'required',
+        training_type: 'general_informational',
+        estimated_minutes: 20,
+      })
+      didPublish = useFoundryDraftStore.getState().setPublished()
+    })
+
+    expect(didPublish).toBe(true)
+    expect(useFoundryDraftStore.getState().publishStatus).toBe('published')
+    expect(useFoundryDraftStore.getState().publishedAt).toEqual(expect.any(String))
+    expect(new Date(useFoundryDraftStore.getState().publishedAt ?? '').toString()).not.toBe('Invalid Date')
+  })
+
+  it('review mutations reset a published draft back to draft status', () => {
+    const approvedReviews = MOCK_LESSON_REVIEWS.map((review) => ({ ...review, status: 'approved' as const }))
+
+    act(() => {
+      useFoundryDraftStore.getState().setLessonReviews(approvedReviews)
+      useFoundryDraftStore.getState().setPublished()
+      useFoundryDraftStore.getState().rejectLessonReview(0, 0)
+    })
+
+    expect(useFoundryDraftStore.getState().publishStatus).toBe('draft')
+    expect(useFoundryDraftStore.getState().publishedAt).toBeNull()
+  })
+
+  it('resetPublishStatus and resetFoundryDraft clear published state', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setBasics({
+        title: 'HR Basics at Redex',
+        parent_course_id: 'standalone',
+        audience: 'New hires',
+        criticality: 'required',
+        training_type: 'general_informational',
+        estimated_minutes: 20,
+      })
+      useFoundryDraftStore.getState().setGeneratedModule(MOCK_GENERATED_MODULE)
+      useFoundryDraftStore.getState().setPublished()
+      useFoundryDraftStore.getState().resetPublishStatus()
+    })
+
+    expect(useFoundryDraftStore.getState().publishStatus).toBe('draft')
+    expect(useFoundryDraftStore.getState().publishedAt).toBeNull()
+    expect(useFoundryDraftStore.getState().currentDraft).not.toBeNull()
+
+    act(() => {
+      useFoundryDraftStore.getState().setPublished()
+      useFoundryDraftStore.getState().resetFoundryDraft()
+    })
+
+    expect(useFoundryDraftStore.getState().currentDraft).toBeNull()
+    expect(useFoundryDraftStore.getState().generatedModule).toBeNull()
+    expect(useFoundryDraftStore.getState().publishStatus).toBe('draft')
+    expect(useFoundryDraftStore.getState().publishedAt).toBeNull()
   })
 
   it('starts with selectedLibraryFileIds as an empty array', () => {

@@ -14,6 +14,7 @@ export function FoundryQuestionsPage() {
   const handleSubmit = (values: SetupAnswersInput) => {
     useFoundryDraftStore.getState().setSetupAnswers(values)
     toast.success('Setup answers saved')
+    navigate('/admin/foundry/outline')
   }
 
   return (

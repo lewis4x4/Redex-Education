@@ -13,6 +13,13 @@ import type {
 import type { SetupAnswersInput } from '../schemas/foundrySchemas';
 import type { ModuleBasicsDraft, ModuleBasicsFormValues } from '../types';
 
+export type FoundryPublishStatus = 'draft' | 'ready_to_publish' | 'published';
+
+const resetPublishState = {
+  publishStatus: 'draft' as FoundryPublishStatus,
+  publishedAt: null,
+};
+
 interface FoundryDraftState {
   /** The current working draft, or null if none */
   currentDraft: ModuleBasicsDraft | null;
@@ -34,6 +41,16 @@ interface FoundryDraftState {
   critique: SelfCritiqueReport | null;
   /** Set self-critique report */
   setCritique: (report: SelfCritiqueReport) => void;
+  /** Publish lifecycle for the current Foundry draft */
+  publishStatus: FoundryPublishStatus;
+  /** ISO timestamp when the module was published, if published */
+  publishedAt: string | null;
+  /** Mark module published when no publish blockers remain; returns true when published. */
+  setPublished: () => boolean;
+  /** Reset publish lifecycle back to draft */
+  resetPublishStatus: () => void;
+  /** Reset the full Foundry draft flow back to an empty draft */
+  resetFoundryDraft: () => void;
   /** Side-by-side review state for generated lessons */
   lessonReviews: LessonReviewItem[];
   /** Overwrite lesson review state */
@@ -98,6 +115,8 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
       outline_status: 'draft',
       generatedModule: null,
       critique: null,
+      publishStatus: 'draft',
+      publishedAt: null,
       lessonReviews: [],
       selectedLibraryFileIds: [],
       setBasics: (values) =>
@@ -106,11 +125,34 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
             ...values,
             updated_at: new Date().toISOString(),
           },
+          ...resetPublishState,
         }),
-      clearDraft: () => set({ currentDraft: null }),
-      setCritique: (report) => set({ critique: report }),
-      setLessonReviews: (items) => set({ lessonReviews: items }),
-      clearLessonReviews: () => set({ lessonReviews: [] }),
+      clearDraft: () => set({ currentDraft: null, ...resetPublishState }),
+      resetPublishStatus: () => set(resetPublishState),
+      resetFoundryDraft: () =>
+        set({
+          currentDraft: null,
+          sourceMaterial: null,
+          setupAnswers: null,
+          outline: null,
+          outline_status: 'draft',
+          generatedModule: null,
+          critique: null,
+          lessonReviews: [],
+          selectedLibraryFileIds: [],
+          ...resetPublishState,
+        }),
+      setPublished: () => {
+        if (get().getPublishBlockers().length > 0) {
+          return false;
+        }
+
+        set({ publishStatus: 'published', publishedAt: new Date().toISOString() });
+        return true;
+      },
+      setCritique: (report) => set({ critique: report, ...resetPublishState }),
+      setLessonReviews: (items) => set({ lessonReviews: items, ...resetPublishState }),
+      clearLessonReviews: () => set({ lessonReviews: [], ...resetPublishState }),
       approveLessonReview: (lessonIdx, moduleIdx) =>
         set((state) => ({
           lessonReviews: state.lessonReviews.map((item) =>
@@ -118,6 +160,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
               ? { ...item, status: 'approved' }
               : item
           ),
+          ...resetPublishState,
         })),
       rejectLessonReview: (lessonIdx, moduleIdx) =>
         set((state) => ({
@@ -126,6 +169,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
               ? { ...item, status: 'needs_regeneration' }
               : item
           ),
+          ...resetPublishState,
         })),
       isPublishBlocked: () =>
         get().lessonReviews.some(
@@ -190,7 +234,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
 
         return blockers;
       },
-      clearCritique: () => set({ critique: null }),
+      clearCritique: () => set({ critique: null, ...resetPublishState }),
       ignoreIssue: (issueId, note) =>
         set((state) => {
           if (state.critique === null) {
@@ -213,6 +257,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
               issues,
               blocks_publish: issues.some((issue) => issue.severity === 'high' && !issue.ignored),
             },
+            ...resetPublishState,
           };
         }),
       unignoreIssue: (issueId) =>
@@ -237,22 +282,25 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
               issues,
               blocks_publish: issues.some((issue) => issue.severity === 'high' && !issue.ignored),
             },
+            ...resetPublishState,
           };
         }),
-      setSourceMaterial: (material) => set({ sourceMaterial: material }),
-      clearSourceMaterial: () => set({ sourceMaterial: null }),
+      setSourceMaterial: (material) => set({ sourceMaterial: material, ...resetPublishState }),
+      clearSourceMaterial: () => set({ sourceMaterial: null, ...resetPublishState }),
       setSetupAnswers: (input) =>
         set({
           setupAnswers: {
             ...input,
             updated_at: new Date().toISOString(),
           },
+          ...resetPublishState,
         }),
-      clearSetupAnswers: () => set({ setupAnswers: null }),
+      clearSetupAnswers: () => set({ setupAnswers: null, ...resetPublishState }),
       setOutline: (draft) =>
         set({
           outline: draft,
           outline_status: 'draft',
+          ...resetPublishState,
         }),
       approveOutline: () =>
         set((state) =>
@@ -266,10 +314,11 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
         set({
           outline: null,
           outline_status: 'draft',
+          ...resetPublishState,
         }),
-      regenerateOutlineStart: () => set({ outline_status: 'regenerating' }),
-      setGeneratedModule: (preview) => set({ generatedModule: preview }),
-      clearGeneratedModule: () => set({ generatedModule: null }),
+      regenerateOutlineStart: () => set({ outline_status: 'regenerating', ...resetPublishState }),
+      setGeneratedModule: (preview) => set({ generatedModule: preview, ...resetPublishState }),
+      clearGeneratedModule: () => set({ generatedModule: null, ...resetPublishState }),
       updateLessonStatus: (lessonIdx, moduleIdx, status) =>
         set((state) => {
           if (state.generatedModule === null) {
@@ -285,6 +334,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
                   : lesson
               ),
             },
+            ...resetPublishState,
           };
         }),
       toggleLibraryFile: (driveFileId) =>
@@ -292,8 +342,9 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
           selectedLibraryFileIds: state.selectedLibraryFileIds.includes(driveFileId)
             ? state.selectedLibraryFileIds.filter((selectedId) => selectedId !== driveFileId)
             : [...state.selectedLibraryFileIds, driveFileId],
+          ...resetPublishState,
         })),
-      clearLibrarySelection: () => set({ selectedLibraryFileIds: [] }),
+      clearLibrarySelection: () => set({ selectedLibraryFileIds: [], ...resetPublishState }),
     }),
     {
       name: 'redex-foundry-draft-v1',

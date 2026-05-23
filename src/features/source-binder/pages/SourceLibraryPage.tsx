@@ -1,6 +1,8 @@
 import { ExternalLink } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
 import { DriveSyncButton } from '@/features/source-binder/components/DriveSyncButton'
@@ -22,6 +24,7 @@ function formatLastSynced(value: string | null) {
 }
 
 export function SourceLibraryPage() {
+  const navigate = useNavigate()
   const { files, loading, error, refresh } = useSourceLibrary()
   const selectedLibraryFileIds = useFoundryDraftStore((state) => state.selectedLibraryFileIds)
   const toggleLibraryFile = useFoundryDraftStore((state) => state.toggleLibraryFile)
@@ -124,6 +127,12 @@ export function SourceLibraryPage() {
           </a>
         </p>
       </Card>
+
+      <footer className="flex justify-end">
+        <Button variant="brand" onClick={() => navigate('/admin/foundry/source')}>
+          Back to source binder
+        </Button>
+      </footer>
     </section>
   )
 }

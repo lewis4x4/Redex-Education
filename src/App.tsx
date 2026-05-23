@@ -50,6 +50,10 @@ const PublishBlockersPage = lazy(() =>
   import('@/features/foundry/pages/PublishBlockersPage').then((m) => ({ default: m.PublishBlockersPage })),
 )
 
+const PublishConfirmationPage = lazy(() =>
+  import('@/features/foundry/pages/PublishConfirmationPage').then((m) => ({ default: m.PublishConfirmationPage })),
+)
+
 // Redex Academy - Active Build
 // Phase 2 routes: learner demo stays open; admin shell is protected by AuthGate.
 
@@ -232,6 +236,18 @@ function PublishBlockersRoute() {
   )
 }
 
+function PublishConfirmationRoute() {
+  return (
+    <AppShell breadcrumb="Admin flow › Course Foundry › Published">
+      <AuthGate>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <PublishConfirmationPage />
+        </Suspense>
+      </AuthGate>
+    </AppShell>
+  )
+}
+
 function NotFoundRoute() {
   return (
     <AppShell breadcrumb="Page not found">
@@ -257,6 +273,7 @@ export default function App() {
       <Route path="/admin/foundry/critique" element={<SelfCritiqueReviewRoute />} />
       <Route path="/admin/foundry/sidebyside" element={<SideBySideReviewRoute />} />
       <Route path="/admin/foundry/blockers" element={<PublishBlockersRoute />} />
+      <Route path="/admin/foundry/published" element={<PublishConfirmationRoute />} />
       <Route path="/admin/foundry/library" element={<SourceLibraryRoute />} />
       <Route path="/admin/*" element={<AdminRoute />} />
       <Route path="*" element={<NotFoundRoute />} />

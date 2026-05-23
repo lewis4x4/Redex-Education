@@ -199,4 +199,12 @@ describe('Redex Education routes', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Publish blockers' })).toBeInTheDocument()
   })
+
+  it('renders PublishConfirmationPage at /admin/foundry/published', async () => {
+    vi.stubEnv('VITE_MOCK_AUTH', 'true')
+
+    renderAt('/admin/foundry/published')
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Module published' })).toBeInTheDocument()
+  })
 })

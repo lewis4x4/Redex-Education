@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
 const useSourceLibraryMock = vi.hoisted(() => vi.fn())
@@ -34,11 +35,16 @@ describe('SourceLibraryPage', () => {
 
     const { SourceLibraryPage } = await import('./SourceLibraryPage')
 
-    render(<SourceLibraryPage />)
+    render(
+      <MemoryRouter>
+        <SourceLibraryPage />
+      </MemoryRouter>,
+    )
 
     expect(screen.getByText('REDEX AI COURSE FOUNDRY · SOURCE LIBRARY')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Source Library' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sync from Drive' })).toBeInTheDocument()
     expect(screen.getByText('Source Library Browser Mock')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back to source binder' })).toBeInTheDocument()
   })
 })
