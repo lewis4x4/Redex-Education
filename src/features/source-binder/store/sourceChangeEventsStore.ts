@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
+import { useAuditLogStore } from '@/features/audit/store/auditLogStore'
 import type { SourceChangeEvent } from '@/lib/education'
 
 type RecordSourceChangeEventInput = Omit<SourceChangeEvent, 'id' | 'detected_at' | 'status'> &
@@ -53,8 +54,8 @@ function getSourceChangeEventsStorage(): Storage {
   return createMemoryStorage()
 }
 
-function createEventId(input: RecordSourceChangeEventInput, detectedAt: string): string {
-  return `source-change-${input.source_file_id}-${input.new_revision_id}-${Date.parse(detectedAt)}`
+function createEventId(input: RecordSourceChangeEventInput): string {
+  return `source-change-${input.source_file_id}-${input.old_revision_id}-${input.new_revision_id}`
 }
 
 function cloneEvent(event: SourceChangeEvent): SourceChangeEvent {
@@ -70,7 +71,7 @@ export const useSourceChangeEventsStore = create<SourceChangeEventsState>()(
       events: [],
       recordChangeEvent: (input) => {
         const detectedAt = input.detected_at ?? new Date().toISOString()
-        const id = input.id ?? createEventId(input, detectedAt)
+        const id = input.id ?? createEventId(input)
         const existingEvent = get().events.find((existing) => existing.id === id)
         const event: SourceChangeEvent = {
           id,
@@ -86,6 +87,18 @@ export const useSourceChangeEventsStore = create<SourceChangeEventsState>()(
         set((state) => ({
           events: [...state.events.filter((existing) => existing.id !== event.id), event],
         }))
+
+        if (!existingEvent) {
+          useAuditLogStore.getState().recordEvent({
+            event_type: 'source_change_detected',
+            actor_user_id: 'system',
+            actor_name: 'Drive sync',
+            entity_type: 'source_file',
+            entity_id: event.source_file_id,
+            entity_label: event.source_file_name,
+            metadata: { old_revision_id: event.old_revision_id, new_revision_id: event.new_revision_id },
+          })
+        }
 
         return cloneEvent(event)
       },

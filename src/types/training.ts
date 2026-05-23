@@ -774,24 +774,43 @@ export interface Assignment {
 }
 
 /**
+ * Audit event taxonomy — Slice 7.4 audit log UI.
+ *
+ * These string literals mirror the future persisted audit table event names so
+ * the local mock store can be swapped for Supabase reads with minimal UI churn.
+ */
+export const AUDIT_EVENT_TYPES = [
+  'module_created',
+  'source_uploaded',
+  'outline_generated',
+  'outline_approved',
+  'module_generated',
+  'self_critique_completed',
+  'lesson_approved',
+  'module_published',
+  'module_version_forked',
+  'assignment_created',
+  'employee_completed_module',
+  'quiz_attempted',
+  'source_change_detected',
+  'stale_lesson_regenerated',
+] as const;
+
+export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];
+
+/**
  * Audit log entry — Slice 7.4 audit log UI.
  */
 export interface AuditLog {
   id: UUID;
-  actor_id?: UUID;
-  action: string;
-  entity_type:
-    | 'module'
-    | 'module_version'
-    | 'source_file'
-    | 'assignment'
-    | 'enrollment'
-    | 'assessment_attempt'
-    | 'critique'
-    | 'review';
-  entity_id: UUID;
-  metadata?: Record<string, unknown>;
-  created_at: ISODateTime;
+  event_type: AuditEventType;
+  actor_user_id: UUID;
+  actor_name: string;
+  entity_type: 'module' | 'module_version' | 'source_file' | 'assignment' | 'lesson' | 'quiz';
+  entity_id: string;
+  entity_label: string;
+  occurred_at: ISODateTime;
+  metadata?: Record<string, string | number | boolean>;
 }
 
 export interface SourceMaterial {

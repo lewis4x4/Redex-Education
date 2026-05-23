@@ -3457,3 +3457,62 @@ Closes the loop on the published-but-source-may-change problem. Real `module_sou
 
 ---
 
+## 2026-05-23 — Slice 7.4: Audit Log UI
+
+**Status**: ✅ Completed. Phase 7 complete (7.1 / 7.2 / 7.3 / 7.4 all green).
+
+**Linear ticket**: `Audit: build admin audit log view`.
+
+**Context**:
+Closes Phase 7 by surfacing a chronological record of the demo's key actions. Rather than a static dataset, the audit store is wired into every existing event-producing action (Foundry, Assignments, Progress, Source Impact). Seeded with ~15 historical events so the page reads as a coherent HR Basics narrative on first load.
+
+**Orchestration**: Single pair agent (Codex CLI · gpt-5.5 high) with internal Oracle review pass — three real defects flagged, all fixed before verification:
+1. Forking a published version was double-recording the `module_version_forked` event on subsequent fork attempts (now guarded per seeded version id).
+2. `source_change_detected` audit events depended on caller-provided IDs (now generates stable IDs at the store layer).
+3. Assignment audit actor was hard-pinned to `MOCK_ADMIN_USER` (now follows `assigned_by`).
+
+The agent also fixed a pre-existing mock-generation loading edge case in `useMockGenerationDelay.ts` that surfaced during route-flow verification.
+
+**Files touched**:
+- `src/types/training.ts` — confirmed/extended `AuditLog` + new `AuditEventType` union with 14 events (module_created, source_uploaded, outline_generated, outline_approved, module_generated, self_critique_completed, lesson_approved, module_published, module_version_forked, assignment_created, employee_completed_module, quiz_attempted, source_change_detected, stale_lesson_regenerated).
+- `src/features/audit/store/auditLogStore.ts` (new) — Zustand + `persist` (`redex-audit-log-v1`); seeded with HR Basics historical events spanning all event types + established personas; actions `recordEvent`, `getEvents(filter)`, `getEventCountByType`, `resetEvents`.
+- `src/features/audit/lib/eventLabels.ts` (new) — pure `getEventLabel`, `getEventIcon`, `getEventBadgeVariant` for every event type.
+- `src/features/audit/components/AuditEventRow.tsx` (new) — compact row: glyph + label + actor + entity + relative timestamp.
+- `src/features/audit/components/AuditEventTypeFilter.tsx` (new) — chip row with counts; "All" + most common event types.
+- `src/features/audit/pages/AuditLogPage.tsx` (new) at `/admin/audit` — composes filter + list; reactive subscription; empty-state copy when filter yields no rows.
+- `src/App.tsx` — `/admin/audit` lazy route.
+- `src/features/admin/pages/AdminDashboardPage.tsx` — "Audit log →" entry link alongside the source-impact link.
+- **Wire-ups** (audit recording added inline to existing stores/actions, all idempotent):
+  - `foundryDraftStore.ts`: setBasics (first time) → module_created; setSourceMaterial → source_uploaded; setOutline (first time) → outline_generated; approveOutline → outline_approved; setGeneratedModule → module_generated; setCritique → self_critique_completed; approveLessonReview → lesson_approved; setPublished → module_published; seedDraftFromModuleVersion → module_version_forked (Oracle-guarded against double-fire).
+  - `assignmentStore.ts`: createAssignment → assignment_created (actor = `assigned_by`, Oracle fix); updateAssignmentStatus → 'completed' → employee_completed_module.
+  - `assessmentAttemptStore.ts`: recordAttempt → quiz_attempted (new optional `actor_user_id` on input; LearnerPlayerRoute passes the enrollment user id).
+  - `sourceChangeEventsStore.ts`: recordChangeEvent → source_change_detected (system actor + Drive sync sentinel; Oracle fix made IDs stable).
+  - `SourceImpactReviewPage.tsx`: regenerate → stale_lesson_regenerated with lesson IDs in metadata.
+- `src/features/foundry/lib/useMockGenerationDelay.ts` — fixed a loading-state edge case surfaced during route-flow verification (unrelated pre-existing bug).
+- Tests: auditLogStore (seed + filter + persist + idempotency), eventLabels (every type), AuditEventRow, AuditEventTypeFilter, AuditLogPage (seeded events render + filter narrows + empty state), wire-up coverage added to foundryDraftStore.test, assignmentStore.test, assessmentAttemptStore.test, sourceChangeEventsStore.test, SourceImpactReviewPage.test, App.routes.test smoke.
+
+**Verification**:
+- ✅ typecheck green
+- ✅ lint 0/0
+- ✅ npm test: **423 passed, 1 skipped** (+24 vs Slice 7.3 baseline of 399)
+- ✅ build green
+- ✅ Oracle review pass — three findings applied (fork double-fire, stable change-event IDs, assignment actor)
+
+**Acceptance criteria** (master roadmap):
+- ✅ Audit log page renders mock events (~15 seeded + every store action now contributes live)
+- ✅ Events include actor, action, entity, timestamp (canonical `AuditLog` shape + denormalized actor_name + entity_label fields for display)
+- ✅ Build Bible updated
+
+**Known scope deferred**:
+- Audit log is local/persisted-Zustand only. Phase 8 swaps store reads/writes to a Supabase `audit_logs` table.
+- Some `entity_label` values are heuristic for generated / custom module IDs until real auth + entity resolution lands.
+- No CSV export / date-range picker — out of scope.
+
+**Naming guardrails honored**: Jordan Patel (admin actor for foundry/assignments), Marcus / Ana / Devon (learner actors), Drive sync (system actor sentinel) — established personas only.
+
+**Phase 7 status**: COMPLETE. Publishing states (7.1) + Versioning (7.2) + Source impact (7.3) + Audit log (7.4) all shipped.
+
+**Next**: Phase 8 — Supabase Integration. The roadmap explicitly notes "Do not start this phase until the mock vertical slice is accepted. The UI and data contracts should be stable first." The mock vertical is now visibly stable across Phases 2-7 (~425 tests). Phase 8 begins with Slice 8.1 — Supabase Environment and Client Setup (env vars, .env.example, client helper). Most of this is already in place from Slice 2.4's Drive sync work; the slice will confirm/normalize the env contract and add any missing pieces.
+
+---
+

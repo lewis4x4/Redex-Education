@@ -78,5 +78,6 @@ describe('AdminDashboardPage', () => {
       '/admin/modules/hr-basics-mod-001/versions',
     )
     expect(screen.getByRole('link', { name: 'Source Impact Review →' })).toHaveAttribute('href', '/admin/source-impact')
+    expect(screen.getByRole('link', { name: 'Audit log →' })).toHaveAttribute('href', '/admin/audit')
   })
 })

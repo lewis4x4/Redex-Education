@@ -21,6 +21,10 @@ const AssignmentAdminPage = lazy(() =>
   import('@/features/assignments/pages/AssignmentAdminPage').then((m) => ({ default: m.AssignmentAdminPage })),
 )
 
+const AuditLogPage = lazy(() =>
+  import('@/features/audit/pages/AuditLogPage').then((m) => ({ default: m.AuditLogPage })),
+)
+
 const ManagerDashboardPage = lazy(() =>
   import('@/features/manager/pages/ManagerDashboardPage').then((m) => ({ default: m.ManagerDashboardPage })),
 )
@@ -170,6 +174,7 @@ function LearnerModuleRoute() {
             score_percent: attempt.score,
             passed: attempt.passed,
             answers: attempt.answers,
+            actor_user_id: moduleEnrollment.user_id,
           })
         }}
         onCompleteModule={() => {
@@ -200,6 +205,18 @@ function AssignmentAdminRoute() {
       <AuthGate>
         <Suspense fallback={<RouteLoadingFallback />}>
           <AssignmentAdminPage />
+        </Suspense>
+      </AuthGate>
+    </AppShell>
+  )
+}
+
+function AuditLogRoute() {
+  return (
+    <AppShell breadcrumb="Admin flow › Audit log">
+      <AuthGate>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <AuditLogPage />
         </Suspense>
       </AuthGate>
     </AppShell>
@@ -378,6 +395,7 @@ export default function App() {
       <Route path="/learn/player/:moduleId" element={<LearnerModuleRoute />} />
       <Route path="/admin" element={<AdminRoute />} />
       <Route path="/admin/assignments" element={<AssignmentAdminRoute />} />
+      <Route path="/admin/audit" element={<AuditLogRoute />} />
       <Route path="/admin/source-impact" element={<SourceImpactReviewRoute />} />
       <Route path="/admin/modules/:moduleId/versions" element={<ModuleVersionHistoryRoute />} />
       <Route path="/manager" element={<ManagerRoute />} />

@@ -13,12 +13,15 @@ const baseAttempt: RecordAttemptInput = {
 
 describe('useAssessmentAttemptStore', () => {
   let useAssessmentAttemptStore: (typeof import('./assessmentAttemptStore'))['useAssessmentAttemptStore']
+  let useAuditLogStore: (typeof import('@/features/audit/store/auditLogStore'))['useAuditLogStore']
 
   beforeEach(async () => {
     vi.resetModules()
+    ;({ useAuditLogStore } = await import('@/features/audit/store/auditLogStore'))
     ;({ useAssessmentAttemptStore } = await import('./assessmentAttemptStore'))
 
     act(() => {
+      useAuditLogStore.getState().resetEvents()
       useAssessmentAttemptStore.getState().resetAttempts()
     })
   })
@@ -46,6 +49,22 @@ describe('useAssessmentAttemptStore', () => {
     expect(recorded?.id).toEqual(expect.any(String))
     expect(Number.isNaN(Date.parse(recorded?.attempted_at ?? ''))).toBe(false)
     expect(useAssessmentAttemptStore.getState().attempts).toContainEqual(recorded)
+  })
+
+  it('recordAttempt records quiz_attempted audit event with learner actor', () => {
+    act(() => {
+      useAuditLogStore.setState({ events: [] })
+      useAssessmentAttemptStore.getState().recordAttempt({ ...baseAttempt, actor_user_id: 'user-marcus' })
+    })
+
+    expect(useAuditLogStore.getState().events).toEqual([
+      expect.objectContaining({
+        event_type: 'quiz_attempted',
+        actor_name: 'Marcus Chen',
+        entity_label: 'Final Quiz · HR Basics at Redex',
+        metadata: { score_percent: 80, passed: true },
+      }),
+    ])
   })
 
   it('retains multiple attempts for the same lesson', () => {

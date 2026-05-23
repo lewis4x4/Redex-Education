@@ -11,12 +11,13 @@ import type {
   SetupAnswers,
   SourceMaterial,
 } from '@/lib/education';
+import { useAuditLogStore } from '@/features/audit/store/auditLogStore';
 import { inferModuleState } from '@/features/publishing/lib/moduleStates';
 import { useModuleVersionsStore } from '@/features/publishing/store/moduleVersionsStore';
 import { usePublishedModulesStore } from '@/features/publishing/store/publishedModulesStore';
 import type { SetupAnswersInput } from '../schemas/foundrySchemas';
 import type { ModuleBasicsDraft, ModuleBasicsFormValues } from '../types';
-import type { ModuleVersion } from '@/lib/education';
+import type { AuditLog, ModuleVersion } from '@/lib/education';
 
 const DEFAULT_MODULE_VERSION_ID = 'module-version-hr-basics-v1';
 
@@ -91,6 +92,26 @@ function resolvePublishedVersionNumber(currentDraft: ModuleBasicsDraft | null, m
   }
 
   return parseVersionNumberFromVersionId(moduleVersionId) ?? 1;
+}
+
+function resolveDraftModuleId(title: string, currentDraft?: ModuleBasicsDraft | null): string {
+  if (currentDraft?.module_id) {
+    return currentDraft.module_id;
+  }
+
+  if (title.trim().toLowerCase() === 'hr basics at redex' || title.trim() === '') {
+    return 'hr-basics-mod-001';
+  }
+
+  return `${slugifyModuleTitle(title)}-mod-001`;
+}
+
+function recordAuditEvent(input: Omit<AuditLog, 'id' | 'occurred_at' | 'actor_user_id' | 'actor_name'>) {
+  useAuditLogStore.getState().recordEvent({
+    actor_user_id: MOCK_ADMIN_USER.id,
+    actor_name: MOCK_ADMIN_USER.display_name,
+    ...input,
+  });
 }
 
 export type FoundryPublishStatus = 'draft' | 'ready_to_publish' | 'published';
@@ -201,14 +222,27 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
       publishedAt: null,
       lessonReviews: [],
       selectedLibraryFileIds: [],
-      setBasics: (values) =>
+      setBasics: (values) => {
+        const wasNewDraft = get().currentDraft === null;
+        const moduleId = resolveDraftModuleId(values.title);
+
         set({
           currentDraft: {
             ...values,
             updated_at: new Date().toISOString(),
           },
           ...resetPublishState,
-        }),
+        });
+
+        if (wasNewDraft) {
+          recordAuditEvent({
+            event_type: 'module_created',
+            entity_type: 'module',
+            entity_id: moduleId,
+            entity_label: values.title,
+          });
+        }
+      },
       clearDraft: () => set({ currentDraft: null, ...resetPublishState }),
       resetPublishStatus: () => set(resetPublishState),
       resetFoundryDraft: () =>
@@ -224,7 +258,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
           selectedLibraryFileIds: [],
           ...resetPublishState,
         }),
-      seedDraftFromModuleVersion: (version) =>
+      seedDraftFromModuleVersion: (version) => {
         set({
           currentDraft: {
             id: version.id,
@@ -249,7 +283,21 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
           lessonReviews: [],
           selectedLibraryFileIds: [],
           ...resetPublishState,
-        }),
+        });
+        const alreadyRecordedFork = useAuditLogStore
+          .getState()
+          .events.some((event) => event.event_type === 'module_version_forked' && event.entity_id === version.id);
+
+        if (!alreadyRecordedFork) {
+          recordAuditEvent({
+            event_type: 'module_version_forked',
+            entity_type: 'module_version',
+            entity_id: version.id,
+            entity_label: `${version.module_title} v${version.version_number}`,
+            metadata: { module_id: version.module_id, version_number: version.version_number },
+          });
+        }
+      },
       setPublished: () => {
         const state = get();
         const blockers = state.getPublishBlockers();
@@ -278,6 +326,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
         const moduleId = resolvePublishedModuleId(state.currentDraft, state.generatedModule, moduleVersionId);
         const versionNumber = resolvePublishedVersionNumber(state.currentDraft, moduleVersionId);
         const title = state.currentDraft?.title ?? state.generatedModule?.module_title ?? 'HR Basics at Redex';
+        const wasAlreadyPublished = state.publishStatus === 'published';
         const moduleVersion = useModuleVersionsStore.getState().registerVersion({
           module_id: moduleId,
           module_title: title,
@@ -296,12 +345,40 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
         });
 
         set({ publishStatus: 'published', publishedAt: moduleVersion.published_at ?? new Date().toISOString() });
+
+        if (!wasAlreadyPublished) {
+          recordAuditEvent({
+            event_type: 'module_published',
+            entity_type: 'module_version',
+            entity_id: moduleVersion.id,
+            entity_label: `${title} v${versionNumber}`,
+            metadata: { module_id: moduleId, version_number: versionNumber },
+          });
+        }
+
         return true;
       },
-      setCritique: (report) => set({ critique: report, ...resetPublishState }),
+      setCritique: (report) => {
+        const wasMissingCritique = get().critique === null;
+        set({ critique: report, ...resetPublishState });
+
+        if (wasMissingCritique) {
+          recordAuditEvent({
+            event_type: 'self_critique_completed',
+            entity_type: 'module',
+            entity_id: resolveDraftModuleId(report.module_title, get().currentDraft),
+            entity_label: report.module_title,
+            metadata: { issue_count: report.issues.length, blocks_publish: report.blocks_publish },
+          });
+        }
+      },
       setLessonReviews: (items) => set({ lessonReviews: items, ...resetPublishState }),
       clearLessonReviews: () => set({ lessonReviews: [], ...resetPublishState }),
-      approveLessonReview: (lessonIdx, moduleIdx) =>
+      approveLessonReview: (lessonIdx, moduleIdx) => {
+        const priorReview = get().lessonReviews.find(
+          (item) => item.lesson_index === lessonIdx && item.module_index === moduleIdx,
+        );
+
         set((state) => ({
           lessonReviews: state.lessonReviews.map((item) =>
             item.lesson_index === lessonIdx && item.module_index === moduleIdx
@@ -309,7 +386,18 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
               : item
           ),
           ...resetPublishState,
-        })),
+        }));
+
+        if (priorReview && priorReview.status !== 'approved') {
+          recordAuditEvent({
+            event_type: 'lesson_approved',
+            entity_type: 'lesson',
+            entity_id: `${priorReview.module_index}-${priorReview.lesson_index}`,
+            entity_label: priorReview.lesson_title,
+            metadata: { module_index: priorReview.module_index, lesson_index: priorReview.lesson_index },
+          });
+        }
+      },
       rejectLessonReview: (lessonIdx, moduleIdx) =>
         set((state) => ({
           lessonReviews: state.lessonReviews.map((item) =>
@@ -433,7 +521,20 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
             ...resetPublishState,
           };
         }),
-      setSourceMaterial: (material) => set({ sourceMaterial: material, ...resetPublishState }),
+      setSourceMaterial: (material) => {
+        const wasMissingSource = get().sourceMaterial === null;
+        set({ sourceMaterial: material, ...resetPublishState });
+
+        if (wasMissingSource) {
+          recordAuditEvent({
+            event_type: 'source_uploaded',
+            entity_type: 'source_file',
+            entity_id: material.id,
+            entity_label: material.title,
+            metadata: { source_type: material.type },
+          });
+        }
+      },
       clearSourceMaterial: () => set({ sourceMaterial: null, ...resetPublishState }),
       setSetupAnswers: (input) =>
         set({
@@ -444,20 +545,46 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
           ...resetPublishState,
         }),
       clearSetupAnswers: () => set({ setupAnswers: null, ...resetPublishState }),
-      setOutline: (draft) =>
+      setOutline: (draft) => {
+        const wasMissingOutline = get().outline === null;
         set({
           outline: draft,
           outline_status: 'draft',
           ...resetPublishState,
-        }),
-      approveOutline: () =>
-        set((state) =>
-          state.outline === null
-            ? state
+        });
+
+        if (wasMissingOutline) {
+          const lessonCount = draft.modules.reduce((total, module) => total + module.lessons.length, 0);
+          recordAuditEvent({
+            event_type: 'outline_generated',
+            entity_type: 'module',
+            entity_id: resolveDraftModuleId(draft.course_title, get().currentDraft),
+            entity_label: draft.course_title,
+            metadata: { modules: draft.modules.length, lessons: lessonCount },
+          });
+        }
+      },
+      approveOutline: () => {
+        const state = get();
+        const shouldRecord = state.outline !== null && state.outline_status !== 'approved';
+
+        set((currentState) =>
+          currentState.outline === null
+            ? currentState
             : {
                 outline_status: 'approved',
               }
-        ),
+        );
+
+        if (shouldRecord && state.outline) {
+          recordAuditEvent({
+            event_type: 'outline_approved',
+            entity_type: 'module',
+            entity_id: resolveDraftModuleId(state.outline.course_title, state.currentDraft),
+            entity_label: state.outline.course_title,
+          });
+        }
+      },
       clearOutline: () =>
         set({
           outline: null,
@@ -465,7 +592,20 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
           ...resetPublishState,
         }),
       regenerateOutlineStart: () => set({ outline_status: 'regenerating', ...resetPublishState }),
-      setGeneratedModule: (preview) => set({ generatedModule: preview, ...resetPublishState }),
+      setGeneratedModule: (preview) => {
+        const wasMissingModule = get().generatedModule === null;
+        set({ generatedModule: preview, ...resetPublishState });
+
+        if (wasMissingModule) {
+          recordAuditEvent({
+            event_type: 'module_generated',
+            entity_type: 'module',
+            entity_id: resolveDraftModuleId(preview.module_title, get().currentDraft),
+            entity_label: preview.module_title,
+            metadata: { lessons: preview.lessons.length },
+          });
+        }
+      },
       clearGeneratedModule: () => set({ generatedModule: null, ...resetPublishState }),
       updateLessonStatus: (lessonIdx, moduleIdx, status) =>
         set((state) => {

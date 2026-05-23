@@ -2,18 +2,21 @@ import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { MOCK_ASSIGNMENTS } from '@/lib/education/mockAssignments'
-import { MOCK_ADMIN_USER, MOCK_LEARNER_MARCUS } from '@/lib/education/mockOrgPeople'
+import { MOCK_ADMIN_USER, MOCK_LEARNER_MARCUS, MOCK_MANAGER_USER } from '@/lib/education/mockOrgPeople'
 
 describe('useAssignmentStore', () => {
   let useAssignmentStore: (typeof import('./assignmentStore'))['useAssignmentStore']
+  let useAuditLogStore: (typeof import('@/features/audit/store/auditLogStore'))['useAuditLogStore']
   let usePublishedModulesStore: (typeof import('@/features/publishing/store/publishedModulesStore'))['usePublishedModulesStore']
 
   beforeEach(async () => {
     vi.resetModules()
+    ;({ useAuditLogStore } = await import('@/features/audit/store/auditLogStore'))
     ;({ usePublishedModulesStore } = await import('@/features/publishing/store/publishedModulesStore'))
     ;({ useAssignmentStore } = await import('./assignmentStore'))
 
     act(() => {
+      useAuditLogStore.getState().resetEvents()
       usePublishedModulesStore.getState().resetPublishedModules()
       useAssignmentStore.getState().resetAssignments()
     })
@@ -51,6 +54,40 @@ describe('useAssignmentStore', () => {
     expect(useAssignmentStore.getState().assignments).toContainEqual(created)
   })
 
+  it('createAssignment records assignment_created audit event', () => {
+    act(() => {
+      useAuditLogStore.setState({ events: [] })
+      useAssignmentStore.getState().createAssignment({
+        module_version_id: 'module-version-hr-basics-v1',
+        assignee_user_id: MOCK_LEARNER_MARCUS.id,
+        assigned_by: MOCK_ADMIN_USER.id,
+      })
+    })
+
+    expect(useAuditLogStore.getState().events).toEqual([
+      expect.objectContaining({
+        event_type: 'assignment_created',
+        actor_name: 'Jordan Patel',
+        entity_label: 'Marcus Chen assigned HR Basics at Redex',
+      }),
+    ])
+  })
+
+  it('createAssignment audit actor follows assigned_by', () => {
+    act(() => {
+      useAuditLogStore.setState({ events: [] })
+      useAssignmentStore.getState().createAssignment({
+        module_version_id: 'module-version-hr-basics-v1',
+        assignee_user_id: MOCK_LEARNER_MARCUS.id,
+        assigned_by: MOCK_MANAGER_USER.id,
+      })
+    })
+
+    expect(useAuditLogStore.getState().events[0]).toEqual(
+      expect.objectContaining({ actor_user_id: MOCK_MANAGER_USER.id, actor_name: 'Sarah Chen' }),
+    )
+  })
+
   it('createAssignment rejects unpublished module versions', () => {
     expect(() =>
       useAssignmentStore.getState().createAssignment({
@@ -69,6 +106,22 @@ describe('useAssignmentStore', () => {
     expect(
       useAssignmentStore.getState().assignments.find((assignment) => assignment.id === 'assignment-hr-basics-ana')?.status,
     ).toBe('in_progress')
+  })
+
+  it('updateAssignmentStatus records employee_completed_module on completed transition only', () => {
+    act(() => {
+      useAuditLogStore.setState({ events: [] })
+      useAssignmentStore.getState().updateAssignmentStatus('assignment-hr-basics-marcus', 'completed')
+      useAssignmentStore.getState().updateAssignmentStatus('assignment-hr-basics-marcus', 'completed')
+    })
+
+    expect(useAuditLogStore.getState().events).toEqual([
+      expect.objectContaining({
+        event_type: 'employee_completed_module',
+        actor_name: 'Marcus Chen',
+        entity_label: 'Marcus Chen completed HR Basics at Redex',
+      }),
+    ])
   })
 
   it('getAssignmentsForUser returns Marcus assignment', () => {

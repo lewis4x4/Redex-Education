@@ -6,6 +6,7 @@ import App from '@/App'
 import { useEducation, useMyProgress } from '@/hooks/useEducation'
 import { useAuth } from '@/hooks/useAuth'
 import { useAssignmentStore } from '@/features/assignments/store/assignmentStore'
+import { useAuditLogStore } from '@/features/audit/store/auditLogStore'
 import { useAssessmentAttemptStore } from '@/features/progress/store/assessmentAttemptStore'
 import { useModuleVersionsStore } from '@/features/publishing/store/moduleVersionsStore'
 import { MOCK_HR_ONBOARDING_ASSIGNMENT } from '@/lib/education'
@@ -89,6 +90,7 @@ describe('Redex Education routes', () => {
     } as never)
 
     act(() => {
+      useAuditLogStore.getState().resetEvents()
       useModuleVersionsStore.getState().resetVersions()
       useAssignmentStore.getState().resetAssignments()
       useAssessmentAttemptStore.getState().resetAttempts()
@@ -288,6 +290,15 @@ describe('Redex Education routes', () => {
     renderAt('/admin/assignments')
 
     expect(await screen.findByRole('heading', { name: 'Manage assignments' })).toBeInTheDocument()
+  })
+
+  it('renders AuditLogPage at /admin/audit', async () => {
+    vi.stubEnv('VITE_MOCK_AUTH', 'true')
+
+    renderAt('/admin/audit')
+
+    expect(await screen.findByRole('heading', { name: 'Audit log' })).toBeInTheDocument()
+    expect(screen.getByText('ADMIN · AUDIT')).toBeInTheDocument()
   })
 
   it('renders ModuleVersionHistoryPage at /admin/modules/:moduleId/versions', async () => {

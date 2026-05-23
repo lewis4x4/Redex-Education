@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { useAuditLogStore } from '@/features/audit/store/auditLogStore'
 import { useModuleVersionsStore } from '@/features/publishing/store/moduleVersionsStore'
 import { MOCK_DRIVE_SYNC_DELAY_MS } from '@/features/source-binder/lib/mockDriveSync'
 import { useSourceChangeEventsStore } from '@/features/source-binder/store/sourceChangeEventsStore'
@@ -10,6 +11,7 @@ describe('SourceImpactReviewPage', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     act(() => {
+      useAuditLogStore.getState().resetEvents()
       useModuleVersionsStore.getState().resetVersions()
       useSourceChangeEventsStore.getState().resetEvents()
     })
@@ -45,6 +47,15 @@ describe('SourceImpactReviewPage', () => {
 
     expect(useModuleVersionsStore.getState().versions[0]?.source_stale).toBeUndefined()
     expect(useSourceChangeEventsStore.getState().events[0]?.status).toBe('resolved')
+    expect(useAuditLogStore.getState().events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event_type: 'stale_lesson_regenerated',
+          actor_name: 'Jordan Patel',
+          entity_label: 'HR Basics at Redex v1',
+        }),
+      ]),
+    )
     expect(screen.getByText('Resolved')).toBeInTheDocument()
   })
 

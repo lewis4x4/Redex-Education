@@ -1,6 +1,9 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
+import { useAuditLogStore } from '@/features/audit/store/auditLogStore'
+import { DEMO_HR_BASICS_LESSONS, DEMO_LESSONS } from '@/lib/education/demo-data'
+import { MOCK_ORG_PEOPLE } from '@/lib/education/mockOrgPeople'
 import type { AssessmentAttempt } from '@/types/training'
 
 export interface RecordAttemptInput {
@@ -9,6 +12,7 @@ export interface RecordAttemptInput {
   score_percent: AssessmentAttempt['score_percent']
   passed: AssessmentAttempt['passed']
   answers: AssessmentAttempt['answers']
+  actor_user_id?: string
 }
 
 interface AssessmentAttemptState {
@@ -71,6 +75,36 @@ function sortAttemptsOldestFirst(attempts: AssessmentAttempt[]): AssessmentAttem
   return [...attempts].sort((a, b) => a.attempted_at.localeCompare(b.attempted_at))
 }
 
+function getActorUserId(input: RecordAttemptInput): string {
+  if (input.actor_user_id) {
+    return input.actor_user_id
+  }
+
+  if (input.enrollment_id.includes('marcus')) {
+    return 'user-marcus'
+  }
+
+  if (input.enrollment_id.includes('ana')) {
+    return 'user-ana'
+  }
+
+  if (input.enrollment_id.includes('devon')) {
+    return 'user-devon-lee'
+  }
+
+  return 'system'
+}
+
+function getActorName(userId: string): string {
+  return MOCK_ORG_PEOPLE.find((person) => person.id === userId)?.display_name ?? 'Learner'
+}
+
+function getLessonLabel(lessonId: string): string {
+  const lesson = [...DEMO_HR_BASICS_LESSONS, ...DEMO_LESSONS].find((candidate) => candidate.id === lessonId)
+
+  return lesson ? `${lesson.title} · ${lesson.module_id === 'hr-basics-mod-001' ? 'HR Basics at Redex' : 'Redex Academy'}` : lessonId
+}
+
 export const useAssessmentAttemptStore = create<AssessmentAttemptState>()(
   persist(
     (set, get) => ({
@@ -87,6 +121,18 @@ export const useAssessmentAttemptStore = create<AssessmentAttemptState>()(
         }
 
         set((state) => ({ attempts: [...state.attempts, attempt] }))
+
+        const actorUserId = getActorUserId(input)
+        useAuditLogStore.getState().recordEvent({
+          event_type: 'quiz_attempted',
+          actor_user_id: actorUserId,
+          actor_name: getActorName(actorUserId),
+          entity_type: 'quiz',
+          entity_id: input.lesson_id,
+          entity_label: getLessonLabel(input.lesson_id),
+          metadata: { score_percent: input.score_percent, passed: input.passed },
+        })
+
         return attempt
       },
       getAttemptsForLesson: (lessonId) =>

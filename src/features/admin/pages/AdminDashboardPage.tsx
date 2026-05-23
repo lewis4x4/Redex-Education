@@ -57,6 +57,9 @@ export function AdminDashboardPage() {
           <Link className="inline-flex text-sm font-semibold text-redex-red hover:underline" to="/admin/source-impact">
             Source Impact Review →
           </Link>
+          <Link className="inline-flex text-sm font-semibold text-redex-red hover:underline" to="/admin/audit">
+            Audit log →
+          </Link>
         </div>
       </div>
 

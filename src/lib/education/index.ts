@@ -43,6 +43,7 @@ export type {
   AssignmentLessonContent,
   AssignmentRubric,
   AssignmentRubricCriterion,
+  AuditEventType,
   AuditLog,
   ChecklistItem,
   ChecklistLessonContent,
@@ -145,6 +146,7 @@ export {
 export { MOCK_MANAGER_REPORTS, getDirectReports } from './mockManagerReports'
 
 export {
+  AUDIT_EVENT_TYPES,
   ASSESSMENT_STYLE_LABELS,
   CRITIQUE_CATEGORY_LABELS,
   CRITIQUE_SEVERITY_LABELS,

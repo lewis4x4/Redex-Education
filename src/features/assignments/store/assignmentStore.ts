@@ -1,8 +1,10 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
+import { useAuditLogStore } from '@/features/audit/store/auditLogStore'
 import { usePublishedModulesStore } from '@/features/publishing/store/publishedModulesStore'
 import { MOCK_ASSIGNMENTS } from '@/lib/education/mockAssignments'
+import { MOCK_ORG_PEOPLE } from '@/lib/education/mockOrgPeople'
 import type { Assignment } from '@/types/training'
 
 export interface CreateAssignmentInput {
@@ -72,6 +74,27 @@ function createAssignmentId(): string {
   return `assignment-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
+function getModuleLabel(moduleVersionId: string): string {
+  return (
+    usePublishedModulesStore.getState().publishedModules.find((module) => module.module_version_id === moduleVersionId)?.title ??
+    moduleVersionId
+  )
+}
+
+function getActorName(userId?: string): string {
+  return MOCK_ORG_PEOPLE.find((person) => person.id === userId)?.display_name ?? userId ?? 'Unassigned learner'
+}
+
+function getAssignmentEntityLabel(assignment: Assignment, verb: 'assigned' | 'completed'): string {
+  const assigneeLabel = assignment.assignee_user_id
+    ? getActorName(assignment.assignee_user_id)
+    : assignment.assignee_role
+      ? `All ${assignment.assignee_role}s`
+      : 'Unassigned learner'
+
+  return `${assigneeLabel} ${verb} ${getModuleLabel(assignment.module_version_id)}`
+}
+
 export const useAssignmentStore = create<AssignmentState>()(
   persist(
     (set, get) => ({
@@ -93,14 +116,40 @@ export const useAssignmentStore = create<AssignmentState>()(
         }
 
         set((state) => ({ assignments: [...state.assignments, assignment] }))
+        useAuditLogStore.getState().recordEvent({
+          event_type: 'assignment_created',
+          actor_user_id: input.assigned_by,
+          actor_name: getActorName(input.assigned_by),
+          entity_type: 'assignment',
+          entity_id: assignment.id,
+          entity_label: getAssignmentEntityLabel(assignment, 'assigned'),
+          metadata: { module_version_id: assignment.module_version_id },
+        })
         return assignment
       },
-      updateAssignmentStatus: (id, status) =>
+      updateAssignmentStatus: (id, status) => {
+        const existing = get().assignments.find((assignment) => assignment.id === id)
+        const shouldRecordCompletion = existing !== undefined && existing.status !== 'completed' && status === 'completed'
+
         set((state) => ({
           assignments: state.assignments.map((assignment) =>
             assignment.id === id ? { ...assignment, status } : assignment,
           ),
-        })),
+        }))
+
+        if (existing && shouldRecordCompletion) {
+          const actorUserId = existing.assignee_user_id ?? 'system'
+          useAuditLogStore.getState().recordEvent({
+            event_type: 'employee_completed_module',
+            actor_user_id: actorUserId,
+            actor_name: existing.assignee_user_id ? getActorName(existing.assignee_user_id) : 'System',
+            entity_type: 'assignment',
+            entity_id: existing.id,
+            entity_label: getAssignmentEntityLabel(existing, 'completed'),
+            metadata: { module_version_id: existing.module_version_id },
+          })
+        }
+      },
       getAssignmentsForUser: (userId) =>
         get().assignments.filter((assignment) => assignment.assignee_user_id === userId),
       getAssignmentsForModule: (moduleVersionId) =>

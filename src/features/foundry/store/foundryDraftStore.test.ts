@@ -33,6 +33,7 @@ function createStorageMock(): Storage {
 
 describe('useFoundryDraftStore', () => {
   let useFoundryDraftStore: (typeof import('./foundryDraftStore'))['useFoundryDraftStore']
+  let useAuditLogStore: (typeof import('@/features/audit/store/auditLogStore'))['useAuditLogStore']
   let usePublishedModulesStore: (typeof import('@/features/publishing/store/publishedModulesStore'))['usePublishedModulesStore']
   let useModuleVersionsStore: (typeof import('@/features/publishing/store/moduleVersionsStore'))['useModuleVersionsStore']
 
@@ -44,11 +45,13 @@ describe('useFoundryDraftStore', () => {
       value: createStorageMock(),
     })
 
+    ;({ useAuditLogStore } = await import('@/features/audit/store/auditLogStore'))
     ;({ useModuleVersionsStore } = await import('@/features/publishing/store/moduleVersionsStore'))
     ;({ usePublishedModulesStore } = await import('@/features/publishing/store/publishedModulesStore'))
     ;({ useFoundryDraftStore } = await import('./foundryDraftStore'))
 
     act(() => {
+      useAuditLogStore.getState().resetEvents()
       useModuleVersionsStore.getState().resetVersions()
       usePublishedModulesStore.getState().resetPublishedModules()
       useFoundryDraftStore.getState().clearDraft()
@@ -111,6 +114,30 @@ describe('useFoundryDraftStore', () => {
       }),
     )
     expect(typeof draft?.updated_at).toBe('string')
+  })
+
+  it('setBasics records module_created once for a new draft', () => {
+    act(() => {
+      useAuditLogStore.setState({ events: [] })
+      useFoundryDraftStore.getState().setBasics({
+        title: 'Field Safety Refresher',
+        parent_course_id: 'standalone',
+        audience: 'New hires',
+        criticality: 'required',
+        training_type: 'safety',
+        estimated_minutes: 30,
+      })
+      useFoundryDraftStore.getState().setBasics({
+        title: 'Field Safety Refresher Updated',
+        parent_course_id: 'standalone',
+        audience: 'New hires',
+        criticality: 'required',
+        training_type: 'safety',
+        estimated_minutes: 35,
+      })
+    })
+
+    expect(useAuditLogStore.getState().events.filter((event) => event.event_type === 'module_created')).toHaveLength(1)
   })
 
   it('clearDraft resets current draft to null', () => {
@@ -347,6 +374,19 @@ describe('useFoundryDraftStore', () => {
     expect(useFoundryDraftStore.getState().outline_status).toBe('approved')
   })
 
+  it('records outline_generated once and outline_approved once', () => {
+    act(() => {
+      useAuditLogStore.setState({ events: [] })
+      useFoundryDraftStore.getState().setOutline(MOCK_GENERATED_OUTLINE)
+      useFoundryDraftStore.getState().setOutline(MOCK_GENERATED_OUTLINE)
+      useFoundryDraftStore.getState().approveOutline()
+      useFoundryDraftStore.getState().approveOutline()
+    })
+
+    expect(useAuditLogStore.getState().events.filter((event) => event.event_type === 'outline_generated')).toHaveLength(1)
+    expect(useAuditLogStore.getState().events.filter((event) => event.event_type === 'outline_approved')).toHaveLength(1)
+  })
+
   it('starts with generatedModule as null', () => {
     expect(useFoundryDraftStore.getState().generatedModule).toBeNull()
   })
@@ -449,6 +489,17 @@ describe('useFoundryDraftStore', () => {
 
     expect(updated?.lesson_title).toBe('Payroll and Timekeeping Basics')
     expect(updated?.status).toBe('approved')
+  })
+
+  it('approveLessonReview records lesson_approved once per pending lesson', () => {
+    act(() => {
+      useAuditLogStore.setState({ events: [] })
+      useFoundryDraftStore.getState().setLessonReviews(MOCK_LESSON_REVIEWS)
+      useFoundryDraftStore.getState().approveLessonReview(2, 0)
+      useFoundryDraftStore.getState().approveLessonReview(2, 0)
+    })
+
+    expect(useAuditLogStore.getState().events.filter((event) => event.event_type === 'lesson_approved')).toHaveLength(1)
   })
 
   it('isPublishBlocked follows unsupported pending claims and clears after approval', () => {
@@ -559,6 +610,20 @@ describe('useFoundryDraftStore', () => {
     )
   })
 
+  it('setPublished records module_published when publish succeeds', () => {
+    act(() => {
+      useAuditLogStore.setState({ events: [] })
+      seedPublishReadyModule()
+      useFoundryDraftStore.getState().setPublished()
+    })
+
+    expect(useAuditLogStore.getState().events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ event_type: 'module_published', entity_label: 'HR Basics at Redex v1' }),
+      ]),
+    )
+  })
+
   it('setPublished rejects drafts that are not approved yet', () => {
     let didPublish = true
 
@@ -636,6 +701,19 @@ describe('useFoundryDraftStore', () => {
         title: 'HR Basics at Redex',
       }),
     )
+  })
+
+  it('seedDraftFromModuleVersion records module_version_forked once per version id', () => {
+    act(() => {
+      useAuditLogStore.setState({ events: [] })
+      seedPublishReadyModule()
+      useFoundryDraftStore.getState().setPublished()
+      const forked = useModuleVersionsStore.getState().forkNewDraftVersion('module-version-hr-basics-v1')
+      useFoundryDraftStore.getState().seedDraftFromModuleVersion(forked)
+      useFoundryDraftStore.getState().seedDraftFromModuleVersion(forked)
+    })
+
+    expect(useAuditLogStore.getState().events.filter((event) => event.event_type === 'module_version_forked')).toHaveLength(1)
   })
 
   it('review mutations reset a published draft back to draft status', () => {

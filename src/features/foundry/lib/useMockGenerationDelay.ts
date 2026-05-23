@@ -63,5 +63,5 @@ export function useMockGenerationDelay(opts: UseMockGenerationDelayOptions): Use
     }
   }, [delayMs, shouldGenerate])
 
-  return { isGenerating }
+  return { isGenerating: shouldGenerate && isGenerating }
 }
