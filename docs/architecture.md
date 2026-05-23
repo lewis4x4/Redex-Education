@@ -45,6 +45,7 @@ Grounded in `src/App.tsx`:
 | `/admin/foundry/preview` | `ModuleGenerationPreviewRoute` → `ModuleGenerationPreviewPage` | ✓ | ✓ | Course Foundry full module generation preview — generates all lessons in one click; status-tagged; not published |
 | `/admin/foundry/critique` | `SelfCritiqueReviewRoute` → `SelfCritiqueReviewPage` | ✓ | ✓ | Course Foundry AI self-critique — flagged issues with severity; high-severity blocks publish until resolved or ignored |
 | `/admin/foundry/sidebyside` | `SideBySideReviewRoute` → `SideBySideReviewPage` | ✓ | ✓ | Course Foundry side-by-side generated/source comparison — per-lesson approve/regeneration with confidence + unsupported claim flags |
+| `/admin/foundry/blockers` | `PublishBlockersRoute` → `PublishBlockersPage` | ✓ | ✓ | Course Foundry publish blockers — aggregated view of missing-source + critique + unsupported-claim blockers across the module |
 | `/admin/foundry/library` | `SourceLibraryRoute` → `SourceLibraryPage` | ✓ | ✓ | Course Foundry source library — browse Drive-ingested source files with authority + version |
 | `*` | `NotFoundRoute` → `NotFoundPage` | ✓ | — | Catchall |
 

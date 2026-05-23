@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertOctagon } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -57,6 +57,7 @@ function generatedContentFor(review: LessonReviewItem) {
 }
 
 export function SideBySideReviewPage() {
+  const navigate = useNavigate()
   const lessonReviews = useFoundryDraftStore((state) => state.lessonReviews)
   const setLessonReviews = useFoundryDraftStore((state) => state.setLessonReviews)
   const approveLessonReview = useFoundryDraftStore((state) => state.approveLessonReview)
@@ -195,7 +196,7 @@ export function SideBySideReviewPage() {
         <Link to="/admin/foundry/source" className="text-sm font-medium text-slate-600 transition-colors hover:text-slate-900">
           Return to source binder
         </Link>
-        <Button variant="brand" disabled title="Coming in Slice 3.5 — missing source policy">
+        <Button variant="brand" onClick={() => navigate('/admin/foundry/blockers')}>
           Continue → Resolve blockers
         </Button>
       </footer>

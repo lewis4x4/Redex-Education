@@ -2840,3 +2840,64 @@ Wires "Continue → Side-by-side review" on SelfCritiqueReviewPage. Admin compar
 
 ---
 
+## 2026-05-22 — Slice 3.5: Placeholder and Missing Source Policy (Phase 3 closes)
+
+**Status**: ✅ Completed. **Closes out Phase 3 — Source Binder and AI Review Loop.**
+
+**Master roadmap**: Phase 3 / Slice 3.5 (lines 1248–1295).
+**Linear ticket**: `Source Binder: enforce placeholder and missing-source policy`.
+
+**Context**:
+Consolidates the missing-source policy that was emerging in scattered form across Slices 2.3 (PLACEHOLDER_TOKENS detection), 3.1 (MissingInfoWarnings), 3.3 (critique.blocks_publish), and 3.4 (lessonReviews.isPublishBlocked). Unifies into a single canonical policy + reusable components + an aggregated PublishBlockersPage that gathers blockers from all three sources (source files with placeholders, high-severity critique issues, lessons with unsupported claims). Wires "Continue → Resolve blockers" on the side-by-side page to this new aggregated view. Publish workflow itself remains deferred to Slice 7.1.
+
+**Orchestration**: 4 engineer sub-agents (A blocking → B || C parallel → D). Zero file conflicts.
+
+**Summary**:
+
+### Item A — Foundation
+- Canonical `PublishBlockerSeverity` ('warning' | 'blocker'), `PublishBlockerSource` (3 sources), `PUBLISH_BLOCKER_SOURCE_LABELS`, `PublishBlocker` interface
+- `src/features/source-binder/utils/sourceValidation.ts` (96 lines) — pure utility reusing `PLACEHOLDER_TOKENS` from `markdownSections.ts`. Exports `detectMissingSource(text)`, `hasMissingSource(text)`, `MISSING_SOURCE_WARNING` const, `classifyMissingSourceSeverity(snippet)` (maps `[PLACEHOLDER]`/`[FIXME]` → blocker; `[TODO]` → warning)
+- `foundryDraftStore.getPublishBlockers(): PublishBlocker[]` — aggregates blockers across the three sources with stable IDs (`source-placeholder-<sectionId>`, `critique-<issueId>`, `lesson-unsupported-<lessonIdx>-<moduleIdx>`)
+- `mockMissingSource.ts` (47 lines) — `MOCK_MISSING_SOURCE_TEXTS` + `MOCK_PUBLISH_BLOCKERS` fallback data for the page when full foundry state isn't populated
+
+### Item B — Components
+- `MissingSourceBanner.tsx` (44) — standard red Tier 1 alert card with AlertOctagon, "Missing source" heading, default body from `MISSING_SOURCE_WARNING`, optional CTA via `resolveLabel` + `onResolve`. `role="alert"` for screen readers.
+- `PublishBlockerList.tsx` (87) — Tier 1 card titled "Publish blockers" with count badge. Empty state with CheckCircle2 + "No publish blockers. You're clear to publish." Non-empty rows: severity icon + source label badge + summary + collapsible `<details>` for detail + Resolve button when `resolve_route` present.
+
+### Item C — Page + route + SideBySide wire
+- `PublishBlockersPage.tsx` (64) — eyebrow STEP 8 + H1 "Publish blockers". Reads blockers from `getPublishBlockers()`; falls back to `MOCK_PUBLISH_BLOCKERS` when foundry state is empty (dev/demo). Footer "Publish module" button always disabled (publishing is Slice 7.1) with title swapping per blocker count: "Resolve all blockers above..." when count > 0; "Publishing workflow lands in Slice 7.1" when zero. Green "✓ Module is clear to publish" card appears when blockers.length === 0.
+- `src/App.tsx` — new `PublishBlockersRoute` + `<Route path="/admin/foundry/blockers">` before `/admin/*`
+- `SideBySideReviewPage.tsx` — "Continue → Resolve blockers" flipped from disabled to enabled with navigation
+- `docs/architecture.md` — new route row
+
+### Item D — Tests
+- **+19 net new tests** across 4 new + 3 extended files; total **217 → 236 passing** across 47 test files
+- Coverage: Statements **90.93%** (slight -0.11 from baseline; new error branches in PublishBlockerList expand/collapse not all exercised — acceptable)
+
+**Verification**:
+- ✅ typecheck green, lint 0/0
+- ✅ npm test: 236/236 passing
+- ✅ build green
+- ✅ coverage 90.93% statements
+
+**Acceptance criteria** (master roadmap):
+- ✅ Placeholder text is detected in mock source — `detectMissingSource` exercised in 5 unit tests
+- ✅ Missing-source warning appears — `MissingSourceBanner` ships the canonical ⚠️ MISSING SOURCE message
+- ✅ Publish is blocked while unresolved — `PublishBlockersPage` disables the Publish button when blockers.length > 0; aggregated view shows all blockers across the workflow
+- ✅ Build Bible updated
+
+**Phase 3 complete**: Source Binder + AI Review Loop ships end-to-end (mocked AI throughout per Phase 3 charter). Workflow: Source Library → paste → outline review → module preview → self-critique → side-by-side → publish blockers. Real AI generation lands in the AI Slices A/B/C; publish workflow lands in Slice 7.1.
+
+**Known gaps (deferred)**:
+- Real AI generation/critique remains mocked
+- Real publish workflow (Slice 7.1)
+- Manual editing (future)
+- Module versioning + audit log (Slices 7.2/7.4)
+- Slice 4.x — formal Phase 4 type consolidation (most domain types are already canonical from Slices 2.x-3.x; this becomes mostly bookkeeping)
+
+**Naming guardrails honored**: Foundry context.
+
+**Next**: Phase 4 — Structured Data Model (Slice 4.1 — Training Domain Types). Most of this is now retrospective bookkeeping since Phase 3 already required canonical types per slice; the actual Phase 4 effort consolidates and documents what's already in place.
+
+---
+

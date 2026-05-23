@@ -1,5 +1,5 @@
-import { act, render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { MOCK_LESSON_REVIEWS } from '@/features/foundry/data/mockLessonReviews'
@@ -92,5 +92,25 @@ describe('SideBySideReviewPage', () => {
     expect(await screen.findByText('2 approved')).toBeInTheDocument()
     expect(screen.getByText('6 pending')).toBeInTheDocument()
     expect(screen.getByText('0 need regeneration')).toBeInTheDocument()
+  })
+
+  it('keeps Continue enabled and navigates to blockers page on click', async () => {
+    render(
+      <MemoryRouter initialEntries={['/admin/foundry/sidebyside']}>
+        <Routes>
+          <Route path="/admin/foundry/sidebyside" element={<SideBySideReviewPage />} />
+          <Route path="/admin/foundry/blockers" element={<h1>Publish blockers</h1>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await screen.findByRole('heading', { name: 'Generated content' })
+
+    const continueButton = screen.getByRole('button', { name: 'Continue → Resolve blockers' })
+    expect(continueButton).toBeEnabled()
+
+    fireEvent.click(continueButton)
+
+    expect(screen.getByRole('heading', { name: 'Publish blockers' })).toBeInTheDocument()
   })
 })

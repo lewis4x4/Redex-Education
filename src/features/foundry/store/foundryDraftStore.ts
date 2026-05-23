@@ -5,6 +5,7 @@ import type {
   GeneratedModulePreview,
   LessonGenerationStatus,
   LessonReviewItem,
+  PublishBlocker,
   SelfCritiqueReport,
   SetupAnswers,
   SourceMaterial,
@@ -45,6 +46,8 @@ interface FoundryDraftState {
   rejectLessonReview: (lessonIdx: number, moduleIdx: number) => void;
   /** Computes true when any lesson has unsupported_claim AND is not approved. */
   isPublishBlocked: () => boolean;
+  /** Aggregates all blockers that prevent publishing. */
+  getPublishBlockers: () => PublishBlocker[];
   /** Clear self-critique report */
   clearCritique: () => void;
   /** Mark one critique issue ignored and attach note */
@@ -128,6 +131,65 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
         get().lessonReviews.some(
           (item) => item.has_unsupported_claim && item.status !== 'approved'
         ),
+      getPublishBlockers: () => {
+        const state = get();
+        const blockers: PublishBlocker[] = [];
+
+        const sourceSections = state.sourceMaterial?.sections ?? [];
+        for (const section of sourceSections) {
+          if (!section.has_placeholders) {
+            continue;
+          }
+
+          blockers.push({
+            id: `source-placeholder-${section.id}`,
+            source: 'source_placeholder',
+            severity: 'blocker',
+            location:
+              section.heading.trim() !== ''
+                ? `Source section: ${section.heading}`
+                : `Source section #${section.position_index + 1}`,
+            summary: 'Source section contains placeholder content that must be resolved.',
+            detail: section.body.slice(0, 200) || 'Section body is empty.',
+            resolve_route: '/admin/foundry/source',
+          });
+        }
+
+        const critiqueIssues = state.critique?.issues ?? [];
+        for (const issue of critiqueIssues) {
+          if (issue.severity !== 'high' || issue.ignored) {
+            continue;
+          }
+
+          blockers.push({
+            id: `critique-${issue.id}`,
+            source: 'critique_high_severity',
+            severity: 'blocker',
+            location: issue.lesson_title ?? 'Critique review',
+            summary: issue.summary,
+            detail: issue.detail,
+            resolve_route: '/admin/foundry/critique',
+          });
+        }
+
+        for (const review of state.lessonReviews) {
+          if (!review.has_unsupported_claim || review.status === 'approved') {
+            continue;
+          }
+
+          blockers.push({
+            id: `lesson-unsupported-${review.lesson_index}-${review.module_index}`,
+            source: 'lesson_unsupported_claim',
+            severity: 'blocker',
+            location: review.lesson_title,
+            summary: 'Lesson has an unsupported claim pending resolution.',
+            detail: review.unsupported_note,
+            resolve_route: '/admin/foundry/sidebyside',
+          });
+        }
+
+        return blockers;
+      },
       clearCritique: () => set({ critique: null }),
       ignoreIssue: (issueId, note) =>
         set((state) => {

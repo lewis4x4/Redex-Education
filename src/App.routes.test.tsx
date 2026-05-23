@@ -162,4 +162,12 @@ describe('Redex Education routes', () => {
 
     expect(await screen.findByRole('heading', { name: 'Side-by-side review' })).toBeInTheDocument()
   })
+
+  it('renders PublishBlockersPage at /admin/foundry/blockers', async () => {
+    vi.stubEnv('VITE_MOCK_AUTH', 'true')
+
+    renderAt('/admin/foundry/blockers')
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Publish blockers' })).toBeInTheDocument()
+  })
 })

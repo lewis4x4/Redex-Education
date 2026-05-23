@@ -403,6 +403,32 @@ export type LessonGenerationStatus =
 
 export type CritiqueSeverity = 'low' | 'medium' | 'high';
 
+export type PublishBlockerSeverity = 'warning' | 'blocker';
+export type PublishBlockerSource =
+  | 'source_placeholder'
+  | 'critique_high_severity'
+  | 'lesson_unsupported_claim';
+
+export const PUBLISH_BLOCKER_SOURCE_LABELS: Record<PublishBlockerSource, string> = {
+  source_placeholder: 'Source file placeholder',
+  critique_high_severity: 'Critique high-severity issue',
+  lesson_unsupported_claim: 'Lesson with unsupported claim',
+};
+
+export interface PublishBlocker {
+  id: string;
+  source: PublishBlockerSource;
+  severity: PublishBlockerSeverity;
+  /** Where the blocker was detected. */
+  location: string;
+  /** Short summary of the blocker. */
+  summary: string;
+  /** Optional detail / suggested fix. */
+  detail?: string;
+  /** Route path to resolve, if known. */
+  resolve_route?: string;
+}
+
 export type LessonReviewStatus = 'pending' | 'approved' | 'needs_regeneration';
 export type LessonConfidenceLevel = 'high' | 'medium' | 'low' | 'unsupported';
 

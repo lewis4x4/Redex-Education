@@ -438,6 +438,53 @@ describe('useFoundryDraftStore', () => {
     expect(useFoundryDraftStore.getState().isPublishBlocked()).toBe(false)
   })
 
+  it('getPublishBlockers starts empty', () => {
+    expect(useFoundryDraftStore.getState().getPublishBlockers()).toEqual([])
+  })
+
+  it('getPublishBlockers includes critique high-severity unignored issues with stable IDs', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setCritique(MOCK_SELF_CRITIQUE)
+    })
+
+    const blockers = useFoundryDraftStore
+      .getState()
+      .getPublishBlockers()
+      .filter((blocker) => blocker.source === 'critique_high_severity')
+
+    expect(blockers.length).toBeGreaterThan(0)
+    expect(blockers.map((blocker) => blocker.id)).toEqual(
+      expect.arrayContaining(['critique-critique-issue-001', 'critique-critique-issue-002']),
+    )
+  })
+
+  it('getPublishBlockers includes lesson unsupported-claim blockers for non-approved lessons', () => {
+    const firstReview = MOCK_LESSON_REVIEWS[0]!
+
+    act(() => {
+      useFoundryDraftStore.getState().setLessonReviews([
+        {
+          ...firstReview,
+          has_unsupported_claim: true,
+          status: 'pending',
+          lesson_index: 0,
+          module_index: 1,
+        },
+      ])
+    })
+
+    const blockers = useFoundryDraftStore.getState().getPublishBlockers()
+
+    expect(blockers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'lesson_unsupported_claim',
+          id: 'lesson-unsupported-0-1',
+        }),
+      ]),
+    )
+  })
+
   it('starts with selectedLibraryFileIds as an empty array', () => {
     expect(useFoundryDraftStore.getState().selectedLibraryFileIds).toEqual([])
   })
