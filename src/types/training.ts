@@ -721,6 +721,10 @@ export interface ModuleVersion {
   source_binder_version?: UUID;
   /** Assessment version paired with this module version. */
   assessment_version?: UUID;
+  /** Advisory flag only: a source change touched this version but does not alter publish status. */
+  source_stale?: boolean;
+  /** Timestamp when the advisory stale flag was set. */
+  stale_since?: ISODateTime;
   /** Cached/mock count used by admin history views; live helpers can recompute it. */
   completed_count?: number;
   created_at: ISODateTime;
@@ -731,16 +735,13 @@ export interface ModuleVersion {
  */
 export interface SourceChangeEvent {
   id: UUID;
-  source_file_id: UUID;
-  old_source_file_version_id?: UUID;
-  new_source_file_version_id: UUID;
+  source_file_id: string;
+  source_file_name: string;
+  section_ids_changed: string[];
+  old_revision_id: string;
+  new_revision_id: string;
   detected_at: ISODateTime;
-  /** Sections that changed between old and new versions. */
-  changed_section_ids: UUID[];
-  /** Module versions impacted by the change. */
-  impacted_module_version_ids: UUID[];
-  /** Resolution status. */
-  status: 'pending' | 'regenerating' | 'resolved' | 'ignored';
+  status: 'unreviewed' | 'reviewed' | 'resolved';
 }
 
 /**

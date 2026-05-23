@@ -136,7 +136,17 @@ export function ModuleVersionHistoryPage() {
                         </span>
                       ) : null}
                       <ModuleStateBadge state={statusToApprovalState(version.status)} />
+                      {version.source_stale ? (
+                        <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                          Stale source
+                        </span>
+                      ) : null}
                     </div>
+                    {version.source_stale ? (
+                      <Link className="inline-flex text-sm font-semibold text-redex-red hover:underline" to="/admin/source-impact">
+                        Review source impact →
+                      </Link>
+                    ) : null}
                     <dl className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
                       <div>
                         <dt className="font-semibold text-slate-900">Published</dt>

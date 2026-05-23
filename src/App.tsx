@@ -33,6 +33,10 @@ const SourceLibraryPage = lazy(() =>
   import('@/features/source-binder/pages/SourceLibraryPage').then((m) => ({ default: m.SourceLibraryPage })),
 )
 
+const SourceImpactReviewPage = lazy(() =>
+  import('@/features/source-binder/pages/SourceImpactReviewPage').then((m) => ({ default: m.SourceImpactReviewPage })),
+)
+
 const FoundryStartPage = lazy(() =>
   import('@/features/foundry/pages/FoundryStartPage').then((m) => ({ default: m.FoundryStartPage })),
 )
@@ -344,6 +348,18 @@ function ModuleVersionHistoryRoute() {
   )
 }
 
+function SourceImpactReviewRoute() {
+  return (
+    <AppShell breadcrumb="Admin flow › Source impact">
+      <AuthGate>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <SourceImpactReviewPage />
+        </Suspense>
+      </AuthGate>
+    </AppShell>
+  )
+}
+
 function NotFoundRoute() {
   return (
     <AppShell breadcrumb="Page not found">
@@ -362,6 +378,7 @@ export default function App() {
       <Route path="/learn/player/:moduleId" element={<LearnerModuleRoute />} />
       <Route path="/admin" element={<AdminRoute />} />
       <Route path="/admin/assignments" element={<AssignmentAdminRoute />} />
+      <Route path="/admin/source-impact" element={<SourceImpactReviewRoute />} />
       <Route path="/admin/modules/:moduleId/versions" element={<ModuleVersionHistoryRoute />} />
       <Route path="/manager" element={<ManagerRoute />} />
       <Route path="/admin/foundry/start" element={<FoundryStartRoute />} />

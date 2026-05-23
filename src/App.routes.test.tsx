@@ -299,6 +299,15 @@ describe('Redex Education routes', () => {
     expect(screen.getByText('Version history')).toBeInTheDocument()
   })
 
+  it('renders SourceImpactReviewPage at /admin/source-impact', async () => {
+    vi.stubEnv('VITE_MOCK_AUTH', 'true')
+
+    renderAt('/admin/source-impact')
+
+    expect(await screen.findByRole('heading', { name: 'Review source changes before regeneration' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sync from Drive' })).toBeInTheDocument()
+  })
+
   it('renders ManagerDashboardPage at /manager', async () => {
     renderAt('/manager')
 

@@ -47,12 +47,17 @@ export function AdminDashboardPage() {
 
       <div className="space-y-3">
         <CourseStatusList title="Published" items={summary.published} />
-        <Link
-          className="inline-flex text-sm font-semibold text-redex-red hover:underline"
-          to="/admin/modules/hr-basics-mod-001/versions"
-        >
-          View HR Basics versions →
-        </Link>
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
+          <Link
+            className="inline-flex text-sm font-semibold text-redex-red hover:underline"
+            to="/admin/modules/hr-basics-mod-001/versions"
+          >
+            View HR Basics versions →
+          </Link>
+          <Link className="inline-flex text-sm font-semibold text-redex-red hover:underline" to="/admin/source-impact">
+            Source Impact Review →
+          </Link>
+        </div>
       </div>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="assignment-summary-heading">

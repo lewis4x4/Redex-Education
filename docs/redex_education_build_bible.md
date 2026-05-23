@@ -3400,3 +3400,60 @@ Slice 7.1's `publishedModulesStore` tracks "what's currently assignable" but hol
 
 ---
 
+## 2026-05-23 — Slice 7.3: Source Change Detection and Version Impact Review
+
+**Status**: ✅ Completed.
+
+**Linear ticket**: `Source Binder: add source change detection and version impact review`.
+
+**Context**:
+Closes the loop on the published-but-source-may-change problem. Real `module_source_bindings` lands in Slice 8.2 (Supabase); this slice ships the full mocked vertical so the UI and contract are stable. An admin can click "Sync from Drive" → see changed sections → see which module versions are affected → run a scoped regenerate that only touches lessons bound to changed sections. Published modules stay Published, but display an advisory "Stale source" pill until the impact is resolved.
+
+**Orchestration**: Single pair agent (Codex CLI · gpt-5.5 high) with internal Oracle review pass — four real defects flagged, all fixed before verification:
+1. Same-revision re-sync was creating duplicate events + re-staling resolved modules (now preserves resolved state).
+2. Deleted source sections weren't detected as changed (now caught by `computeChangedSections`).
+3. Regeneration cleared `source_stale` even when only some affected lessons were regenerated (now requires all affected lessons across all unreviewed events to be resolved).
+4. Diff view only rendered one changed section when an event touched multiple (Payroll + Timekeeping now both render).
+
+**Files touched**:
+- `src/types/training.ts` — extended `SourceChangeEvent` (`section_ids_changed`, `old_revision_id`, `new_revision_id`, `detected_at`, `status`); extended `ModuleVersion` with `source_stale?` + `stale_since?` (advisory, does NOT break Published status).
+- `src/features/source-binder/data/mockModuleSourceBindings.ts` (new) — `ModuleSourceBinding` shape + 6 HR Basics v1 seed bindings, one per lesson. Section IDs consistent with `MOCK_LESSON_SOURCE_BINDINGS`.
+- `src/features/source-binder/store/sourceChangeEventsStore.ts` (new) — Zustand + `persist` (`redex-source-change-events-v1`); empty initial state; CRUD + mark-reviewed/resolved + reset.
+- `src/features/source-binder/lib/sourceImpact.ts` (new) — pure `computeAffectedModules` + `computeChangedSections` (catches deletions); `AffectedModule = { version, affectedLessonIds, affectedSectionIds, changedSourceFileIds }`.
+- `src/features/source-binder/lib/mockDriveSync.ts` (new) — `simulateDriveSync()` records a synthetic event (Payroll + Timekeeping sections of `HR_ONBOARDING_SOURCE_SAMPLE.md`); cross-store side effect calls `moduleVersionsStore.markVersionStale(versionId, true)` on affected versions. Idempotent: re-syncing at the same revision preserves resolved events.
+- `src/features/publishing/store/moduleVersionsStore.ts` — new `markVersionStale(versionId, stale)` action; also sets/clears `stale_since`.
+- `src/features/source-binder/components/SourceChangeList.tsx` (new) — file/who/when/old→new revision card; status badge.
+- `src/features/source-binder/components/SectionDiffView.tsx` (new) — side-by-side before/after for ALL changed sections in the selected event; no diff library (plain panes + Changed badge per section).
+- `src/features/source-binder/components/AffectedModulesPanel.tsx` (new) — grouped affected modules; per-card status badge (Up-to-date green / Stale amber / Regenerating muted-blue); lesson selection checkboxes; scoped Regenerate CTA.
+- `src/features/source-binder/pages/SourceImpactReviewPage.tsx` (new) at `/admin/source-impact` — Sync from Drive button → list/diff/affected-modules layout. Regeneration mocks a 600ms delay; clears `source_stale` only when all affected lessons for the event are resolved AND no unresolved impact remains across other events.
+- `src/App.tsx` — `/admin/source-impact` lazy route.
+- `src/features/admin/pages/AdminDashboardPage.tsx` — "Source Impact Review →" entry link.
+- `src/features/publishing/pages/ModuleVersionHistoryPage.tsx` — amber "Stale source" pill next to status badge when `source_stale: true`; "Review source impact →" link to `/admin/source-impact`.
+- Tests: `sourceImpact.test.ts` (compute branches + edge cases + deletion detection), `sourceChangeEventsStore.test.ts` (CRUD + persist), `mockDriveSync.test.ts` (sync produces events + cross-store stale side effect + same-revision idempotency), three component tests, `SourceImpactReviewPage.test.tsx` (happy path: sync → events → select → diff → regenerate → stale clears → event resolved with fake timers), `ModuleVersionHistoryPage` stale-pill coverage, route smoke.
+
+**Verification**:
+- ✅ typecheck green
+- ✅ lint 0/0
+- ✅ npm test: **399 passed, 1 skipped** (+19 vs Slice 7.2 baseline of 380)
+- ✅ build green
+- ✅ Oracle review pass — four findings applied (idempotent re-sync, deletion detection, partial-regen stale-clear gate, multi-section diff rendering)
+
+**Acceptance criteria** (master roadmap):
+- ✅ A changed Drive source file is detected on sync (mocked via `simulateDriveSync()`; real wiring deferred to Phase 8 / 8.2 — contract is stable)
+- ✅ Affected modules identified via section-level bindings (`computeAffectedModules` joins events against `MOCK_MODULE_SOURCE_BINDINGS`; unaffected modules don't appear)
+- ✅ Stale modules flagged without losing Published state (advisory `source_stale` flag on `ModuleVersion`; module remains `status: 'published'`)
+- ✅ Scoped regeneration re-runs only affected lessons (per-lesson checkbox selection; only selected affected lessons are "regenerated" in the mock; stale clears only when fully resolved)
+- ✅ Build Bible updated
+
+**Known scope deferred**:
+- Real Drive `headRevisionId` comparison via the existing `drive-sync` edge function — Phase 8 / 8.2 swaps the mock for the real call. Contract stable.
+- `module_source_bindings` persisted table — Phase 8 / 8.2.
+- AI regeneration of stale lessons — currently mocked with a 600ms delay; real regeneration arrives with the rest of the Foundry AI wire-up (Phase 8 / 9).
+- No automated background sync (`pg_cron` poll) — explicitly fast-follow per the roadmap.
+
+**Naming guardrails honored**: HR Basics, Marcus / Jordan / etc. — established personas only. Synthetic change event uses the existing Payroll + Timekeeping placeholder story line that ties back to `HR_ONBOARDING_SOURCE_SAMPLE.md`.
+
+**Next**: Slice 7.4 — Audit Log UI. Admin can see audit events (module created / source uploaded / outline generated / outline approved / module generated / self-critique completed / lesson approved / module published / assignment created / employee completed module / quiz attempted). Mock-event surfaced; events include actor + action + entity + timestamp.
+
+---
+

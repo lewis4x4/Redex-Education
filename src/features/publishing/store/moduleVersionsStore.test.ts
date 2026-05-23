@@ -159,6 +159,22 @@ describe('useModuleVersionsStore', () => {
     )
   })
 
+  it('markVersionStale toggles advisory stale metadata without changing publish status', () => {
+    act(() => {
+      useModuleVersionsStore.getState().markVersionStale('module-version-hr-basics-v1', true)
+    })
+
+    const staleVersion = useModuleVersionsStore.getState().versions[0]
+    expect(staleVersion).toEqual(expect.objectContaining({ status: 'published', source_stale: true }))
+    expect(Number.isNaN(Date.parse(staleVersion?.stale_since ?? ''))).toBe(false)
+
+    act(() => {
+      useModuleVersionsStore.getState().markVersionStale('module-version-hr-basics-v1', false)
+    })
+
+    expect(useModuleVersionsStore.getState().versions[0]).toEqual(HR_BASICS_MODULE_VERSION_V1)
+  })
+
   it('archiveVersion marks a version archived, removes assignability, and resetVersions restores the seed', () => {
     act(() => {
       useModuleVersionsStore.getState().archiveVersion('module-version-hr-basics-v1')

@@ -67,11 +67,16 @@ describe('AdminDashboardPage', () => {
     expect(screen.getByRole('heading', { name: 'Learners in progress' })).toBeInTheDocument()
   })
 
-  it('renders all course status sections', () => {
+  it('renders all course status sections and admin review links', () => {
     renderPage()
 
     expect(screen.getByRole('list', { name: 'Drafts modules' })).toBeInTheDocument()
     expect(screen.getByRole('list', { name: 'Needs review modules' })).toBeInTheDocument()
     expect(screen.getByRole('list', { name: 'Published modules' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'View HR Basics versions →' })).toHaveAttribute(
+      'href',
+      '/admin/modules/hr-basics-mod-001/versions',
+    )
+    expect(screen.getByRole('link', { name: 'Source Impact Review →' })).toHaveAttribute('href', '/admin/source-impact')
   })
 })

@@ -29,6 +29,8 @@ export interface RegisterModuleVersionInput {
   approved_by?: UUID
   source_binder_version?: UUID
   assessment_version?: UUID
+  source_stale?: boolean
+  stale_since?: ISODateTime
   completed_count?: number
   published_at?: ISODateTime
   created_at?: ISODateTime
@@ -41,6 +43,7 @@ interface ModuleVersionsState {
   getLatestPublishedVersion: (moduleId: string) => ModuleVersion | undefined
   forkNewDraftVersion: (fromVersionId: string) => ModuleVersion
   archiveVersion: (versionId: string) => void
+  markVersionStale: (versionId: string, stale: boolean) => void
   resetVersions: () => void
 }
 
@@ -157,6 +160,8 @@ export const useModuleVersionsStore = create<ModuleVersionsState>()(
           ...(input.assessment_version ?? existing?.assessment_version
             ? { assessment_version: input.assessment_version ?? existing?.assessment_version }
             : {}),
+          ...(input.source_stale ?? existing?.source_stale ? { source_stale: input.source_stale ?? existing?.source_stale } : {}),
+          ...(input.stale_since ?? existing?.stale_since ? { stale_since: input.stale_since ?? existing?.stale_since } : {}),
           ...(completedCount !== undefined ? { completed_count: completedCount } : {}),
           created_at: existing?.created_at ?? input.created_at ?? now,
         }
@@ -219,6 +224,28 @@ export const useModuleVersionsStore = create<ModuleVersionsState>()(
           versions: state.versions.map((version) =>
             version.id === versionId ? { ...version, status: 'archived' } : version,
           ),
+        }))
+      },
+      markVersionStale: (versionId, stale) => {
+        set((state) => ({
+          versions: state.versions.map((version) => {
+            if (version.id !== versionId) {
+              return version
+            }
+
+            if (!stale) {
+              const freshVersion = { ...version }
+              delete freshVersion.source_stale
+              delete freshVersion.stale_since
+              return freshVersion
+            }
+
+            return {
+              ...version,
+              source_stale: true,
+              stale_since: version.stale_since ?? new Date().toISOString(),
+            }
+          }),
         }))
       },
       resetVersions: () => set({ versions: cloneSeedVersions() }),

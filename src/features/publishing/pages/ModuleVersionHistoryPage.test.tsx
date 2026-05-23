@@ -94,6 +94,17 @@ describe('ModuleVersionHistoryPage', () => {
     expect(await screen.findByText('Devon Lee')).toBeInTheDocument()
   })
 
+  it('renders a stale source pill and source impact review link when a version is stale', () => {
+    act(() => {
+      useModuleVersionsStore.getState().markVersionStale('module-version-hr-basics-v1', true)
+    })
+
+    renderPage()
+
+    expect(screen.getByText('Stale source')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Review source impact →' })).toHaveAttribute('href', '/admin/source-impact')
+  })
+
   it('renders a defensive empty state for modules without history', () => {
     renderPage('unknown-module')
 
