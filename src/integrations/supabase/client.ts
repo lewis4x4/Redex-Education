@@ -15,6 +15,12 @@ if (!hasSupabaseEnv) {
   if (!MOCK_AUTH_ENABLED) {
     throw new Error(message);
   }
+
+  // Mock-auth mode: continue without env but make the configuration gap
+  // visible so it isn't accidentally deployed to a real Supabase backend.
+  if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+    console.warn(message);
+  }
 }
 
 // Never pass empty URL/key to Supabase client creation.

@@ -11,12 +11,32 @@ import {
 
 const DRIVE_API_BASE_URL = "https://www.googleapis.com/drive/v3";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+// CORS: defaults to `*` (parity with previous behavior) but can be locked down
+// in production by setting ALLOWED_ORIGINS (comma-separated). Authentication
+// still relies on the Supabase JWT in the Authorization header; CORS is
+// defense-in-depth.
+const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? "*")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+function resolveCorsHeaders(request: Request): Record<string, string> {
+  const requestOrigin = request.headers.get("origin") ?? "";
+  const allowAll = ALLOWED_ORIGINS.includes("*");
+  const isAllowed = allowAll || ALLOWED_ORIGINS.includes(requestOrigin);
+  const allowOriginValue = allowAll
+    ? "*"
+    : isAllowed
+    ? requestOrigin
+    : ALLOWED_ORIGINS[0] ?? "";
+  return {
+    "Access-Control-Allow-Origin": allowOriginValue,
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    Vary: "Origin",
+  };
+}
 
 interface ParseSourceFileRequest {
   source_file_id?: string;
@@ -55,19 +75,19 @@ class EdgeFunctionError extends Error {
   }
 }
 
-function jsonResponse(body: unknown, status = 200): Response {
+function jsonResponse(request: Request, body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...corsHeaders,
+      ...resolveCorsHeaders(request),
       "Content-Type": "application/json",
     },
   });
 }
 
-function errorResponse(error: unknown): Response {
+function errorResponse(request: Request, error: unknown): Response {
   if (error instanceof EdgeFunctionError) {
-    return jsonResponse({
+    return jsonResponse(request, {
       status: "error",
       code: error.code,
       message: error.message,
@@ -82,6 +102,7 @@ function errorResponse(error: unknown): Response {
     : "db_write_failed";
 
   return jsonResponse(
+    request,
     { status: "error", code, message },
     code === "auth_failed" ? 401 : 500,
   );
@@ -302,11 +323,15 @@ function authorityUpdateFrom(
 
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: resolveCorsHeaders(request),
+    });
   }
 
   if (request.method !== "POST") {
     return jsonResponse(
+      request,
       {
         status: "error",
         code: "unsupported_method",
@@ -497,7 +522,7 @@ Deno.serve(async (request) => {
       );
     }
 
-    return jsonResponse({
+    return jsonResponse(request, {
       status: "ok",
       source_file_version_id: sourceFileVersionId,
       sections_count: sectionsCount,
@@ -528,6 +553,6 @@ Deno.serve(async (request) => {
       }
     }
 
-    return errorResponse(error);
+    return errorResponse(request, error);
   }
 });

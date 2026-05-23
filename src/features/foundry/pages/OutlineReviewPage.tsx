@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -8,6 +7,7 @@ import { GeneratedOutlineCard } from '@/features/foundry/components/GeneratedOut
 import { LessonOutlineList } from '@/features/foundry/components/LessonOutlineList'
 import { MissingInfoWarnings } from '@/features/foundry/components/MissingInfoWarnings'
 import { MOCK_GENERATED_OUTLINE, MOCK_LESSON_SOURCE_BINDINGS } from '@/features/foundry/data/mockGeneratedOutline'
+import { useMockGenerationDelay } from '@/features/foundry/lib/useMockGenerationDelay'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
 
 const OUTLINE_STATUS_LABELS = {
@@ -24,27 +24,11 @@ export function OutlineReviewPage() {
   const approveOutline = useFoundryDraftStore((state) => state.approveOutline)
   const regenerateOutlineStart = useFoundryDraftStore((state) => state.regenerateOutlineStart)
 
-  const mountedRef = useRef(false)
-  const [isInitialGenerating, setIsInitialGenerating] = useState(outline === null)
-
-  useEffect(() => {
-    if (mountedRef.current) {
-      return
-    }
-
-    mountedRef.current = true
-
-    if (outline === null) {
-      const timeoutId = window.setTimeout(() => {
-        setOutline(MOCK_GENERATED_OUTLINE)
-        setIsInitialGenerating(false)
-      }, 600)
-
-      return () => {
-        window.clearTimeout(timeoutId)
-      }
-    }
-  }, [outline, setOutline])
+  const { isGenerating } = useMockGenerationDelay({
+    shouldGenerate: outline === null,
+    delayMs: 600,
+    populate: () => setOutline(MOCK_GENERATED_OUTLINE),
+  })
 
   const handleRegenerate = async () => {
     regenerateOutlineStart()
@@ -82,7 +66,7 @@ export function OutlineReviewPage() {
         </div>
       </header>
 
-      {isInitialGenerating || outline === null ? (
+      {isGenerating || outline === null ? (
         <Card className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-sm text-slate-600 animate-pulse">Generating outline…</p>
         </Card>

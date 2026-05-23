@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { SelfCritiquePanel } from '@/features/foundry/components/SelfCritiquePanel'
 import { MOCK_SELF_CRITIQUE } from '@/features/foundry/data/mockSelfCritique'
+import { useMockGenerationDelay } from '@/features/foundry/lib/useMockGenerationDelay'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
 
 export function SelfCritiqueReviewPage() {
@@ -15,24 +16,11 @@ export function SelfCritiqueReviewPage() {
   const ignoreIssue = useFoundryDraftStore((state) => state.ignoreIssue)
   const unignoreIssue = useFoundryDraftStore((state) => state.unignoreIssue)
 
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const hasHydratedFallbackRef = useRef(false)
-
-  useEffect(() => {
-    if (critique !== null || hasHydratedFallbackRef.current) {
-      return
-    }
-
-    hasHydratedFallbackRef.current = true
-    setIsAnalyzing(true)
-
-    const timeoutId = window.setTimeout(() => {
-      setCritique(MOCK_SELF_CRITIQUE)
-      setIsAnalyzing(false)
-    }, 700)
-
-    return () => window.clearTimeout(timeoutId)
-  }, [critique, setCritique])
+  const { isGenerating: isAnalyzing } = useMockGenerationDelay({
+    shouldGenerate: critique === null,
+    delayMs: 700,
+    populate: () => setCritique(MOCK_SELF_CRITIQUE),
+  })
 
   const statusMeta = useMemo(() => {
     if (critique === null) {

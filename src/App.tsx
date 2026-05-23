@@ -1,22 +1,54 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import AuthGate from '@/components/auth/AuthGate'
 import { AppShell } from '@/components/layout/AppShell'
 import { NotFoundPage } from '@/components/layout/NotFoundPage'
-import { AdminDashboardPage } from '@/features/admin/pages/AdminDashboardPage'
-import { FoundryQuestionsPage } from '@/features/foundry/pages/FoundryQuestionsPage'
-import { OutlineReviewPage } from '@/features/foundry/pages/OutlineReviewPage'
-import { FoundryStartPage } from '@/features/foundry/pages/FoundryStartPage'
-import { ModuleGenerationPreviewPage } from '@/features/foundry/pages/ModuleGenerationPreviewPage'
-import { SelfCritiqueReviewPage } from '@/features/foundry/pages/SelfCritiqueReviewPage'
-import { SideBySideReviewPage } from '@/features/foundry/pages/SideBySideReviewPage'
-import { PublishBlockersPage } from '@/features/foundry/pages/PublishBlockersPage'
-import { SourceBinderInputPage } from '@/features/source-binder/pages/SourceBinderInputPage'
-import { SourceLibraryPage } from '@/features/source-binder/pages/SourceLibraryPage'
+import { RouteLoadingFallback } from '@/components/layout/RouteLoadingFallback'
 import { LearnerDashboardPage } from '@/features/learner/pages/LearnerDashboardPage'
 import { LearnerWelcomePage } from '@/features/learner/pages/LearnerWelcomePage'
 import { ModulePlayer } from '@/features/learner/components/ModulePlayer'
 import { useEducation } from '@/hooks/useEducation'
 import type { ProgressStatus } from '@/lib/education'
+
+const AdminDashboardPage = lazy(() =>
+  import('@/features/admin/pages/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })),
+)
+
+const SourceBinderInputPage = lazy(() =>
+  import('@/features/source-binder/pages/SourceBinderInputPage').then((m) => ({ default: m.SourceBinderInputPage })),
+)
+
+const SourceLibraryPage = lazy(() =>
+  import('@/features/source-binder/pages/SourceLibraryPage').then((m) => ({ default: m.SourceLibraryPage })),
+)
+
+const FoundryStartPage = lazy(() =>
+  import('@/features/foundry/pages/FoundryStartPage').then((m) => ({ default: m.FoundryStartPage })),
+)
+
+const FoundryQuestionsPage = lazy(() =>
+  import('@/features/foundry/pages/FoundryQuestionsPage').then((m) => ({ default: m.FoundryQuestionsPage })),
+)
+
+const OutlineReviewPage = lazy(() =>
+  import('@/features/foundry/pages/OutlineReviewPage').then((m) => ({ default: m.OutlineReviewPage })),
+)
+
+const ModuleGenerationPreviewPage = lazy(() =>
+  import('@/features/foundry/pages/ModuleGenerationPreviewPage').then((m) => ({ default: m.ModuleGenerationPreviewPage })),
+)
+
+const SelfCritiqueReviewPage = lazy(() =>
+  import('@/features/foundry/pages/SelfCritiqueReviewPage').then((m) => ({ default: m.SelfCritiqueReviewPage })),
+)
+
+const SideBySideReviewPage = lazy(() =>
+  import('@/features/foundry/pages/SideBySideReviewPage').then((m) => ({ default: m.SideBySideReviewPage })),
+)
+
+const PublishBlockersPage = lazy(() =>
+  import('@/features/foundry/pages/PublishBlockersPage').then((m) => ({ default: m.PublishBlockersPage })),
+)
 
 // Redex Academy - Active Build
 // Phase 2 routes: learner demo stays open; admin shell is protected by AuthGate.
@@ -84,7 +116,9 @@ function AdminRoute() {
   return (
     <AppShell breadcrumb="Admin flow › Course Foundry">
       <AuthGate>
-        <AdminDashboardPage />
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <AdminDashboardPage />
+        </Suspense>
       </AuthGate>
     </AppShell>
   )
@@ -94,7 +128,9 @@ function FoundryStartRoute() {
   return (
     <AppShell breadcrumb="Admin flow › Course Foundry › New module">
       <AuthGate>
-        <FoundryStartPage />
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <FoundryStartPage />
+        </Suspense>
       </AuthGate>
     </AppShell>
   )
@@ -104,7 +140,9 @@ function FoundrySourceRoute() {
   return (
     <AppShell breadcrumb="Admin flow › Course Foundry › Source material">
       <AuthGate>
-        <SourceBinderInputPage />
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <SourceBinderInputPage />
+        </Suspense>
       </AuthGate>
     </AppShell>
   )
@@ -114,7 +152,9 @@ function FoundryQuestionsRoute() {
   return (
     <AppShell breadcrumb="Admin flow › Course Foundry › Setup questions">
       <AuthGate>
-        <FoundryQuestionsPage />
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <FoundryQuestionsPage />
+        </Suspense>
       </AuthGate>
     </AppShell>
   )
@@ -124,7 +164,9 @@ function OutlineReviewRoute() {
   return (
     <AppShell breadcrumb="Admin flow › Course Foundry › Outline review">
       <AuthGate>
-        <OutlineReviewPage />
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <OutlineReviewPage />
+        </Suspense>
       </AuthGate>
     </AppShell>
   )
@@ -134,7 +176,9 @@ function SourceLibraryRoute() {
   return (
     <AppShell breadcrumb="Admin flow › Course Foundry › Source Library">
       <AuthGate>
-        <SourceLibraryPage />
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <SourceLibraryPage />
+        </Suspense>
       </AuthGate>
     </AppShell>
   )
@@ -144,7 +188,9 @@ function ModuleGenerationPreviewRoute() {
   return (
     <AppShell breadcrumb="Admin flow › Course Foundry › Module preview">
       <AuthGate>
-        <ModuleGenerationPreviewPage />
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <ModuleGenerationPreviewPage />
+        </Suspense>
       </AuthGate>
     </AppShell>
   )
@@ -154,7 +200,9 @@ function SelfCritiqueReviewRoute() {
   return (
     <AppShell breadcrumb="Admin flow › Course Foundry › Self-critique">
       <AuthGate>
-        <SelfCritiqueReviewPage />
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <SelfCritiqueReviewPage />
+        </Suspense>
       </AuthGate>
     </AppShell>
   )
@@ -164,7 +212,9 @@ function SideBySideReviewRoute() {
   return (
     <AppShell breadcrumb="Admin flow › Course Foundry › Side-by-side review">
       <AuthGate>
-        <SideBySideReviewPage />
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <SideBySideReviewPage />
+        </Suspense>
       </AuthGate>
     </AppShell>
   )
@@ -174,7 +224,9 @@ function PublishBlockersRoute() {
   return (
     <AppShell breadcrumb="Admin flow › Course Foundry › Publish blockers">
       <AuthGate>
-        <PublishBlockersPage />
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <PublishBlockersPage />
+        </Suspense>
       </AuthGate>
     </AppShell>
   )

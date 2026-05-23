@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { AlertOctagon } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -14,6 +14,7 @@ import {
 import { GeneratedSourceCompare } from '@/features/foundry/components/GeneratedSourceCompare'
 import { ReviewActionBar } from '@/features/foundry/components/ReviewActionBar'
 import { MOCK_LESSON_REVIEWS } from '@/features/foundry/data/mockLessonReviews'
+import { useMockGenerationDelay } from '@/features/foundry/lib/useMockGenerationDelay'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
 
 const CONFIDENCE_DOT_CLASS: Record<LessonConfidenceLevel, string> = {
@@ -65,21 +66,12 @@ export function SideBySideReviewPage() {
   const isPublishBlocked = useFoundryDraftStore((state) => state.isPublishBlocked)
 
   const [selectedLessonKey, setSelectedLessonKey] = useState<string | null>(null)
-  const hasHydratedFallbackRef = useRef(false)
 
-  useEffect(() => {
-    if (lessonReviews.length > 0 || hasHydratedFallbackRef.current) {
-      return
-    }
-
-    hasHydratedFallbackRef.current = true
-
-    const timeoutId = window.setTimeout(() => {
-      setLessonReviews(MOCK_LESSON_REVIEWS)
-    }, 500)
-
-    return () => window.clearTimeout(timeoutId)
-  }, [lessonReviews.length, setLessonReviews])
+  useMockGenerationDelay({
+    shouldGenerate: lessonReviews.length === 0,
+    delayMs: 500,
+    populate: () => setLessonReviews(MOCK_LESSON_REVIEWS),
+  })
 
   const selectedReview = useMemo(() => {
     if (lessonReviews.length === 0) {

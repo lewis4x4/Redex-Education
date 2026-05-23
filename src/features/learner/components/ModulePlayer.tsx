@@ -238,9 +238,6 @@ export function ModulePlayer({
           <LessonContentRenderer
             lesson={currentLesson}
             onQuizComplete={(score, passed) => {
-              console.log(
-                `[ModulePlayer] Quiz "${currentLesson.title}" completed: ${score}% — ${passed ? 'PASSED ✓' : 'NOT PASSED'}`
-              );
               // Record result for gating + UI
               setQuizResults((prev) => ({
                 ...prev,
