@@ -50,6 +50,8 @@ export type {
   GeneratedModulePreview,
   LessonGenerationStatus,
   LessonType,
+  CritiqueIssueCategory,
+  CritiqueSeverity,
   ProgressStatus,
   TrainingType,
   WizardCriticality,
@@ -58,6 +60,8 @@ export type {
   Course,
   Module,
   Lesson,
+  CritiqueIssue,
+  SelfCritiqueReport,
   // Lesson content variants
   LessonContent,
   TextLessonContent,
@@ -109,6 +113,8 @@ export {
 
 export {
   ASSESSMENT_STYLE_LABELS,
+  CRITIQUE_CATEGORY_LABELS,
+  CRITIQUE_SEVERITY_LABELS,
   LESSON_GENERATION_STATUS_LABELS,
   TRAINING_TYPE_LABELS,
   WIZARD_CRITICALITY_LABELS,

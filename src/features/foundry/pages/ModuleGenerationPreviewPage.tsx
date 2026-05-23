@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,7 @@ const STATUS_ORDER: LessonGenerationStatus[] = [
 ]
 
 export function ModuleGenerationPreviewPage() {
+  const navigate = useNavigate()
   const generatedModule = useFoundryDraftStore((state) => state.generatedModule)
   const updateLessonStatus = useFoundryDraftStore((state) => state.updateLessonStatus)
   const [selectedLessonIndex, setSelectedLessonIndex] = useState(0)
@@ -155,7 +156,7 @@ export function ModuleGenerationPreviewPage() {
         <Link to="/admin/foundry/outline" className="text-sm font-medium text-slate-600 transition-colors hover:text-slate-900">
           ← Back to outline
         </Link>
-        <Button variant="brand" disabled title="Coming in Slice 3.3 — AI self-critique">
+        <Button variant="brand" onClick={() => navigate('/admin/foundry/critique')}>
           Continue → Self-critique
         </Button>
       </footer>

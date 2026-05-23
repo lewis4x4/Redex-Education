@@ -2719,3 +2719,64 @@ Wires the "Continue → Module preview" button on the approved OutlineReviewPage
 
 ---
 
+## 2026-05-22 — Slice 3.3: AI Self-Critique Review Step
+
+**Status**: ✅ Completed.
+
+**Master roadmap**: Phase 3 / Slice 3.3 (lines 1141–1185).
+**Linear ticket**: `Foundry: add AI self-critique and regenerate loop`.
+
+**Context**:
+Wires the "Continue → Self-critique" button on ModuleGenerationPreviewPage. The Foundry now (mocked) reviews its own generated module and surfaces issues with severity (low/medium/high). High-severity issues block publish until resolved or ignored with a note. Categories: unsupported claims / weak questions / missing source references / confusing language / overly corporate wording / missing critical info / needs admin approval.
+
+**Orchestration**: 4 engineer sub-agents (A blocking → B || C parallel → D). Zero file conflicts.
+
+**Summary**:
+
+### Item A — Foundation
+- Canonical types: `CritiqueSeverity` (low/medium/high) + `CritiqueIssueCategory` (7 values) + `CritiqueIssue` + `SelfCritiqueReport`, plus label maps
+- `foundryDraftStore.critique` slice with `setCritique` / `clearCritique` / `ignoreIssue(id, note)` / `unignoreIssue(id)` — ignore/unignore actions recompute `blocks_publish = issues.some(i => i.severity === 'high' && !i.ignored)`
+- `mockSelfCritique.ts` (86 lines) — 7 issues tied to the HR Basics module: 2 high (PTO unsupported claim + missing source ref), 3 medium (weak quiz question + confusing language + needs HR approval), 2 low (corporate wording + missing critical info)
+
+### Item B — Components
+- `CritiqueIssueCard.tsx` (164) — Tier 1 card; severity badge, category label, summary/detail, optional suggested_fix in emerald italic block. Inline Ignore textarea + Save/Cancel flow. Edit manually disabled with Slice 3.4 tooltip. Per-issue Regenerate. Ignored issues render `opacity-60` + "Ignored: <note>" + Unignore.
+- `RegenerateWithFixesButton.tsx` (33) — primary RefreshCw button. Label "Regenerate with N fix(es)". Disabled when issueCount === 0.
+- `SelfCritiquePanel.tsx` (106) — groups by severity (high → medium → low). 🚫 Publish blocked red banner at top when `blocks_publish`. Bottom RegenerateWithFixesButton wired to un-ignored count. "No issues found" empty state.
+
+### Item C — Page + route + Preview wire
+- `SelfCritiqueReviewPage.tsx` (127) — eyebrow STEP 6 + H1 "AI self-critique". 700ms simulated "Analyzing module…" loader on mount when `critique === null` then auto-populates MOCK_SELF_CRITIQUE. Status badge (Publish blocked / Pending review / Resolved). Footer: disabled "Continue → Side-by-side review" (Slice 3.4) + "Return to source binder" link.
+- `src/App.tsx` — new `SelfCritiqueReviewRoute` + `<Route path="/admin/foundry/critique">` before `/admin/*`
+- `ModuleGenerationPreviewPage.tsx` — "Continue → Self-critique" button flipped from disabled to enabled with navigation
+- `docs/architecture.md` — new route row
+
+### Item D — Tests
+- **+18 new tests** across 4 new + 3 extended files; total **181 → 199 passing** across 40 test files
+- Coverage: Statements **90.55%** (+0.39)
+
+**Files touched** (~14 total).
+
+**Verification**:
+- ✅ typecheck green, lint 0/0
+- ✅ npm test: 199/199 passing
+- ✅ build green
+- ✅ coverage 90.55% statements
+
+**Acceptance criteria** (master roadmap):
+- ✅ Self-critique issues render clearly
+- ✅ Admin can trigger mocked regenerate-with-fixes (button at bottom of panel)
+- ✅ Issues have severity (high/medium/low with visual distinction)
+- ✅ High-severity issues block publish (red "🚫 Publish blocked" banner; lifts when all high-severity issues are ignored)
+- ✅ Build Bible updated
+
+**Known gaps (deferred)**:
+- Real AI generation/critique (Phase 3 mocks)
+- Side-by-side admin review (Slice 3.4)
+- Manual editing of issues (Slice 3.4 / future)
+- Regenerate only re-loads the mock for now; real regen lands when AI is wired (Phase AI Slices)
+
+**Naming guardrails honored**: Foundry context.
+
+**Next**: Slice 3.4 — Side-by-Side Admin Review.
+
+---
+

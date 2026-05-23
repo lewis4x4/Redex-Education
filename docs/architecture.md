@@ -43,6 +43,7 @@ Grounded in `src/App.tsx`:
 | `/admin/foundry/questions` | `FoundryQuestionsRoute` → `FoundryQuestionsPage` | ✓ | ✓ | Course Foundry setup questions wizard — captures criticality, assessment style, audience, source control, approval gates |
 | `/admin/foundry/outline` | `OutlineReviewRoute` → `OutlineReviewPage` | ✓ | ✓ | Course Foundry generated outline review — approve / edit / regenerate proposed module structure |
 | `/admin/foundry/preview` | `ModuleGenerationPreviewRoute` → `ModuleGenerationPreviewPage` | ✓ | ✓ | Course Foundry full module generation preview — generates all lessons in one click; status-tagged; not published |
+| `/admin/foundry/critique` | `SelfCritiqueReviewRoute` → `SelfCritiqueReviewPage` | ✓ | ✓ | Course Foundry AI self-critique — flagged issues with severity; high-severity blocks publish until resolved or ignored |
 | `/admin/foundry/library` | `SourceLibraryRoute` → `SourceLibraryPage` | ✓ | ✓ | Course Foundry source library — browse Drive-ingested source files with authority + version |
 | `*` | `NotFoundRoute` → `NotFoundPage` | ✓ | — | Catchall |
 

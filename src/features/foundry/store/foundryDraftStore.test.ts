@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { MOCK_GENERATED_MODULE } from '@/features/foundry/data/mockGeneratedModule'
 import { MOCK_GENERATED_OUTLINE } from '@/features/foundry/data/mockGeneratedOutline'
+import { MOCK_SELF_CRITIQUE } from '@/features/foundry/data/mockSelfCritique'
 
 function createStorageMock(): Storage {
   const store = new Map<string, string>()
@@ -48,6 +49,7 @@ describe('useFoundryDraftStore', () => {
       useFoundryDraftStore.getState().clearSetupAnswers()
       useFoundryDraftStore.getState().clearOutline()
       useFoundryDraftStore.getState().clearGeneratedModule()
+      useFoundryDraftStore.getState().clearCritique()
       useFoundryDraftStore.getState().clearLibrarySelection()
     })
   })
@@ -349,6 +351,49 @@ describe('useFoundryDraftStore', () => {
     })
 
     expect(useFoundryDraftStore.getState().generatedModule).toBeNull()
+  })
+
+  it('starts with critique as null', () => {
+    expect(useFoundryDraftStore.getState().critique).toBeNull()
+  })
+
+  it('setCritique writes the critique report', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setCritique(MOCK_SELF_CRITIQUE)
+    })
+
+    expect(useFoundryDraftStore.getState().critique).toEqual(MOCK_SELF_CRITIQUE)
+  })
+
+  it('ignoreIssue marks ignored, stores note, and recomputes blocks_publish to false when all high issues are ignored', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setCritique(MOCK_SELF_CRITIQUE)
+      useFoundryDraftStore.getState().ignoreIssue('critique-issue-001', 'Accepted by policy owner')
+      useFoundryDraftStore.getState().ignoreIssue('critique-issue-002', 'Covered externally')
+    })
+
+    const critique = useFoundryDraftStore.getState().critique
+    const ignoredIssue = critique?.issues.find((issue) => issue.id === 'critique-issue-001')
+
+    expect(ignoredIssue?.ignored).toBe(true)
+    expect(ignoredIssue?.ignored_note).toBe('Accepted by policy owner')
+    expect(critique?.blocks_publish).toBe(false)
+  })
+
+  it('unignoreIssue restores issue and recomputes blocks_publish to true when high issue is active again', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setCritique(MOCK_SELF_CRITIQUE)
+      useFoundryDraftStore.getState().ignoreIssue('critique-issue-001', 'temp')
+      useFoundryDraftStore.getState().ignoreIssue('critique-issue-002', 'temp')
+      useFoundryDraftStore.getState().unignoreIssue('critique-issue-001')
+    })
+
+    const critique = useFoundryDraftStore.getState().critique
+    const restoredIssue = critique?.issues.find((issue) => issue.id === 'critique-issue-001')
+
+    expect(restoredIssue?.ignored).toBe(false)
+    expect(restoredIssue?.ignored_note).toBeUndefined()
+    expect(critique?.blocks_publish).toBe(true)
   })
 
   it('starts with selectedLibraryFileIds as an empty array', () => {

@@ -4,6 +4,7 @@ import type {
   CourseOutlineDraft,
   GeneratedModulePreview,
   LessonGenerationStatus,
+  SelfCritiqueReport,
   SetupAnswers,
   SourceMaterial,
 } from '@/lib/education';
@@ -27,6 +28,16 @@ interface FoundryDraftState {
   outline_status: 'draft' | 'approved' | 'regenerating';
   /** Generated module preview for Slice 3.2 */
   generatedModule: GeneratedModulePreview | null;
+  /** Self-critique report for generated module */
+  critique: SelfCritiqueReport | null;
+  /** Set self-critique report */
+  setCritique: (report: SelfCritiqueReport) => void;
+  /** Clear self-critique report */
+  clearCritique: () => void;
+  /** Mark one critique issue ignored and attach note */
+  ignoreIssue: (issueId: string, note: string) => void;
+  /** Remove ignore state for one critique issue */
+  unignoreIssue: (issueId: string) => void;
   /** Save parsed source material */
   setSourceMaterial: (material: SourceMaterial) => void;
   /** Clear source material draft */
@@ -70,6 +81,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
       outline: null,
       outline_status: 'draft',
       generatedModule: null,
+      critique: null,
       selectedLibraryFileIds: [],
       setBasics: (values) =>
         set({
@@ -79,6 +91,56 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
           },
         }),
       clearDraft: () => set({ currentDraft: null }),
+      setCritique: (report) => set({ critique: report }),
+      clearCritique: () => set({ critique: null }),
+      ignoreIssue: (issueId, note) =>
+        set((state) => {
+          if (state.critique === null) {
+            return state;
+          }
+
+          const issues = state.critique.issues.map((issue) =>
+            issue.id === issueId
+              ? {
+                  ...issue,
+                  ignored: true,
+                  ignored_note: note,
+                }
+              : issue
+          );
+
+          return {
+            critique: {
+              ...state.critique,
+              issues,
+              blocks_publish: issues.some((issue) => issue.severity === 'high' && !issue.ignored),
+            },
+          };
+        }),
+      unignoreIssue: (issueId) =>
+        set((state) => {
+          if (state.critique === null) {
+            return state;
+          }
+
+          const issues = state.critique.issues.map((issue) =>
+            issue.id === issueId
+              ? {
+                  ...issue,
+                  ignored: false,
+                  ignored_note: undefined,
+                }
+              : issue
+          );
+
+          return {
+            critique: {
+              ...state.critique,
+              issues,
+              blocks_publish: issues.some((issue) => issue.severity === 'high' && !issue.ignored),
+            },
+          };
+        }),
       setSourceMaterial: (material) => set({ sourceMaterial: material }),
       clearSourceMaterial: () => set({ sourceMaterial: null }),
       setSetupAnswers: (input) =>

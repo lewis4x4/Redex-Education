@@ -401,6 +401,61 @@ export type LessonGenerationStatus =
   | 'missing_source'
   | 'ready_for_approval';
 
+export type CritiqueSeverity = 'low' | 'medium' | 'high';
+
+export const CRITIQUE_SEVERITY_LABELS: Record<CritiqueSeverity, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+};
+
+export type CritiqueIssueCategory =
+  | 'unsupported_claim'
+  | 'weak_question'
+  | 'missing_source_reference'
+  | 'confusing_language'
+  | 'overly_corporate_wording'
+  | 'missing_critical_info'
+  | 'needs_admin_approval';
+
+export const CRITIQUE_CATEGORY_LABELS: Record<CritiqueIssueCategory, string> = {
+  unsupported_claim: 'Unsupported claim',
+  weak_question: 'Weak question',
+  missing_source_reference: 'Missing source reference',
+  confusing_language: 'Confusing employee language',
+  overly_corporate_wording: 'Overly corporate wording',
+  missing_critical_info: 'Missing critical information',
+  needs_admin_approval: 'Needs admin approval',
+};
+
+export interface CritiqueIssue {
+  id: UUID;
+  category: CritiqueIssueCategory;
+  severity: CritiqueSeverity;
+  /** Lesson title or section identifier where the issue was found. */
+  lesson_title?: string;
+  /** Module index 0-based (for cross-referencing with GeneratedModulePreview). */
+  module_index?: number;
+  /** Short summary of the issue. */
+  summary: string;
+  /** Detailed explanation. */
+  detail: string;
+  /** Suggested fix if AI can propose one. */
+  suggested_fix?: string;
+  /** Whether the admin has marked this issue as ignored (with note). */
+  ignored: boolean;
+  /** Free text note when ignored. */
+  ignored_note?: string;
+}
+
+export interface SelfCritiqueReport {
+  module_title: string;
+  generated_at: ISODateTime;
+  issues: CritiqueIssue[];
+  /** True when at least one high-severity issue exists AND none of them are ignored. */
+  blocks_publish: boolean;
+}
+
 export const LESSON_GENERATION_STATUS_LABELS: Record<LessonGenerationStatus, string> = {
   draft: 'Draft',
   needs_review: 'Needs review',

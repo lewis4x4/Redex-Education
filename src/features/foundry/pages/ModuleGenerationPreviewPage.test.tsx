@@ -1,6 +1,6 @@
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const toastSuccessMock = vi.fn()
@@ -65,6 +65,17 @@ describe('ModuleGenerationPreviewPage', () => {
     )
   }
 
+  function renderPageWithRoutes() {
+    return render(
+      <MemoryRouter initialEntries={['/admin/foundry/preview']}>
+        <Routes>
+          <Route path="/admin/foundry/preview" element={<ModuleGenerationPreviewPage />} />
+          <Route path="/admin/foundry/critique" element={<h1>Critique route reached</h1>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+  }
+
   it('shows empty state when generatedModule is null', () => {
     renderPage()
 
@@ -100,5 +111,17 @@ describe('ModuleGenerationPreviewPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Quick Check: PTO Basics' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /Generated quiz preview/i })).toBeInTheDocument()
+  })
+
+  it('keeps Continue → Self-critique enabled and navigates to critique route on click', async () => {
+    const user = userEvent.setup()
+    renderPageWithRoutes()
+
+    const continueButton = screen.getByRole('button', { name: /Continue → Self-critique/i })
+    expect(continueButton).toBeEnabled()
+
+    await user.click(continueButton)
+
+    expect(screen.getByRole('heading', { name: 'Critique route reached' })).toBeInTheDocument()
   })
 })
