@@ -1,8 +1,10 @@
+import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAssignmentStore } from '@/features/assignments/store/assignmentStore';
 import { useMyProgress } from '@/hooks/useEducation';
-import { DEMO_HR_BASICS_COURSE } from '@/lib/education';
-import type { Course, Enrollment, LearnerProfile, Lesson } from '@/lib/education';
+import { DEMO_HR_BASICS_COURSE, MOCK_LEARNER_MARCUS } from '@/lib/education';
+import type { Assignment, Course, Enrollment, LearnerProfile, Lesson } from '@/lib/education';
 import { ArrowRight, CheckCircle2, Circle, Clock, HelpCircle, Lock } from 'lucide-react';
 
 // Temporary inline progress
@@ -26,6 +28,29 @@ function Progress({ value, className }: { value: number; className?: string }) {
   );
 }
 
+const HR_BASICS_MODULE_VERSION_ID = 'module-version-hr-basics-v1';
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function getDueState(assignment?: Assignment): { dueInDays: number; label: string; isOverdue: boolean } {
+  if (!assignment?.due_at) {
+    return { dueInDays: 5, label: 'Due in 5 days', isOverdue: false };
+  }
+
+  const millisecondsUntilDue = new Date(assignment.due_at).getTime() - Date.now();
+  const dueInDays = Math.max(0, Math.ceil(millisecondsUntilDue / MS_PER_DAY));
+  const isOverdue = millisecondsUntilDue < 0 && assignment.status !== 'completed';
+
+  if (isOverdue) {
+    return { dueInDays, label: 'Overdue', isOverdue: true };
+  }
+
+  return {
+    dueInDays,
+    label: `Due in ${dueInDays} ${dueInDays === 1 ? 'day' : 'days'}`,
+    isOverdue: false,
+  };
+}
+
 interface LearnerDashboardPageProps {
   learner?: LearnerProfile;
   enrollment?: Enrollment & { course: Course };
@@ -43,9 +68,22 @@ interface LearnerDashboardPageProps {
  */
 export function LearnerDashboardPage({ learner, onContinue }: LearnerDashboardPageProps) {
   const { percentage, completed, total } = useMyProgress();
+  const assignments = useAssignmentStore((state) => state.assignments);
   const displayName = learner?.preferred_name ?? learner?.display_name ?? 'Marcus';
+  const learnerUserId = learner?.user_id ?? MOCK_LEARNER_MARCUS.id;
+  const primaryAssignment = useMemo(
+    () =>
+      assignments.find(
+        (assignment) =>
+          assignment.assignee_user_id === learnerUserId &&
+          assignment.module_version_id === HR_BASICS_MODULE_VERSION_ID &&
+          assignment.status !== 'completed',
+      ),
+    [assignments, learnerUserId],
+  );
+  const dueState = getDueState(primaryAssignment);
 
-  // Live data from EducationContext (Task D1)
+  // Live data from EducationContext (Task D1) + assignment store due state.
   const currentAssignment = {
     title: DEMO_HR_BASICS_COURSE.title,
     progress: percentage,
@@ -55,7 +93,9 @@ export function LearnerDashboardPage({ learner, onContinue }: LearnerDashboardPa
       0,
       Math.round(DEMO_HR_BASICS_COURSE.estimated_minutes * ((100 - percentage) / 100))
     ),
-    dueInDays: 5,
+    dueInDays: dueState.dueInDays,
+    dueLabel: dueState.label,
+    isOverdue: dueState.isOverdue,
   };
   const progressValueClass = currentAssignment.progress > 0 ? 'text-redex-red' : 'text-slate-500';
 
@@ -76,8 +116,12 @@ export function LearnerDashboardPage({ learner, onContinue }: LearnerDashboardPa
         <CardHeader className="p-6 pb-4 md:p-8 md:pb-4">
           <CardTitle className="flex items-start justify-between gap-4 text-lg md:text-xl">
             <span>Continue where you left off</span>
-            <span className="shrink-0 text-sm font-normal text-slate-500">
-              Due in {currentAssignment.dueInDays} days
+            <span
+              className={`shrink-0 rounded-full px-3 py-1 text-sm font-semibold ${
+                currentAssignment.isOverdue ? 'bg-red-50 text-red-700' : 'bg-slate-50 text-slate-500'
+              }`}
+            >
+              {currentAssignment.dueLabel}
             </span>
           </CardTitle>
         </CardHeader>

@@ -46,3 +46,9 @@ export const MOCK_HR_ONBOARDING_ASSIGNMENT_COMPLETED: Assignment = {
   due_at: isoDaysAgo(2),
   status: 'completed',
 }
+
+export const MOCK_ASSIGNMENTS: Assignment[] = [
+  MOCK_HR_ONBOARDING_ASSIGNMENT,
+  MOCK_HR_ONBOARDING_ASSIGNMENT_ANA,
+  MOCK_HR_ONBOARDING_ASSIGNMENT_COMPLETED,
+]

@@ -1,8 +1,14 @@
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 
 import { AdminDashboardPage } from './AdminDashboardPage'
+
+function LocationProbe() {
+  const location = useLocation()
+  return <div data-testid="location-path">{location.pathname}</div>
+}
 
 describe('AdminDashboardPage', () => {
   function renderPage() {
@@ -21,10 +27,35 @@ describe('AdminDashboardPage', () => {
     expect(screen.getByText('Your training operations at a glance')).toBeInTheDocument()
   })
 
-  it('renders the Foundry entry CTA in disabled state', () => {
+  it('renders the Foundry entry CTA enabled', () => {
     renderPage()
 
     expect(screen.getByRole('button', { name: /start new module/i })).toBeEnabled()
+  })
+
+  it('routes the assignments CTA to the assignment admin page', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <MemoryRouter initialEntries={['/admin']}>
+        <Routes>
+          <Route
+            path="/admin"
+            element={
+              <>
+                <AdminDashboardPage />
+                <LocationProbe />
+              </>
+            }
+          />
+          <Route path="/admin/assignments" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /open assignments/i }))
+
+    expect(screen.getByTestId('location-path')).toHaveTextContent('/admin/assignments')
   })
 
   it('renders all metric labels', () => {

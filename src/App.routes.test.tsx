@@ -127,6 +127,14 @@ describe('Redex Education routes', () => {
     expect(screen.getByRole('button', { name: /start new module/i })).toBeEnabled()
   })
 
+  it('renders AssignmentAdminPage at /admin/assignments', async () => {
+    vi.stubEnv('VITE_MOCK_AUTH', 'true')
+
+    renderAt('/admin/assignments')
+
+    expect(await screen.findByRole('heading', { name: 'Manage assignments' })).toBeInTheDocument()
+  })
+
   it('renders FoundryStartPage at /admin/foundry/start', async () => {
     vi.stubEnv('VITE_MOCK_AUTH', 'true')
 

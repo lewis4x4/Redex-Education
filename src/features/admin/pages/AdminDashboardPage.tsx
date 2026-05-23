@@ -2,6 +2,7 @@ import { AlertCircle, CheckCircle2, Eye, FileText, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { AdminMetricCard } from '@/features/admin/components/AdminMetricCard'
+import { AssignmentsEntryCard } from '@/features/admin/components/AssignmentsEntryCard'
 import { CourseStatusList } from '@/features/admin/components/CourseStatusList'
 import { FoundryEntryCard } from '@/features/admin/components/FoundryEntryCard'
 import { MOCK_ADMIN_SUMMARY } from '@/features/admin/data/mockAdmin'
@@ -18,7 +19,10 @@ export function AdminDashboardPage() {
         <p className="text-sm text-slate-600">Your training operations at a glance</p>
       </header>
 
-      <FoundryEntryCard onStart={() => navigate('/admin/foundry/start')} isDisabled={false} />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <FoundryEntryCard onStart={() => navigate('/admin/foundry/start')} isDisabled={false} />
+        <AssignmentsEntryCard onStart={() => navigate('/admin/assignments')} isDisabled={false} />
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <AdminMetricCard label="Drafts" value={summary.metrics.drafts} icon={<FileText className="h-4 w-4" />} />

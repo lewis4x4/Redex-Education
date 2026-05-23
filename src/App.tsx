@@ -14,6 +14,10 @@ const AdminDashboardPage = lazy(() =>
   import('@/features/admin/pages/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })),
 )
 
+const AssignmentAdminPage = lazy(() =>
+  import('@/features/assignments/pages/AssignmentAdminPage').then((m) => ({ default: m.AssignmentAdminPage })),
+)
+
 const SourceBinderInputPage = lazy(() =>
   import('@/features/source-binder/pages/SourceBinderInputPage').then((m) => ({ default: m.SourceBinderInputPage })),
 )
@@ -122,6 +126,18 @@ function AdminRoute() {
       <AuthGate>
         <Suspense fallback={<RouteLoadingFallback />}>
           <AdminDashboardPage />
+        </Suspense>
+      </AuthGate>
+    </AppShell>
+  )
+}
+
+function AssignmentAdminRoute() {
+  return (
+    <AppShell breadcrumb="Admin flow › Assignments">
+      <AuthGate>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <AssignmentAdminPage />
         </Suspense>
       </AuthGate>
     </AppShell>
@@ -265,6 +281,7 @@ export default function App() {
       <Route path="/learn/player" element={<LearnerModuleRoute />} />
       <Route path="/learn/player/:moduleId" element={<LearnerModuleRoute />} />
       <Route path="/admin" element={<AdminRoute />} />
+      <Route path="/admin/assignments" element={<AssignmentAdminRoute />} />
       <Route path="/admin/foundry/start" element={<FoundryStartRoute />} />
       <Route path="/admin/foundry/source" element={<FoundrySourceRoute />} />
       <Route path="/admin/foundry/questions" element={<FoundryQuestionsRoute />} />

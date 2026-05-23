@@ -3157,3 +3157,50 @@ Phase 3 built each Foundry page in isolation. This slice closes the remaining ga
 
 ---
 
+## 2026-05-22 — Slice 6.1: Assignment Model and Admin Assignment UI
+
+**Status**: ✅ Completed. Phase 6 / Slice 6.1.
+
+**Linear ticket**: `Assignments: build admin assignment flow`.
+
+**Context**:
+Slice 4.2 seeded `MOCK_ASSIGNMENTS` (Marcus / Ana / Devon) and the canonical `Assignment` type landed in Slice 4.1, but nothing in the app actually consumed assignment records — the learner dashboard hardcoded `dueInDays: 5` and admin had no way to create assignments. This slice ships the full admin assignment flow plus the learner dashboard rewire.
+
+**Orchestration**: Read-only explore probe (Claude Code · sonnet:high) for inventory → single pair agent (Codex CLI · gpt-5.5 high) for implementation + tests. Coupled scope (store → admin UI → learner consumer → tests) kept in one head.
+
+**Files touched**:
+- `src/features/assignments/store/assignmentStore.ts` (new) — Zustand + `persist` (localStorage key `redex-assignments-v1`); seeded from `MOCK_ASSIGNMENTS`; actions: `createAssignment`, `updateAssignmentStatus`, `getAssignmentsForUser`, `getAssignmentsForModule`, `resetAssignments`.
+- `src/features/assignments/lib/cohorts.ts` (new) — three cohorts: All new hires / Operations team / Guest Services team (all `role: 'learner'`).
+- `src/features/assignments/lib/availableModules.ts` (new) — `AVAILABLE_MODULES_FOR_ASSIGNMENT` const (HR Basics v1 only for the current mocked surface).
+- `src/features/assignments/components/AssignmentForm.tsx` (new) — RHF + Zod; union schema (user OR cohort); Redex `variant="brand"` submit; emits toast + `onAssigned` callback.
+- `src/features/assignments/components/AssignedUsersTable.tsx` (new) — reactive subscription to assignments; columns: Learner/Cohort · Module · Status (badge) · Assigned · Due (overdue indicator) · Assigned by; newest-first sort.
+- `src/features/assignments/pages/AssignmentAdminPage.tsx` (new) at `/admin/assignments` — form + table layout; back link to `/admin`.
+- `src/features/admin/components/AssignmentsEntryCard.tsx` (new) — mirrors `FoundryEntryCard.tsx`; entry CTA "Open assignments".
+- `src/features/admin/pages/AdminDashboardPage.tsx` — Foundry + Assignments cards now in a `lg:grid-cols-2` row.
+- `src/features/learner/pages/LearnerDashboardPage.tsx` — `dueInDays` now computed from the active store assignment for the logged-in learner; overdue badge renders when `due_at < now && status !== 'completed'`; preserves the existing fallback copy when no active assignment exists; respects the passed learner profile (no longer Marcus-hardcoded).
+- `src/App.tsx` — lazy-loaded `/admin/assignments` route (preserves bundle-size posture).
+- Mock data: `src/lib/education/mockAssignments.ts` + `src/lib/education/index.ts` — exported helpers + barrel.
+- Tests: assignment store tests; AssignmentForm + AssignedUsersTable + AssignmentAdminPage tests; extended `LearnerDashboardPage.test.tsx` for due-date + overdue branches; extended `AdminDashboardPage.test.tsx` for the new entry card CTA; `App.routes.test.tsx` smoke test for `/admin/assignments`.
+
+**Verification**:
+- ✅ typecheck green
+- ✅ lint 0/0
+- ✅ npm test: **288 passed, 1 skipped** (+19 vs Slice 5.4 baseline of 269)
+- ✅ build green (lazy route intact)
+
+**Acceptance criteria** (master roadmap):
+- ✅ Assignment can be created in local state (Zustand store with persist; `createAssignment()` generates id + `assigned_at`)
+- ✅ Learner dashboard reflects assigned module (`dueInDays` computed from store; overdue badge wired)
+- ✅ Build Bible updated
+
+**Known scope deferred**:
+- Cohort assignments persist only `assignee_role` (no per-cohort denormalized record), so the table currently labels role-targeted assignments using the first matching cohort label. Acceptable for the mocked phase; Phase 8 / Supabase wire-up will introduce real cohort records if needed.
+- Hardcoded "Your Onboarding Progress" module list in `LearnerDashboardPage` (lines ~128–165) is untouched — out of scope for this slice (visual polish task).
+- No edit/delete assignment actions yet — Phase 6.3 (manager dashboard) or Phase 7 (publishing flow) will surface those needs.
+
+**Naming guardrails honored**: Marcus Chen, Ana Rodriguez, Devon Lee, Jordan Patel (admin), Sarah Chen (manager) — no new personas invented.
+
+**Next**: Slice 6.2 — Progress Tracking State. Formalize lesson completion + module progress + quiz attempts + completion timestamps in a learner progress store (currently in-memory via `EducationContext`). Persist locally so reloads don't reset Marcus's progress.
+
+---
+

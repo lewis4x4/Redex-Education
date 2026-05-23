@@ -1,0 +1,243 @@
+import { useState } from 'react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
+import { toast } from 'sonner'
+import { z } from 'zod'
+
+import { Button } from '@/components/ui/button'
+import { MOCK_ADMIN_USER, MOCK_LEARNER_ANA, MOCK_LEARNER_DEVON, MOCK_LEARNER_MARCUS } from '@/lib/education'
+import type { Assignment, User } from '@/types/training'
+import { AVAILABLE_MODULES_FOR_ASSIGNMENT } from '../lib/availableModules'
+import { COHORTS } from '../lib/cohorts'
+import { useAssignmentStore } from '../store/assignmentStore'
+
+const ASSIGNABLE_USERS: User[] = [MOCK_LEARNER_MARCUS, MOCK_LEARNER_ANA, MOCK_LEARNER_DEVON]
+
+const assignmentFormSchema = z
+  .object({
+    moduleVersionId: z.string().min(1, 'Select a module'),
+    assigneeMode: z.enum(['user', 'cohort']),
+    assigneeUserId: z.string().optional(),
+    cohortId: z.string().optional(),
+    dueAt: z.string().optional(),
+  })
+  .superRefine((values, ctx) => {
+    if (values.assigneeMode === 'user' && !values.assigneeUserId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['assigneeUserId'],
+        message: 'Select a learner',
+      })
+    }
+
+    if (values.assigneeMode === 'cohort' && !values.cohortId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['cohortId'],
+        message: 'Select an audience group',
+      })
+    }
+  })
+
+export type AssignmentFormValues = z.infer<typeof assignmentFormSchema>
+
+export interface AssignmentFormProps {
+  onAssigned?: (assignment: Assignment) => void
+}
+
+const defaultValues: AssignmentFormValues = {
+  moduleVersionId: AVAILABLE_MODULES_FOR_ASSIGNMENT[0]?.value ?? '',
+  assigneeMode: 'user',
+  assigneeUserId: '',
+  cohortId: '',
+  dueAt: '',
+}
+
+function toDueAtIso(dateValue?: string): string | undefined {
+  if (!dateValue) {
+    return undefined
+  }
+
+  return new Date(`${dateValue}T17:00:00`).toISOString()
+}
+
+function formatDueToast(dateValue?: string): string {
+  if (!dateValue) {
+    return 'no due date set'
+  }
+
+  return `due ${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(`${dateValue}T00:00:00`))}`
+}
+
+function getAssigneeLabel(values: AssignmentFormValues): string {
+  if (values.assigneeMode === 'cohort') {
+    return COHORTS.find((cohort) => cohort.id === values.cohortId)?.label ?? 'selected cohort'
+  }
+
+  return ASSIGNABLE_USERS.find((user) => user.id === values.assigneeUserId)?.display_name ?? 'selected learner'
+}
+
+export function AssignmentForm({ onAssigned }: AssignmentFormProps) {
+  const createAssignment = useAssignmentStore((state) => state.createAssignment)
+  const [assigneeMode, setAssigneeMode] = useState<AssignmentFormValues['assigneeMode']>('user')
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<AssignmentFormValues>({
+    resolver: zodResolver(assignmentFormSchema),
+    defaultValues,
+    mode: 'onSubmit',
+  })
+  const assigneeModeField = register('assigneeMode')
+
+  const onSubmit = (values: AssignmentFormValues) => {
+    const cohort = COHORTS.find((candidate) => candidate.id === values.cohortId)
+    const assignment = createAssignment({
+      module_version_id: values.moduleVersionId,
+      assigned_by: MOCK_ADMIN_USER.id,
+      due_at: toDueAtIso(values.dueAt),
+      ...(values.assigneeMode === 'user' ? { assignee_user_id: values.assigneeUserId } : {}),
+      ...(values.assigneeMode === 'cohort' && cohort ? { assignee_role: cohort.role } : {}),
+    })
+
+    toast.success(`Assigned to ${getAssigneeLabel(values)} — ${formatDueToast(values.dueAt)}`)
+    onAssigned?.(assignment)
+    reset(defaultValues)
+    setAssigneeMode('user')
+  }
+
+  return (
+    <div className="rounded-2xl bg-white p-6 shadow-sm md:p-8">
+      <form aria-label="Create assignment" className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-slate-900" htmlFor="moduleVersionId">
+            Select module <span aria-hidden="true">*</span>
+          </label>
+          <select
+            id="moduleVersionId"
+            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-redex-red focus:outline-none focus:ring-1 focus:ring-redex-red"
+            aria-invalid={errors.moduleVersionId ? 'true' : 'false'}
+            aria-describedby={errors.moduleVersionId ? 'moduleVersionId-error' : undefined}
+            {...register('moduleVersionId')}
+          >
+            {AVAILABLE_MODULES_FOR_ASSIGNMENT.map((module) => (
+              <option key={module.value} value={module.value}>
+                {module.label}
+              </option>
+            ))}
+          </select>
+          <p id="moduleVersionId-error" aria-live="polite" className="text-sm text-red-600">
+            {errors.moduleVersionId?.message ?? '\u00a0'}
+          </p>
+        </div>
+
+        <fieldset className="space-y-2" aria-describedby={errors.assigneeMode ? 'assigneeMode-error' : undefined}>
+          <legend className="block text-sm font-medium text-slate-900">Assign to</legend>
+          <div className="flex flex-wrap gap-5">
+            <label className="inline-flex items-center gap-2 text-sm text-slate-900" htmlFor="assigneeMode-user">
+              <input
+                id="assigneeMode-user"
+                type="radio"
+                value="user"
+                className="h-4 w-4 border-slate-300 text-redex-red focus:ring-redex-red"
+                {...assigneeModeField}
+                onChange={(event) => {
+                  assigneeModeField.onChange(event)
+                  setAssigneeMode('user')
+                }}
+              />
+              Individual learner
+            </label>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-900" htmlFor="assigneeMode-cohort">
+              <input
+                id="assigneeMode-cohort"
+                type="radio"
+                value="cohort"
+                className="h-4 w-4 border-slate-300 text-redex-red focus:ring-redex-red"
+                {...assigneeModeField}
+                onChange={(event) => {
+                  assigneeModeField.onChange(event)
+                  setAssigneeMode('cohort')
+                }}
+              />
+              Audience group
+            </label>
+          </div>
+          <p id="assigneeMode-error" aria-live="polite" className="text-sm text-red-600">
+            {errors.assigneeMode?.message ?? '\u00a0'}
+          </p>
+        </fieldset>
+
+        {assigneeMode === 'user' ? (
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-900" htmlFor="assigneeUserId">
+              Select user <span aria-hidden="true">*</span>
+            </label>
+            <select
+              id="assigneeUserId"
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-redex-red focus:outline-none focus:ring-1 focus:ring-redex-red"
+              aria-invalid={errors.assigneeUserId ? 'true' : 'false'}
+              aria-describedby={errors.assigneeUserId ? 'assigneeUserId-error' : undefined}
+              {...register('assigneeUserId')}
+            >
+              <option value="">Select a learner</option>
+              {ASSIGNABLE_USERS.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.display_name}
+                </option>
+              ))}
+            </select>
+            <p id="assigneeUserId-error" aria-live="polite" className="text-sm text-red-600">
+              {errors.assigneeUserId?.message ?? '\u00a0'}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-900" htmlFor="cohortId">
+              Select audience group <span aria-hidden="true">*</span>
+            </label>
+            <select
+              id="cohortId"
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-redex-red focus:outline-none focus:ring-1 focus:ring-redex-red"
+              aria-invalid={errors.cohortId ? 'true' : 'false'}
+              aria-describedby={errors.cohortId ? 'cohortId-error cohortId-help' : 'cohortId-help'}
+              {...register('cohortId')}
+            >
+              <option value="">Select a group</option>
+              {COHORTS.map((cohort) => (
+                <option key={cohort.id} value={cohort.id}>
+                  {cohort.label}
+                </option>
+              ))}
+            </select>
+            <p id="cohortId-help" className="text-xs text-slate-500">
+              Groups map to role-based mock assignments for this slice.
+            </p>
+            <p id="cohortId-error" aria-live="polite" className="text-sm text-red-600">
+              {errors.cohortId?.message ?? '\u00a0'}
+            </p>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-slate-900" htmlFor="dueAt">
+            Set due date
+          </label>
+          <input
+            id="dueAt"
+            type="date"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-redex-red focus:outline-none focus:ring-1 focus:ring-redex-red"
+            {...register('dueAt')}
+          />
+          <p className="text-xs text-slate-500">Optional. Leave blank for open-ended onboarding.</p>
+        </div>
+
+        <Button type="submit" variant="brand" disabled={isSubmitting}>
+          Assign training
+        </Button>
+      </form>
+    </div>
+  )
+}
