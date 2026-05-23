@@ -74,7 +74,7 @@ describe('SideBySideReviewPage', () => {
     vi.useRealTimers()
   })
 
-  it('renders eyebrow, heading, two-pane compare layout, and 8-lesson nav', async () => {
+  it('renders eyebrow, heading, two-pane compare layout, and lesson nav', async () => {
     renderPage()
 
     expect(screen.getByText('REDEX AI COURSE FOUNDRY · STEP 7')).toBeInTheDocument()
@@ -90,7 +90,7 @@ describe('SideBySideReviewPage', () => {
     renderPage()
 
     expect(await screen.findByText('2 approved')).toBeInTheDocument()
-    expect(screen.getByText('6 pending')).toBeInTheDocument()
+    expect(screen.getByText('4 pending')).toBeInTheDocument()
     expect(screen.getByText('0 need regeneration')).toBeInTheDocument()
   })
 

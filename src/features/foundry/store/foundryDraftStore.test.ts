@@ -335,14 +335,14 @@ describe('useFoundryDraftStore', () => {
   it('updateLessonStatus updates the matching lesson status by lesson/module indices', () => {
     act(() => {
       useFoundryDraftStore.getState().setGeneratedModule(MOCK_GENERATED_MODULE)
-      useFoundryDraftStore.getState().updateLessonStatus(2, 1, 'ready_for_approval')
+      useFoundryDraftStore.getState().updateLessonStatus(5, 0, 'ready_for_approval')
     })
 
     const updatedLesson = useFoundryDraftStore
       .getState()
-      .generatedModule?.lessons.find((lesson) => lesson.lesson_index === 2 && lesson.module_index === 1)
+      .generatedModule?.lessons.find((lesson) => lesson.lesson_index === 5 && lesson.module_index === 0)
 
-    expect(updatedLesson?.title).toBe('Quick Check: PTO Basics')
+    expect(updatedLesson?.title).toBe('Final Quiz')
     expect(updatedLesson?.status).toBe('ready_for_approval')
   })
 
@@ -413,14 +413,14 @@ describe('useFoundryDraftStore', () => {
   it('approveLessonReview marks the matching lesson review approved', () => {
     act(() => {
       useFoundryDraftStore.getState().setLessonReviews(MOCK_LESSON_REVIEWS)
-      useFoundryDraftStore.getState().approveLessonReview(0, 1)
+      useFoundryDraftStore.getState().approveLessonReview(2, 0)
     })
 
     const updated = useFoundryDraftStore
       .getState()
-      .lessonReviews.find((item) => item.lesson_index === 0 && item.module_index === 1)
+      .lessonReviews.find((item) => item.lesson_index === 2 && item.module_index === 0)
 
-    expect(updated?.lesson_title).toBe('PTO Policy Overview')
+    expect(updated?.lesson_title).toBe('Payroll and Timekeeping Basics')
     expect(updated?.status).toBe('approved')
   })
 
@@ -432,7 +432,7 @@ describe('useFoundryDraftStore', () => {
     expect(useFoundryDraftStore.getState().isPublishBlocked()).toBe(true)
 
     act(() => {
-      useFoundryDraftStore.getState().approveLessonReview(0, 1)
+      useFoundryDraftStore.getState().approveLessonReview(2, 0)
     })
 
     expect(useFoundryDraftStore.getState().isPublishBlocked()).toBe(false)

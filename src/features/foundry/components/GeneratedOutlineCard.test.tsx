@@ -20,15 +20,15 @@ describe('GeneratedOutlineCard', () => {
   it('computes total estimated minutes across all module lessons', () => {
     render(<GeneratedOutlineCard outline={MOCK_GENERATED_OUTLINE} />)
 
-    expect(screen.getByText('24 min')).toBeInTheDocument()
+    expect(screen.getByText('20 min')).toBeInTheDocument()
   })
 
   it('renders module count and lesson count summary', () => {
     render(<GeneratedOutlineCard outline={MOCK_GENERATED_OUTLINE} />)
 
     expect(screen.getByText('Modules')).toBeInTheDocument()
-    expect(screen.getByText('3')).toBeInTheDocument()
+    expect(screen.getByText('1')).toBeInTheDocument()
     expect(screen.getByText('Lessons')).toBeInTheDocument()
-    expect(screen.getByText('8')).toBeInTheDocument()
+    expect(screen.getByText('6')).toBeInTheDocument()
   })
 })

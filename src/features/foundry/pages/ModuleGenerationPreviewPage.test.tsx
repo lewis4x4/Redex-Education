@@ -84,7 +84,7 @@ describe('ModuleGenerationPreviewPage', () => {
     expect(screen.queryByText('Lessons')).not.toBeInTheDocument()
   })
 
-  it('populates generated module and shows sidebar with 8 lesson rows after clicking Magic Button', async () => {
+  it('populates generated module and shows sidebar with 6 lesson rows after clicking Magic Button', async () => {
     const user = userEvent.setup()
     renderPage()
 
@@ -96,10 +96,10 @@ describe('ModuleGenerationPreviewPage', () => {
     const lessonsPanel = screen.getByText('Lessons').closest('div')
     expect(lessonsPanel).not.toBeNull()
     expect(within(lessonsPanel as HTMLElement).getByRole('button', { name: /Welcome to Redex/i })).toBeInTheDocument()
-    expect(within(lessonsPanel as HTMLElement).getByRole('button', { name: /Meeting Your Onboarding Buddy/i })).toBeInTheDocument()
+    expect(within(lessonsPanel as HTMLElement).getByRole('button', { name: /Final Quiz/i })).toBeInTheDocument()
 
     const lessonButtons = within(lessonsPanel as HTMLElement).getAllByRole('button')
-    expect(lessonButtons).toHaveLength(8)
+    expect(lessonButtons).toHaveLength(6)
   })
 
   it('selects clicked lesson and renders that lesson preview in right column', async () => {
@@ -107,9 +107,9 @@ describe('ModuleGenerationPreviewPage', () => {
     renderPage()
 
     await user.click(screen.getByRole('button', { name: /Generate Full Module in One Click/i }))
-    await user.click(screen.getByRole('button', { name: /Quick Check: PTO Basics/i }))
+    await user.click(screen.getByRole('button', { name: /Final Quiz/i }))
 
-    expect(screen.getByRole('heading', { name: 'Quick Check: PTO Basics' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Final Quiz' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /Generated quiz preview/i })).toBeInTheDocument()
   })
 

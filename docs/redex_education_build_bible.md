@@ -3014,3 +3014,54 @@ A footer "approval status" table makes the placeholder gates explicit at a glanc
 
 ---
 
+## 2026-05-22 — Slice 5.2: Generate HR Module Mock From Source
+
+**Status**: ✅ Completed.
+
+**Master roadmap**: Phase 5 / Slice 5.2.
+**Linear ticket**: `HR Prototype: create generated HR module mock`.
+
+**Context**:
+The mock data that the Foundry preview/critique/side-by-side surfaces consume was a generic 8-lesson 3-module placeholder. This slice reshapes everything to the master roadmap's prescribed 6-lesson HR Basics structure AND adds a published-form HR Basics course to learner-side demo data so the learner player can render it. Foundry mock-AI and learner-side now reference the **same** lesson set with the **same** source-section grounding back to `HR_ONBOARDING_SOURCE_SAMPLE.md` (Slice 5.1).
+
+**Files touched**:
+- `src/lib/education/demo-data.ts` (now 338 lines) — added `DEMO_HR_BASICS_COURSE`, `DEMO_HR_BASICS_MODULE` (`hr-basics-mod-001`), `DEMO_HR_BASICS_LESSONS` (6 lessons), `DEMO_HR_BASICS_QUIZ_QUESTIONS` (5 questions, 80% pass threshold), `DEMO_HR_BASICS_ENROLLMENT`. Registered HR module in `DEMO_MODULES`. Existing Orientation data unchanged.
+- `src/lib/education/index.ts` — re-exported new HR Basics constants.
+- `src/features/foundry/data/mockGeneratedOutline.ts` (62 lines) — rewritten to single-module 6-lesson HR Basics outline; `MOCK_LESSON_SOURCE_BINDINGS` updated; `missing_source_notes` updated to payroll/timekeeping/escalation placeholder areas.
+- `src/features/foundry/data/mockGeneratedModule.ts` (80 lines) — 8 → 6 lessons; status mix (4 ready_for_approval / 1 missing_source / 1 draft); quiz lesson reuses `DEMO_HR_BASICS_QUIZ_QUESTIONS`.
+- `src/features/foundry/data/mockLessonReviews.ts` (126 lines) — 6 review items; lesson 3 (Payroll and Timekeeping Basics) is `unsupported` confidence with `has_unsupported_claim: true`.
+- `src/contexts/EducationContext.tsx` — `getLessonsForModule` extended to return HR Basics lessons when called with `hr-basics-mod-001`.
+- `src/features/foundry/pages/ModuleGenerationPreviewPage.tsx` — toast updated to "Generated 6 lessons".
+- 5 test files updated to match the new 6-lesson shape: ModuleGenerationPreviewPage.test, LessonOutlineList.test, GeneratedOutlineCard.test, foundryDraftStore.test, SideBySideReviewPage.test (pending count 6 → 4 wording).
+
+**6 lesson titles** (per roadmap spec):
+1. Welcome to Redex (text)
+2. Who to Contact for HR Help (text)
+3. Payroll and Timekeeping Basics (text — **missing_source flagged**, references `[PLACEHOLDER]` payroll + timekeeping sections)
+4. First-Week Expectations (text)
+5. Required Acknowledgment (acknowledgment)
+6. Final Quiz (quiz — 5 questions, 80% passing)
+
+**Verification**:
+- ✅ typecheck green, lint 0/0
+- ✅ npm test: 247/247 passing (existing tests updated for new shape; same total count)
+- ✅ build green
+- ✅ Spot-check: `getModule('hr-basics-mod-001')` returns the module; `getLessonsForModule('hr-basics-mod-001')` returns 6 lessons
+
+**Acceptance criteria** (master roadmap):
+- ✅ HR module mock data exists
+- ✅ Lessons reference source sections (`MOCK_LESSON_SOURCE_BINDINGS` ties each lesson to real Drive file IDs from the seeded `_library/`)
+- ✅ Placeholder-based sections show missing-source warnings (lesson 3 carries `has_placeholders: true` + side-by-side review flags it `unsupported`)
+- ✅ Learner player can render the HR module (DEMO_HR_BASICS_MODULE registered in DEMO_MODULES; EducationContext routes correctly)
+- ✅ Admin review can render the HR module (foundry mocks updated)
+- ✅ Build Bible updated
+
+**Known scope deferred**:
+- The learner side doesn't yet auto-navigate Marcus to HR Basics specifically — the existing flow lands him on Orientation. **Slice 5.3 wires the learner UI to use Marcus's HR Basics assignment as the primary path.**
+
+**Naming guardrails honored**: HR Basics is the canonical course name. No fictional Redex HR policy in lesson bodies (placeholder sections stay placeholders).
+
+**Next**: Slice 5.3 — End-to-End HR Learner Flow. Marcus's assigned HR onboarding becomes the primary learner experience; he can complete the 6-lesson module start-to-finish (welcome → start → lessons → acknowledgment → final quiz → completion screen) with progress tracking via EducationContext.
+
+---
+

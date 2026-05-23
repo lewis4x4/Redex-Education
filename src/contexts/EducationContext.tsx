@@ -11,9 +11,12 @@ import type {
 import { EducationContext, type EducationContextValue } from './education-context';
 import {
   DEMO_ORIENTATION_COURSE,
+  DEMO_HR_BASICS_COURSE,
   DEMO_MODULES,
   DEMO_LESSONS,
+  DEMO_HR_BASICS_LESSONS,
   DEMO_ENROLLMENT,
+  DEMO_HR_BASICS_ENROLLMENT,
 } from '@/lib/education';
 
 // ============================================================
@@ -25,6 +28,7 @@ import {
 // ============================================================
 
 const LS_KEY = 'redex-education-progress-v1';
+const ALL_DEMO_LESSONS = [...DEMO_LESSONS, ...DEMO_HR_BASICS_LESSONS];
 
 interface StoredLessonProgress {
   status: ProgressStatus;
@@ -139,7 +143,7 @@ export function EducationProvider({ children }: { children: React.ReactNode }) {
       const moduleIds = new Set(
         DEMO_MODULES.filter((module) => module.course_id === courseId).map((module) => module.id)
       );
-      const relevantLessons = DEMO_LESSONS.filter((lesson) => moduleIds.has(lesson.module_id));
+      const relevantLessons = ALL_DEMO_LESSONS.filter((lesson) => moduleIds.has(lesson.module_id));
       const total = relevantLessons.length;
       const completed = relevantLessons.filter((lesson) => getLessonStatus(lesson.id) === 'completed').length;
       const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -157,11 +161,19 @@ export function EducationProvider({ children }: { children: React.ReactNode }) {
   }, [getProgressSummary]);
 
   const getMyEnrollments = useCallback((): Enrollment[] => {
-    return currentEnrollment ? [currentEnrollment] : [];
+    return currentEnrollment ? [currentEnrollment, DEMO_HR_BASICS_ENROLLMENT] : [DEMO_HR_BASICS_ENROLLMENT];
   }, [currentEnrollment]);
 
   const getCourse = useCallback((courseId: UUID): Course | undefined => {
-    return courseId === DEMO_ORIENTATION_COURSE.id ? DEMO_ORIENTATION_COURSE : undefined;
+    if (courseId === DEMO_ORIENTATION_COURSE.id) {
+      return DEMO_ORIENTATION_COURSE;
+    }
+
+    if (courseId === DEMO_HR_BASICS_COURSE.id) {
+      return DEMO_HR_BASICS_COURSE;
+    }
+
+    return undefined;
   }, []);
 
   const getModule = useCallback((moduleId: UUID): Module | undefined => {
@@ -169,7 +181,7 @@ export function EducationProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const getLessonsForModule = useCallback((moduleId: UUID): Lesson[] => {
-    return DEMO_LESSONS.filter((l) => l.module_id === moduleId);
+    return ALL_DEMO_LESSONS.filter((l) => l.module_id === moduleId);
   }, []);
 
   const getDemoCourse = useCallback(() => DEMO_ORIENTATION_COURSE, []);

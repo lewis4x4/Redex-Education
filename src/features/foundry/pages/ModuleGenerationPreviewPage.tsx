@@ -78,7 +78,7 @@ export function ModuleGenerationPreviewPage() {
           onClick={() => {
             setSelectedLessonIndex(0)
             useFoundryDraftStore.getState().setGeneratedModule(MOCK_GENERATED_MODULE)
-            toast.success('Generated 8 lessons')
+            toast.success('Generated 6 lessons')
           }}
         >
           ✨ Generate Full Module in One Click (Preview Mode)
