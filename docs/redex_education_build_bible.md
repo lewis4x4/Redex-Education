@@ -2935,3 +2935,39 @@ Consolidates the missing-source policy that was emerging in scattered form acros
 
 ---
 
+## 2026-05-22 — Slice 4.2: Local Mock Data Store
+
+**Status**: ✅ Completed.
+
+**Master roadmap**: Phase 4 / Slice 4.2.
+**Linear ticket**: `Data: create shared mock training store`.
+
+**Architectural call**: the roadmap suggests `src/data/mockUsers.ts`, `src/data/mockAssignments.ts`, etc. The codebase has evolved with feature-colocated mocks (`src/features/admin/data/mockAdmin.ts`, `src/features/foundry/data/mock*.ts`). **Kept feature-colocated pattern**; added cross-cutting seed data to `src/lib/education/` next to `demo-data.ts` for discoverability.
+
+**Added**:
+- `src/lib/education/mockOrgPeople.ts` (83 lines) — `MOCK_LEARNER_MARCUS` (Marcus Chen), `MOCK_LEARNER_ANA` (Ana Rodriguez), `MOCK_LEARNER_DEVON` (Devon — for completed-assignment variety), `MOCK_ADMIN_USER` (Jordan Patel), `MOCK_MANAGER_USER` (Sarah Chen — matches the existing onboarding-buddy reference in LearnerDashboardPage). Includes canonical `LearnerProfile` siblings.
+- `src/lib/education/mockAssignments.ts` (48 lines) — `MOCK_HR_ONBOARDING_ASSIGNMENT` (Marcus → in_progress, realistic due date), `MOCK_HR_ONBOARDING_ASSIGNMENT_ANA` (pending), `MOCK_HR_ONBOARDING_ASSIGNMENT_COMPLETED` (Devon).
+- Re-exported from `src/lib/education/index.ts` facade.
+- 8 new tests across 2 test files (id uniqueness, assignee↔user integrity, ISO timestamp shapes).
+
+**Deferred** (low-value at current stage): LearnerWelcomePage / LearnerDashboardPage refactor to consume `MOCK_LEARNER_MARCUS.preferred_name` instead of hardcoded "Marcus" — multi-line change with fallback paths; cleaner when auth lands.
+
+**Verification**:
+- ✅ typecheck green, lint 0/0
+- ✅ npm test: 239 → **247 passing** (+8)
+- ✅ build green
+
+**Acceptance criteria** (master roadmap):
+- ✅ Mock HR onboarding course exists (DEMO_ORIENTATION_COURSE — since Slice 1.x)
+- ✅ Mock employee Marcus exists (MOCK_LEARNER_MARCUS)
+- ✅ Mock admin exists (MOCK_ADMIN_USER — Jordan Patel)
+- ✅ Mock manager exists (MOCK_MANAGER_USER — Sarah Chen)
+- ✅ Foundry flow can read/write local draft state (useFoundryDraftStore — since Slice 2.2)
+- ✅ Build Bible updated
+
+**Phase 4 (Structured Data Model) complete.** 25 canonical types established + mock data seeded.
+
+**Next**: **Phase 5 — HR Onboarding Vertical Slice** begins. Slice 5.1 = the sample HR onboarding source markdown fixture under `docs/sample-source/`. This is the moment learner UX meets admin Foundry: the HR source becomes the test corpus the Foundry actually generates from.
+
+---
+

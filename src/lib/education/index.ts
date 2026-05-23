@@ -1,11 +1,5 @@
 import type { Module as EducationModule } from '@/types/training';
-import {
-  DEMO_MODULES as RAW_DEMO_MODULES,
-  DEMO_ORIENTATION_COURSE,
-  DEMO_LESSONS,
-  DEMO_ENROLLMENT,
-  DEMO_VALUES_QUIZ_QUESTIONS,
-} from './demo-data';
+import { DEMO_MODULES as RAW_DEMO_MODULES } from './demo-data';
 
 function requireDemoModules(modules: EducationModule[]): [EducationModule, ...EducationModule[]] {
   const [firstModule, ...remainingModules] = modules;
@@ -123,7 +117,23 @@ export {
   DEMO_LESSONS,
   DEMO_ENROLLMENT,
   DEMO_VALUES_QUIZ_QUESTIONS,
-};
+} from './demo-data'
+
+export {
+  MOCK_LEARNER_MARCUS,
+  MOCK_LEARNER_MARCUS_PROFILE,
+  MOCK_LEARNER_ANA,
+  MOCK_LEARNER_ANA_PROFILE,
+  MOCK_ADMIN_USER,
+  MOCK_MANAGER_USER,
+  MOCK_LEARNER_DEVON,
+} from './mockOrgPeople'
+
+export {
+  MOCK_HR_ONBOARDING_ASSIGNMENT,
+  MOCK_HR_ONBOARDING_ASSIGNMENT_ANA,
+  MOCK_HR_ONBOARDING_ASSIGNMENT_COMPLETED,
+} from './mockAssignments'
 
 export {
   ASSESSMENT_STYLE_LABELS,
