@@ -13,7 +13,7 @@ import {
 } from '@/lib/education'
 import { GeneratedSourceCompare } from '@/features/foundry/components/GeneratedSourceCompare'
 import { ReviewActionBar } from '@/features/foundry/components/ReviewActionBar'
-import { MOCK_LESSON_REVIEWS } from '@/features/foundry/data/mockLessonReviews'
+import { getCourseFoundryInitialLessonReviews } from '@/features/foundry/ai'
 import { useMockGenerationDelay } from '@/features/foundry/lib/useMockGenerationDelay'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
 
@@ -70,7 +70,9 @@ export function SideBySideReviewPage() {
   useMockGenerationDelay({
     shouldGenerate: lessonReviews.length === 0,
     delayMs: 500,
-    populate: () => setLessonReviews(MOCK_LESSON_REVIEWS),
+    populate: () => {
+      void getCourseFoundryInitialLessonReviews().then(setLessonReviews)
+    },
   })
 
   const selectedReview = useMemo(() => {

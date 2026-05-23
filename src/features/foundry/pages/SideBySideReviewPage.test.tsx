@@ -58,14 +58,14 @@ describe('SideBySideReviewPage', () => {
     )
   }
 
-  it('shows loading state, then hydrates lesson reviews after 500ms', () => {
+  it('shows loading state, then hydrates lesson reviews after 500ms', async () => {
     vi.useFakeTimers()
     renderPage()
 
     expect(screen.getByText('Loading review data…')).toBeInTheDocument()
 
-    act(() => {
-      vi.advanceTimersByTime(500)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500)
     })
 
     expect(useFoundryDraftStore.getState().lessonReviews).toEqual(MOCK_LESSON_REVIEWS)

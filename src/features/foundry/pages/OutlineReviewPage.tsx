@@ -6,7 +6,12 @@ import { Card } from '@/components/ui/card'
 import { GeneratedOutlineCard } from '@/features/foundry/components/GeneratedOutlineCard'
 import { LessonOutlineList } from '@/features/foundry/components/LessonOutlineList'
 import { MissingInfoWarnings } from '@/features/foundry/components/MissingInfoWarnings'
-import { MOCK_GENERATED_OUTLINE, MOCK_LESSON_SOURCE_BINDINGS } from '@/features/foundry/data/mockGeneratedOutline'
+import { getCourseFoundryAiClient, getCourseFoundryLessonSourceBindings } from '@/features/foundry/ai'
+import {
+  DEFAULT_AI_MODULE_BASICS,
+  DEFAULT_AI_SETUP_ANSWERS,
+  DEFAULT_AI_SOURCE_MATERIAL,
+} from '@/features/foundry/ai/pageInputDefaults'
 import { useMockGenerationDelay } from '@/features/foundry/lib/useMockGenerationDelay'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
 
@@ -20,20 +25,33 @@ export function OutlineReviewPage() {
   const navigate = useNavigate()
   const outline = useFoundryDraftStore((state) => state.outline)
   const outlineStatus = useFoundryDraftStore((state) => state.outline_status)
+  const currentDraft = useFoundryDraftStore((state) => state.currentDraft)
+  const sourceMaterial = useFoundryDraftStore((state) => state.sourceMaterial)
+  const setupAnswers = useFoundryDraftStore((state) => state.setupAnswers)
   const setOutline = useFoundryDraftStore((state) => state.setOutline)
   const approveOutline = useFoundryDraftStore((state) => state.approveOutline)
   const regenerateOutlineStart = useFoundryDraftStore((state) => state.regenerateOutlineStart)
+  const lessonSourceBindings = getCourseFoundryLessonSourceBindings()
+
+  const generateOutline = () =>
+    getCourseFoundryAiClient().generateOutline({
+      basics: currentDraft ?? DEFAULT_AI_MODULE_BASICS,
+      sources: sourceMaterial ?? DEFAULT_AI_SOURCE_MATERIAL,
+      setupAnswers: setupAnswers ?? DEFAULT_AI_SETUP_ANSWERS,
+    })
 
   const { isGenerating } = useMockGenerationDelay({
     shouldGenerate: outline === null,
     delayMs: 600,
-    populate: () => setOutline(MOCK_GENERATED_OUTLINE),
+    populate: () => {
+      void generateOutline().then(setOutline)
+    },
   })
 
   const handleRegenerate = async () => {
     regenerateOutlineStart()
     await new Promise((resolve) => window.setTimeout(resolve, 800))
-    setOutline(MOCK_GENERATED_OUTLINE)
+    setOutline(await generateOutline())
     toast.success('Regenerated outline')
   }
 
@@ -73,7 +91,7 @@ export function OutlineReviewPage() {
       ) : (
         <>
           <GeneratedOutlineCard outline={outline} />
-          <LessonOutlineList modules={outline.modules} sourceBindings={MOCK_LESSON_SOURCE_BINDINGS} />
+          <LessonOutlineList modules={outline.modules} sourceBindings={lessonSourceBindings} />
           <MissingInfoWarnings notes={outline.missing_source_notes ?? []} />
 
           {outlineStatus === 'approved' ? (

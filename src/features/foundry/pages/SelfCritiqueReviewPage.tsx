@@ -5,21 +5,32 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { SelfCritiquePanel } from '@/features/foundry/components/SelfCritiquePanel'
-import { MOCK_SELF_CRITIQUE } from '@/features/foundry/data/mockSelfCritique'
+import { getCourseFoundryAiClient } from '@/features/foundry/ai'
+import { DEFAULT_AI_MODULE_PREVIEW, DEFAULT_AI_SOURCE_MATERIAL } from '@/features/foundry/ai/pageInputDefaults'
 import { useMockGenerationDelay } from '@/features/foundry/lib/useMockGenerationDelay'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
 
 export function SelfCritiqueReviewPage() {
   const navigate = useNavigate()
   const critique = useFoundryDraftStore((state) => state.critique)
+  const generatedModule = useFoundryDraftStore((state) => state.generatedModule)
+  const sourceMaterial = useFoundryDraftStore((state) => state.sourceMaterial)
   const setCritique = useFoundryDraftStore((state) => state.setCritique)
   const ignoreIssue = useFoundryDraftStore((state) => state.ignoreIssue)
   const unignoreIssue = useFoundryDraftStore((state) => state.unignoreIssue)
 
+  const critiqueModule = () =>
+    getCourseFoundryAiClient().critiqueModule({
+      module: generatedModule ?? DEFAULT_AI_MODULE_PREVIEW,
+      sources: sourceMaterial ?? DEFAULT_AI_SOURCE_MATERIAL,
+    })
+
   const { isGenerating: isAnalyzing } = useMockGenerationDelay({
     shouldGenerate: critique === null,
     delayMs: 700,
-    populate: () => setCritique(MOCK_SELF_CRITIQUE),
+    populate: () => {
+      void critiqueModule().then(setCritique)
+    },
   })
 
   const statusMeta = useMemo(() => {
@@ -94,8 +105,16 @@ export function SelfCritiqueReviewPage() {
           onUnignoreIssue={unignoreIssue}
           onEditIssue={() => toast.info('Manual editing in Slice 3.4')}
           onRegenerateAll={async () => {
+            const selectedFixes = critique.issues.filter((issue) => !issue.ignored).map((issue) => issue.id)
+            const regeneratedModule = await getCourseFoundryAiClient().regenerateWithFixes({
+              module: generatedModule ?? DEFAULT_AI_MODULE_PREVIEW,
+              critique,
+              selectedFixes,
+              sources: sourceMaterial ?? DEFAULT_AI_SOURCE_MATERIAL,
+            })
+            useFoundryDraftStore.getState().setGeneratedModule(regeneratedModule)
             setCritique({
-              ...MOCK_SELF_CRITIQUE,
+              ...(await critiqueModule()),
               generated_at: new Date().toISOString(),
             })
             toast.success('Regenerated module with fixes')

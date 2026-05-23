@@ -328,19 +328,30 @@ Codex must update this section whenever migrations or schema changes are created
 
 ## Current AI Status
 
-No real AI integration has been implemented yet.
+Prompt registry data is centralized in `src/features/foundry/ai/prompts.ts`; no real AI service call path has been implemented in this slice.
 
-## Required Future AI Prompts
+## AI Prompt Registry
 
-The Course Foundry will eventually require:
+All Course Foundry prompts are individually versioned. Generated artifacts must store the prompt id and version used for audit.
 
-1. Source analysis prompt.
-2. Setup question inference prompt.
-3. Outline generation prompt.
-4. Lesson generation prompt.
-5. Assessment generation prompt.
-6. Self-critique prompt.
-7. Regenerate-with-fixes prompt.
+| Prompt key | Version | Purpose |
+| --- | --- | --- |
+| `source_analysis` | `v1` | Analyze source binders, identify authority/topics/sections, and flag placeholders. |
+| `setup_question_inference` | `v1` | Generate 3–5 admin setup questions before outline generation. |
+| `outline_generation` | `v1` | Produce source-cited `CourseOutlineDraft` content from setup answers and approved source. |
+| `lesson_generation.text` | `v1` | Produce source-grounded structured text lessons. |
+| `lesson_generation.checklist` | `v1` | Produce source-grounded checklist lessons with `details_markdown`. |
+| `lesson_generation.scenario` | `v1` | Produce branching scenarios with worked examples, one decision per screen, feedback, and outcomes. |
+| `lesson_generation.acknowledgment` | `v1` | Produce policy acknowledgment content with statement markdown and signature requirements. |
+| `lesson_generation.quiz` | `v1` | Produce quiz lesson content covering recognition, free-recall, sequencing, and confidence-rated item families. |
+| `lesson_generation.video_script` | `v1` | Produce video scripts with semantic 60–120 second segments, checkpoints, and `derived_from_section_ids`. |
+| `lesson_generation.hotspot_diagram` | `v1` | Produce Phase 10.4 hotspot diagram annotations; schema may be stubbed until that slice lands. |
+| `lesson_generation.drag_to_order` | `v1` | Produce Phase 10.5 ordered procedure steps; schema may be stubbed until that slice lands. |
+| `lesson_generation.practical` | `v1` | Produce Phase 11.1 practical lessons with observation checklists; schema may be stubbed until that slice lands. |
+| `assessment_generation` | `v1` | Produce competency-tagged Slice 11.2 item-bank schema-shape items. |
+| `self_critique` | `v1` | Review generated content for source support and pedagogical quality issues. |
+| `regenerate_with_fixes` | `v1` | Regenerate affected lesson sections from critique issues and fixes. |
+| `regenerate_section` | `v1` | Regenerate only lessons bound to a single source section for section-scoped jobs. |
 
 ## AI Guardrail Rule
 
@@ -3881,6 +3892,49 @@ Slice 8.6 hardens the redex-schema Supabase backend after Slices 8.3/8.4 wired r
 **Next**:
 - Slice 8.3 and Slice 8.4 are now unblocked end-to-end by real auth/profile/RLS foundations.
 - Remaining v2 Part 1 close-out items: AI Slices A–D + Slice 9.1.
+
+---
+
+## 2026-05-23 — AI Slice B: AI Service Interface
+
+**Status**: ✅ Completed. Course Foundry UI now calls a provider-agnostic AI client boundary; mock mode remains the default and preserves the existing demo generation behavior.
+
+**Context**:
+AI Slice A is landing the prompt registry in parallel. This slice consumes `getPrompt()` / prompt ids where available and establishes the service boundary that Slice C edge functions will implement. No vendor SDK was added, and no edge functions were built in this slice.
+
+**Files touched**:
+- `src/features/foundry/ai/courseFoundryAiClient.ts` — new provider-agnostic interface for source analysis, outline generation, lesson generation, assessment generation, self-critique, regenerate-with-fixes, and section regeneration.
+- `src/features/foundry/ai/aiSchemas.ts` — Zod validators for every AI method output plus `validateAiOutput()` error reporting.
+- `src/features/foundry/ai/mockAiClient.ts` — mock implementation backed by existing Foundry mock data; validates every returned output.
+- `src/features/foundry/ai/realAiClient.ts` — working stub that posts to `submit-generation-job`, includes prompt ids, polls `generation_jobs`, and throws a clear not-deployed error on missing Slice C infrastructure.
+- `src/features/foundry/ai/index.ts` — `VITE_AI_MODE` dispatcher (`mock` default, `real` opt-in) plus small mock-only helper boundaries for current lesson bindings/reviews.
+- `src/features/foundry/ai/pageInputDefaults.ts` — fallback request inputs so current mock pages can call the typed AI interface before real server state is mandatory.
+- `src/features/foundry/ai/*test.ts` — AI client dispatch, mock client, and real client tests.
+- `src/features/foundry/pages/{OutlineReviewPage,ModuleGenerationPreviewPage,SelfCritiqueReviewPage,SideBySideReviewPage}.tsx` — direct mock data calls replaced with AI boundary calls while preserving existing UX.
+- Corresponding Foundry page tests — adjusted for async Promise resolution through the AI client boundary.
+- `.env.example`, `src/env.d.ts`, `README.md` — documented/typed `VITE_AI_MODE=mock`.
+
+**Acceptance criteria**:
+- ✅ `mockAiClient` implements every `CourseFoundryAiClient` method and returns existing demo data.
+- ✅ Every interface output is Zod-validated before returning.
+- ✅ Foundry UI pages call the AI boundary instead of importing mock AI output files directly.
+- ✅ `realAiClient` posts to the `submit-generation-job` edge function with `operation`, `promptId`, and `input`, polls `generation_jobs`, and cleanly reports missing deployment.
+- ✅ No AI vendor SDK added.
+- ✅ `VITE_AI_MODE` defaults to mock and can opt into real mode.
+
+**Verification**:
+- ✅ `npm run typecheck -- --pretty false` — green.
+- ✅ `npm run lint` — 0 errors / 0 warnings.
+- ✅ Focused AI/page tests — **28 passed** across 7 files.
+- ✅ `npm test -- --run` — **613 passed, 1 skipped, 107 test files**. Current worktree includes Slice A prompt-registry tests; net delta versus the Slice 8.6 baseline is **+21 tests** (Slice B adds 12 new AI-boundary tests; Slice A accounts for the parallel +9 prompt-registry tests).
+- ✅ `npm run build` — green.
+
+**Known scope deferred**:
+- Slice C still owns the actual edge functions and `generation_jobs` persistence.
+- Real generation currently depends on mocked/future fetch responses; `VITE_AI_MODE=real` should not be used until Slice C is deployed.
+- Prompt registry ownership remains Slice A; this slice only consumes prompt ids through `getPrompt()`.
+
+**Next**: AI Slice C — generation jobs table + edge-function pipeline.
 
 ---
 

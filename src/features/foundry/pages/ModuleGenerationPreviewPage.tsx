@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { GeneratedLessonPreview } from '@/features/foundry/components/GeneratedLessonPreview'
 import { GenerationStatusBadge } from '@/features/foundry/components/GenerationStatusBadge'
-import { MOCK_GENERATED_MODULE } from '@/features/foundry/data/mockGeneratedModule'
+import { getCourseFoundryAiClient } from '@/features/foundry/ai'
+import { DEFAULT_AI_OUTLINE, DEFAULT_AI_SOURCE_MATERIAL } from '@/features/foundry/ai/pageInputDefaults'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
 import type { LessonGenerationStatus } from '@/lib/education'
 
@@ -22,8 +23,20 @@ const STATUS_ORDER: LessonGenerationStatus[] = [
 export function ModuleGenerationPreviewPage() {
   const navigate = useNavigate()
   const generatedModule = useFoundryDraftStore((state) => state.generatedModule)
+  const outline = useFoundryDraftStore((state) => state.outline)
+  const sourceMaterial = useFoundryDraftStore((state) => state.sourceMaterial)
   const updateLessonStatus = useFoundryDraftStore((state) => state.updateLessonStatus)
   const [selectedLessonIndex, setSelectedLessonIndex] = useState(0)
+
+  const handleGenerateModule = async () => {
+    setSelectedLessonIndex(0)
+    const generatedPreview = await getCourseFoundryAiClient().generateLessons({
+      outline: outline ?? DEFAULT_AI_OUTLINE,
+      sources: sourceMaterial ?? DEFAULT_AI_SOURCE_MATERIAL,
+    })
+    useFoundryDraftStore.getState().setGeneratedModule(generatedPreview)
+    toast.success(`Generated ${generatedPreview.lessons.length} lessons`)
+  }
 
   const statusCounts = useMemo(() => {
     if (generatedModule === null) {
@@ -76,9 +89,7 @@ export function ModuleGenerationPreviewPage() {
         <Button
           variant="brand"
           onClick={() => {
-            setSelectedLessonIndex(0)
-            useFoundryDraftStore.getState().setGeneratedModule(MOCK_GENERATED_MODULE)
-            toast.success('Generated 6 lessons')
+            void handleGenerateModule()
           }}
         >
           ✨ Generate Full Module in One Click (Preview Mode)

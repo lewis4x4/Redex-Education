@@ -67,14 +67,14 @@ describe('SelfCritiqueReviewPage', () => {
     )
   }
 
-  it('shows analyzing state then hydrates mock critique after 700ms when critique is null', () => {
+  it('shows analyzing state then hydrates mock critique after 700ms when critique is null', async () => {
     vi.useFakeTimers()
     renderPage()
 
     expect(screen.getByText('Analyzing module…')).toBeInTheDocument()
 
-    act(() => {
-      vi.advanceTimersByTime(700)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(700)
     })
 
     expect(useFoundryDraftStore.getState().critique).toEqual(MOCK_SELF_CRITIQUE)

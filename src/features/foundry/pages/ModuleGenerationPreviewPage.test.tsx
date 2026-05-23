@@ -90,8 +90,8 @@ describe('ModuleGenerationPreviewPage', () => {
 
     await user.click(screen.getByRole('button', { name: /Generate Full Module in One Click/i }))
 
+    expect(await screen.findByText('Lessons')).toBeInTheDocument()
     expect(useFoundryDraftStore.getState().generatedModule).not.toBeNull()
-    expect(screen.getByText('Lessons')).toBeInTheDocument()
 
     const lessonsPanel = screen.getByText('Lessons').closest('div')
     expect(lessonsPanel).not.toBeNull()
@@ -107,6 +107,7 @@ describe('ModuleGenerationPreviewPage', () => {
     renderPage()
 
     await user.click(screen.getByRole('button', { name: /Generate Full Module in One Click/i }))
+    await screen.findByText('Lessons')
     await user.click(screen.getByRole('button', { name: /Final Quiz/i }))
 
     expect(screen.getByRole('heading', { name: 'Final Quiz' })).toBeInTheDocument()

@@ -12,6 +12,7 @@ interface ImportMetaEnv {
   readonly VITE_MOCK_AUTH?: 'true' | 'false';
   readonly VITE_MOCK_AUTH_ROLE?: 'admin' | 'foundry_author' | 'manager' | 'learner';
   readonly VITE_DATA_SOURCE?: 'mock' | 'supabase';
+  readonly VITE_AI_MODE?: 'mock' | 'real';
 }
 
 interface ImportMeta {

@@ -38,7 +38,7 @@ npm run dev
 | `npm run preview` | Preview the production build |
 | `npm run typecheck` | TypeScript check only (no emit) |
 | `npm run lint` | ESLint check (currently 0 errors / 0 warnings) |
-| `npm test` | Run Vitest once (531 passing, 1 skipped) |
+| `npm test` | Run Vitest once (613 passing, 1 skipped) |
 | `npm run test:watch` | Vitest watch mode |
 | `npm run test:coverage` | V8 coverage report |
 
@@ -48,7 +48,8 @@ npm run dev
 |---|---|---|
 | `VITE_SUPABASE_URL` | When using real Supabase | Project URL (e.g. `https://your-ref.supabase.co`) |
 | `VITE_SUPABASE_ANON_KEY` | When using real Supabase | Public anon JWT (RLS gates access) |
-| `VITE_DATA_SOURCE` | Defaults to `mock` | Set to `supabase` to route facade helpers through the redex-schema Supabase read layer and fire best-effort writes for MVP flows. Real end-to-end writes still require Slice 8.6 auth/RLS profiles. |
+| `VITE_DATA_SOURCE` | Defaults to `mock` | Set to `supabase` to route facade helpers through the redex-schema Supabase read/write layer. |
+| `VITE_AI_MODE` | Defaults to `mock` | Set to `real` only after the Course Foundry generation edge functions are deployed. Mock mode preserves the existing demo generation behavior. |
 | `VITE_MOCK_AUTH` | Defaults to `false` | When `true`, AuthGate bypasses session checks for demo/dev; production builds are blocked |
 | `VITE_MOCK_AUTH_ROLE` | Defaults to `admin` | Mock-mode role used by AuthGate required-role checks (`admin`, `foundry_author`, `manager`, or `learner`) |
 

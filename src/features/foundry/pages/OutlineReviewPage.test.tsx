@@ -79,6 +79,7 @@ describe('OutlineReviewPage', () => {
     await act(async () => {
       vi.advanceTimersByTime(600)
       vi.runOnlyPendingTimers()
+      await Promise.resolve()
     })
 
     expect(screen.getByRole('heading', { name: 'HR Basics at Redex' })).toBeInTheDocument()
