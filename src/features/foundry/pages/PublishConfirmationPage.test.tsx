@@ -4,6 +4,8 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { MOCK_GENERATED_MODULE } from '@/features/foundry/data/mockGeneratedModule'
+import { MOCK_LESSON_REVIEWS } from '@/features/foundry/data/mockLessonReviews'
+import { MOCK_SELF_CRITIQUE } from '@/features/foundry/data/mockSelfCritique'
 
 function createStorageMock(): Storage {
   const store = new Map<string, string>()
@@ -33,6 +35,7 @@ function createStorageMock(): Storage {
 describe('PublishConfirmationPage', () => {
   let PublishConfirmationPage: (typeof import('./PublishConfirmationPage'))['PublishConfirmationPage']
   let useFoundryDraftStore: (typeof import('@/features/foundry/store/foundryDraftStore'))['useFoundryDraftStore']
+  let usePublishedModulesStore: (typeof import('@/features/publishing/store/publishedModulesStore'))['usePublishedModulesStore']
 
   beforeEach(async () => {
     vi.resetModules()
@@ -42,10 +45,12 @@ describe('PublishConfirmationPage', () => {
       value: createStorageMock(),
     })
 
+    ;({ usePublishedModulesStore } = await import('@/features/publishing/store/publishedModulesStore'))
     ;({ useFoundryDraftStore } = await import('@/features/foundry/store/foundryDraftStore'))
     ;({ PublishConfirmationPage } = await import('./PublishConfirmationPage'))
 
     act(() => {
+      usePublishedModulesStore.getState().resetPublishedModules()
       useFoundryDraftStore.getState().resetFoundryDraft()
       useFoundryDraftStore.getState().setBasics({
         title: 'HR Basics at Redex',
@@ -56,6 +61,14 @@ describe('PublishConfirmationPage', () => {
         estimated_minutes: 20,
       })
       useFoundryDraftStore.getState().setGeneratedModule(MOCK_GENERATED_MODULE)
+      useFoundryDraftStore.getState().setCritique({
+        ...MOCK_SELF_CRITIQUE,
+        blocks_publish: false,
+        issues: MOCK_SELF_CRITIQUE.issues.map((issue) => ({ ...issue, ignored: true })),
+      })
+      useFoundryDraftStore
+        .getState()
+        .setLessonReviews(MOCK_LESSON_REVIEWS.map((review) => ({ ...review, status: 'approved' as const })))
       useFoundryDraftStore.getState().setPublished()
     })
   })

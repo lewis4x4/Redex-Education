@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { usePublishedModulesStore } from '@/features/publishing/store/publishedModulesStore'
 import { useAssignmentStore } from '../store/assignmentStore'
 import { AssignmentForm } from './AssignmentForm'
 
@@ -20,6 +21,7 @@ describe('AssignmentForm', () => {
     toastSuccessMock.mockReset()
     act(() => {
       useAssignmentStore.getState().resetAssignments()
+      usePublishedModulesStore.getState().resetPublishedModules()
     })
   })
 
@@ -40,6 +42,17 @@ describe('AssignmentForm', () => {
     await user.click(screen.getByRole('button', { name: /assign training/i }))
 
     expect(await screen.findByText('Select an audience group')).toBeInTheDocument()
+  })
+
+  it('disables submission and shows empty state when no modules are published', () => {
+    act(() => {
+      usePublishedModulesStore.setState({ publishedModules: [] })
+    })
+
+    render(<AssignmentForm />)
+
+    expect(screen.getByText('No modules are published yet. Publish a module from Foundry to make it assignable.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /assign training/i })).toBeDisabled()
   })
 
   it('successful submit invokes onAssigned with the new Assignment', async () => {

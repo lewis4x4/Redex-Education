@@ -5,9 +5,9 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 
 import { Button } from '@/components/ui/button'
+import { usePublishedModulesStore } from '@/features/publishing/store/publishedModulesStore'
 import { MOCK_ADMIN_USER, MOCK_LEARNER_ANA, MOCK_LEARNER_DEVON, MOCK_LEARNER_MARCUS } from '@/lib/education'
 import type { Assignment, User } from '@/types/training'
-import { AVAILABLE_MODULES_FOR_ASSIGNMENT } from '../lib/availableModules'
 import { COHORTS } from '../lib/cohorts'
 import { useAssignmentStore } from '../store/assignmentStore'
 
@@ -45,12 +45,14 @@ export interface AssignmentFormProps {
   onAssigned?: (assignment: Assignment) => void
 }
 
-const defaultValues: AssignmentFormValues = {
-  moduleVersionId: AVAILABLE_MODULES_FOR_ASSIGNMENT[0]?.value ?? '',
-  assigneeMode: 'user',
-  assigneeUserId: '',
-  cohortId: '',
-  dueAt: '',
+function getDefaultValues(moduleVersionId = ''): AssignmentFormValues {
+  return {
+    moduleVersionId,
+    assigneeMode: 'user',
+    assigneeUserId: '',
+    cohortId: '',
+    dueAt: '',
+  }
 }
 
 function toDueAtIso(dateValue?: string): string | undefined {
@@ -79,6 +81,13 @@ function getAssigneeLabel(values: AssignmentFormValues): string {
 
 export function AssignmentForm({ onAssigned }: AssignmentFormProps) {
   const createAssignment = useAssignmentStore((state) => state.createAssignment)
+  const publishedModules = usePublishedModulesStore((state) => state.publishedModules)
+  const moduleOptions = publishedModules.map((module) => ({
+    value: module.module_version_id,
+    label: module.title,
+  }))
+  const firstModuleId = moduleOptions[0]?.value ?? ''
+  const hasPublishedModules = moduleOptions.length > 0
   const [assigneeMode, setAssigneeMode] = useState<AssignmentFormValues['assigneeMode']>('user')
   const {
     register,
@@ -87,7 +96,7 @@ export function AssignmentForm({ onAssigned }: AssignmentFormProps) {
     formState: { errors, isSubmitting },
   } = useForm<AssignmentFormValues>({
     resolver: zodResolver(assignmentFormSchema),
-    defaultValues,
+    defaultValues: getDefaultValues(firstModuleId),
     mode: 'onSubmit',
   })
   const assigneeModeField = register('assigneeMode')
@@ -104,7 +113,7 @@ export function AssignmentForm({ onAssigned }: AssignmentFormProps) {
 
     toast.success(`Assigned to ${getAssigneeLabel(values)} — ${formatDueToast(values.dueAt)}`)
     onAssigned?.(assignment)
-    reset(defaultValues)
+    reset(getDefaultValues(firstModuleId))
     setAssigneeMode('user')
   }
 
@@ -117,17 +126,31 @@ export function AssignmentForm({ onAssigned }: AssignmentFormProps) {
           </label>
           <select
             id="moduleVersionId"
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-redex-red focus:outline-none focus:ring-1 focus:ring-redex-red"
+            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-redex-red focus:outline-none focus:ring-1 focus:ring-redex-red disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
             aria-invalid={errors.moduleVersionId ? 'true' : 'false'}
-            aria-describedby={errors.moduleVersionId ? 'moduleVersionId-error' : undefined}
+            aria-describedby={
+              errors.moduleVersionId
+                ? 'moduleVersionId-error moduleVersionId-help'
+                : 'moduleVersionId-help'
+            }
+            disabled={!hasPublishedModules}
             {...register('moduleVersionId')}
           >
-            {AVAILABLE_MODULES_FOR_ASSIGNMENT.map((module) => (
+            {moduleOptions.map((module) => (
               <option key={module.value} value={module.value}>
                 {module.label}
               </option>
             ))}
           </select>
+          {!hasPublishedModules ? (
+            <p id="moduleVersionId-help" className="text-sm text-slate-600">
+              No modules are published yet. Publish a module from Foundry to make it assignable.
+            </p>
+          ) : (
+            <p id="moduleVersionId-help" className="sr-only">
+              Only published modules can be assigned.
+            </p>
+          )}
           <p id="moduleVersionId-error" aria-live="polite" className="text-sm text-red-600">
             {errors.moduleVersionId?.message ?? '\u00a0'}
           </p>
@@ -234,7 +257,7 @@ export function AssignmentForm({ onAssigned }: AssignmentFormProps) {
           <p className="text-xs text-slate-500">Optional. Leave blank for open-ended onboarding.</p>
         </div>
 
-        <Button type="submit" variant="brand" disabled={isSubmitting}>
+        <Button type="submit" variant="brand" disabled={isSubmitting || !hasPublishedModules}>
           Assign training
         </Button>
       </form>

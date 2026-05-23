@@ -3296,3 +3296,57 @@ With assignments (6.1) and progress + attempt tracking (6.2) in place, this slic
 
 ---
 
+## 2026-05-22 — Slice 7.1: Publish Workflow and Approval States
+
+**Status**: ✅ Completed. Phase 7 begins.
+
+**Linear ticket**: `Publishing: implement module approval and publish states`.
+
+**Context**:
+The Foundry store already implicitly represented the module lifecycle via its independent fields (currentDraft, sourceMaterial, setupAnswers, outline+outline_status, generatedModule, critique, lessonReviews, publishStatus). What was missing: (a) a single canonical state name derivable from those fields, (b) a published-modules registry that gates `assignmentStore.createAssignment`, and (c) a visible state badge in the admin UI. This slice formalizes all three as a pure inference layer + a small persisted registry, without refactoring the existing Foundry store.
+
+**Orchestration**: Single pair agent (Codex CLI · gpt-5.5 high) with internal Oracle review pass that flagged two real defects — both fixed before verification:
+1. Basics-only drafts could call `setPublished()` and slip through (now gated at store level).
+2. Custom drafts could overwrite the HR Basics registry record by sharing a module_version_id (now uses slugged fallback IDs).
+
+**Files touched**:
+- `src/features/publishing/lib/moduleStates.ts` (new) — pure inference layer:
+  - `ModuleApprovalState` type with all 11 roadmap states
+  - `inferModuleState(input)` — priority-ordered branch logic
+  - `orderedStates()`, `stateLabel()`, `stateBadgeVariant()`, `canTransition(from, to)` helpers
+- `src/features/publishing/store/publishedModulesStore.ts` (new) — Zustand + `persist` (`redex-published-modules-v1`):
+  - State: `publishedModules: PublishedModuleRecord[]` seeded with HR Basics (`module-version-hr-basics-v1`, published by Jordan Patel)
+  - Actions: `registerPublishedModule`, `archivePublishedModule`, `isAssignable`, `getAllPublished`, `resetPublishedModules`
+- `src/features/foundry/store/foundryDraftStore.ts` — `setPublished()` now also registers the module in `publishedModulesStore`. Gated: refuses to publish basics-only drafts; uses slugged fallback module_version_id for custom drafts so they don't overwrite HR Basics.
+- `src/features/foundry/components/ModuleStateBadge.tsx` (new) — badge chip using `stateLabel()` + `stateBadgeVariant()`; consistent with existing status badges.
+- `src/features/foundry/pages/PublishBlockersPage.tsx` — shows current `ModuleStateBadge` derived via `inferModuleState(...)` near the heading.
+- `src/features/assignments/store/assignmentStore.ts` — `createAssignment()` validates the target `module_version_id` against `publishedModulesStore.isAssignable()`; unpublished IDs now throw.
+- `src/features/assignments/components/AssignmentForm.tsx` — module options now sourced reactively from `publishedModulesStore`; submit disabled + polite empty state when no modules are published.
+- `src/features/assignments/lib/availableModules.ts` (deleted) — replaced by the store.
+- `src/features/assignments/components/AssignedUsersTable.tsx` — module title resolution now reads from `publishedModulesStore` for currency.
+- Tests: moduleStates branch + transition coverage; publishedModulesStore CRUD + persistence; ModuleStateBadge component; PublishBlockersPage badge integration; foundryDraftStore cross-store wiring + custom-id slug; AssignmentForm published-modules-only path + empty state; assignmentStore unpublished-id rejection; E2E foundry flow now asserts the newly-published module appears in `getAllPublished()`.
+
+**Verification**:
+- ✅ typecheck green
+- ✅ lint 0/0
+- ✅ npm test: **363 passed, 1 skipped** (+46 vs Slice 6.3 baseline of 317)
+- ✅ build green
+- ✅ Oracle review pass — two recommendations applied (basics-only publish gate + slugged custom-id fallback)
+
+**Acceptance criteria** (master roadmap):
+- ✅ State machine / state helper exists (`inferModuleState` + `canTransition` + label/variant helpers)
+- ✅ Publish button is disabled when blockers exist (already from Slice 5.4 — preserved)
+- ✅ **Published module becomes assignable** — `assignmentStore.createAssignment` now rejects unpublished IDs; `AssignmentForm` reads only from the registry
+- ✅ Build Bible updated
+
+**Known scope deferred**:
+- No "Approve" action separate from publish — the existing single-step Publish flow already covers the demo use case. A formal Approver role gate enters Phase 8 with real auth.
+- Archive transitions exist in the state helper but no UI action surface yet (Phase 7.2 / 7.3 will introduce versioning + impact review).
+- Module identity is still local/demo-derived until a real backend module-version id exists.
+
+**Naming guardrails honored**: HR Basics, Jordan Patel (admin), Marcus / Sarah / Ana / Devon — established personas only.
+
+**Next**: Slice 7.2 — Course/Module Versioning. Track version number / published date / approved by / source binder version / assessment version / employees who completed each version. Published modules cannot be silently edited; editing creates a new draft version.
+
+---
+

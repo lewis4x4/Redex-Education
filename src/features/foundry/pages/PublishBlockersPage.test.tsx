@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { MOCK_LESSON_REVIEWS } from '@/features/foundry/data/mockLessonReviews'
+import { MOCK_SELF_CRITIQUE } from '@/features/foundry/data/mockSelfCritique'
 
 function createStorageMock(): Storage {
   const store = new Map<string, string>()
@@ -67,6 +68,18 @@ describe('PublishBlockersPage', () => {
     })
   }
 
+  function seedApprovedModule() {
+    seedBasics()
+    useFoundryDraftStore.getState().setCritique({
+      ...MOCK_SELF_CRITIQUE,
+      blocks_publish: false,
+      issues: MOCK_SELF_CRITIQUE.issues.map((issue) => ({ ...issue, ignored: true })),
+    })
+    useFoundryDraftStore
+      .getState()
+      .setLessonReviews(MOCK_LESSON_REVIEWS.map((review) => ({ ...review, status: 'approved' as const })))
+  }
+
   function renderPage() {
     return render(
       <MemoryRouter initialEntries={['/admin/foundry/blockers']}>
@@ -86,6 +99,7 @@ describe('PublishBlockersPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Publish blockers' })).toBeInTheDocument()
     expect(screen.getByText('All outstanding items that prevent this module from being published.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '← Back to side-by-side review' })).toBeInTheDocument()
+    expect(screen.getByText('Draft')).toBeInTheDocument()
   })
 
   it('falls back to HR Basics MOCK_PUBLISH_BLOCKERS when foundry data is empty', () => {
@@ -105,16 +119,29 @@ describe('PublishBlockersPage', () => {
 
     const publishButton = screen.getByRole('button', { name: 'Publish module' })
     expect(publishButton).toBeDisabled()
-    expect(publishButton).toHaveAttribute('title', 'Resolve all blockers above to enable publishing')
+    expect(screen.getByText('Blocked')).toBeInTheDocument()
+    expect(publishButton).toHaveAttribute('title', 'Complete all approval requirements above to enable publishing')
   })
 
-  it('enables Publish module when blockers are clear and module is not already published', () => {
+  it('keeps Publish module disabled until approval requirements are complete', () => {
     act(() => {
       seedBasics()
     })
 
     renderPage()
 
+    expect(screen.getByText('Draft')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Publish module' })).toBeDisabled()
+  })
+
+  it('enables Publish module when the module is approved', () => {
+    act(() => {
+      seedApprovedModule()
+    })
+
+    renderPage()
+
+    expect(screen.getByText('Approved')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Publish module' })).toBeEnabled()
     expect(screen.getByText('✓ Module is clear to publish.')).toBeInTheDocument()
   })
@@ -122,7 +149,7 @@ describe('PublishBlockersPage', () => {
   it('publishes, timestamps the store, and navigates to the published route', async () => {
     const user = userEvent.setup()
     act(() => {
-      seedBasics()
+      seedApprovedModule()
     })
     renderPage()
 
@@ -133,9 +160,28 @@ describe('PublishBlockersPage', () => {
     expect(await screen.findByText('Published route reached')).toBeInTheDocument()
   })
 
+  it('shows published badge and confirmation guidance for published modules', () => {
+    act(() => {
+      seedApprovedModule()
+      useFoundryDraftStore.getState().setPublished()
+    })
+
+    renderPage()
+
+    expect(screen.getByText('Published')).toBeInTheDocument()
+    expect(screen.getByText('✓ Module published.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'View publish confirmation' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Publish module' })).toBeDisabled()
+  })
+
   it('reactively enables Publish module when lesson review blockers are approved', async () => {
     act(() => {
       seedBasics()
+      useFoundryDraftStore.getState().setCritique({
+        ...MOCK_SELF_CRITIQUE,
+        blocks_publish: false,
+        issues: MOCK_SELF_CRITIQUE.issues.map((issue) => ({ ...issue, ignored: true })),
+      })
       useFoundryDraftStore.getState().setLessonReviews(MOCK_LESSON_REVIEWS)
     })
 

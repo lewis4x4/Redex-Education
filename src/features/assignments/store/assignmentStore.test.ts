@@ -6,12 +6,15 @@ import { MOCK_ADMIN_USER, MOCK_LEARNER_MARCUS } from '@/lib/education/mockOrgPeo
 
 describe('useAssignmentStore', () => {
   let useAssignmentStore: (typeof import('./assignmentStore'))['useAssignmentStore']
+  let usePublishedModulesStore: (typeof import('@/features/publishing/store/publishedModulesStore'))['usePublishedModulesStore']
 
   beforeEach(async () => {
     vi.resetModules()
+    ;({ usePublishedModulesStore } = await import('@/features/publishing/store/publishedModulesStore'))
     ;({ useAssignmentStore } = await import('./assignmentStore'))
 
     act(() => {
+      usePublishedModulesStore.getState().resetPublishedModules()
       useAssignmentStore.getState().resetAssignments()
     })
   })
@@ -46,6 +49,16 @@ describe('useAssignmentStore', () => {
     expect(created?.id).toEqual(expect.any(String))
     expect(Number.isNaN(Date.parse(created?.assigned_at ?? ''))).toBe(false)
     expect(useAssignmentStore.getState().assignments).toContainEqual(created)
+  })
+
+  it('createAssignment rejects unpublished module versions', () => {
+    expect(() =>
+      useAssignmentStore.getState().createAssignment({
+        module_version_id: 'module-version-unpublished-v1',
+        assignee_user_id: MOCK_LEARNER_MARCUS.id,
+        assigned_by: MOCK_ADMIN_USER.id,
+      }),
+    ).toThrow('Cannot assign unpublished module version: module-version-unpublished-v1')
   })
 
   it('updateAssignmentStatus mutates the matching record', () => {

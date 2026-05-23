@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { MOCK_ADMIN_USER } from '@/lib/education';
 import type {
   CourseOutlineDraft,
   GeneratedModulePreview,
@@ -10,8 +11,52 @@ import type {
   SetupAnswers,
   SourceMaterial,
 } from '@/lib/education';
+import { inferModuleState } from '@/features/publishing/lib/moduleStates';
+import { usePublishedModulesStore } from '@/features/publishing/store/publishedModulesStore';
 import type { SetupAnswersInput } from '../schemas/foundrySchemas';
 import type { ModuleBasicsDraft, ModuleBasicsFormValues } from '../types';
+
+const DEFAULT_MODULE_VERSION_ID = 'module-version-hr-basics-v1';
+
+type MaybeModuleVersionCarrier = {
+  id?: unknown;
+  module_version_id?: unknown;
+};
+
+function readStringProperty(source: MaybeModuleVersionCarrier | null | undefined, key: keyof MaybeModuleVersionCarrier) {
+  const value = source?.[key];
+
+  return typeof value === 'string' && value.trim() !== '' ? value : undefined;
+}
+
+function slugifyModuleTitle(title: string): string {
+  return title
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'untitled-module';
+}
+
+function resolvePublishedModuleVersionId(
+  currentDraft: ModuleBasicsDraft | null,
+  generatedModule: GeneratedModulePreview | null,
+): string {
+  const explicitModuleVersionId =
+    readStringProperty(currentDraft as MaybeModuleVersionCarrier | null, 'id') ??
+    readStringProperty(generatedModule as MaybeModuleVersionCarrier | null, 'module_version_id');
+
+  if (explicitModuleVersionId) {
+    return explicitModuleVersionId;
+  }
+
+  const title = currentDraft?.title ?? generatedModule?.module_title ?? '';
+
+  if (title.trim().toLowerCase() === 'hr basics at redex' || title.trim() === '') {
+    return DEFAULT_MODULE_VERSION_ID;
+  }
+
+  return `module-version-${slugifyModuleTitle(title)}-v1`;
+}
 
 export type FoundryPublishStatus = 'draft' | 'ready_to_publish' | 'published';
 
@@ -143,9 +188,37 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
           ...resetPublishState,
         }),
       setPublished: () => {
-        if (get().getPublishBlockers().length > 0) {
+        const state = get();
+        const blockers = state.getPublishBlockers();
+
+        if (blockers.length > 0) {
           return false;
         }
+
+        const moduleState = inferModuleState({
+          currentDraft: state.currentDraft,
+          sourceMaterial: state.sourceMaterial,
+          setupAnswers: state.setupAnswers,
+          outline: state.outline,
+          outlineStatus: state.outline_status,
+          generatedModule: state.generatedModule,
+          critique: state.critique,
+          lessonReviews: state.lessonReviews,
+          blockerCount: blockers.length,
+          publishStatus: state.publishStatus,
+        });
+
+        if (moduleState !== 'approved') {
+          return false;
+        }
+        const moduleVersionId = resolvePublishedModuleVersionId(state.currentDraft, state.generatedModule);
+        const title = state.currentDraft?.title ?? state.generatedModule?.module_title ?? 'HR Basics at Redex';
+
+        usePublishedModulesStore.getState().registerPublishedModule({
+          module_version_id: moduleVersionId,
+          title,
+          published_by: MOCK_ADMIN_USER.id,
+        });
 
         set({ publishStatus: 'published', publishedAt: new Date().toISOString() });
         return true;

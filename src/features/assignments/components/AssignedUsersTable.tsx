@@ -1,4 +1,4 @@
-import { AVAILABLE_MODULES_FOR_ASSIGNMENT } from '../lib/availableModules'
+import { usePublishedModulesStore, type PublishedModuleRecord } from '@/features/publishing/store/publishedModulesStore'
 import { COHORTS } from '../lib/cohorts'
 import { useAssignmentStore } from '../store/assignmentStore'
 import {
@@ -59,8 +59,11 @@ function isPastDue(assignment: Assignment): boolean {
   return new Date(assignment.due_at).getTime() < Date.now()
 }
 
-function getModuleLabel(moduleVersionId: string): string {
-  return AVAILABLE_MODULES_FOR_ASSIGNMENT.find((module) => module.value === moduleVersionId)?.label ?? moduleVersionId
+function getModuleLabel(
+  moduleVersionId: string,
+  publishedModules: PublishedModuleRecord[],
+): string {
+  return publishedModules.find((module) => module.module_version_id === moduleVersionId)?.title ?? moduleVersionId
 }
 
 function getUserName(userId?: string): string | undefined {
@@ -82,6 +85,7 @@ function getAssigneeLabel(assignment: Assignment): string {
 
 export function AssignedUsersTable() {
   const assignments = useAssignmentStore((state) => state.assignments)
+  const publishedModules = usePublishedModulesStore((state) => state.publishedModules)
   const sortedAssignments = [...assignments].sort(
     (left, right) => new Date(right.assigned_at).getTime() - new Date(left.assigned_at).getTime(),
   )
@@ -112,7 +116,9 @@ export function AssignedUsersTable() {
               return (
                 <tr key={assignment.id}>
                   <td className="whitespace-nowrap px-5 py-4 font-medium text-slate-900">{getAssigneeLabel(assignment)}</td>
-                  <td className="px-5 py-4 text-slate-700">{getModuleLabel(assignment.module_version_id)}</td>
+                  <td className="px-5 py-4 text-slate-700">
+                    {getModuleLabel(assignment.module_version_id, publishedModules)}
+                  </td>
                   <td className="whitespace-nowrap px-5 py-4">
                     <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_CLASSES[assignment.status]}`}>
                       {STATUS_LABELS[assignment.status]}

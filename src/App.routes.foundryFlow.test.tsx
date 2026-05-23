@@ -7,6 +7,7 @@ import App from '@/App'
 import { MOCK_GENERATED_MODULE } from '@/features/foundry/data/mockGeneratedModule'
 import { MOCK_GENERATED_OUTLINE } from '@/features/foundry/data/mockGeneratedOutline'
 import { MOCK_LESSON_REVIEWS } from '@/features/foundry/data/mockLessonReviews'
+import { MOCK_SELF_CRITIQUE } from '@/features/foundry/data/mockSelfCritique'
 import { useAuth } from '@/hooks/useAuth'
 import { useEducation, useMyProgress } from '@/hooks/useEducation'
 
@@ -56,6 +57,7 @@ function LocationProbe() {
 
 describe('Foundry admin end-to-end route flow', () => {
   let useFoundryDraftStore: (typeof import('@/features/foundry/store/foundryDraftStore'))['useFoundryDraftStore']
+  let usePublishedModulesStore: (typeof import('@/features/publishing/store/publishedModulesStore'))['usePublishedModulesStore']
 
   beforeEach(async () => {
     vi.stubEnv('VITE_MOCK_AUTH', 'true')
@@ -86,9 +88,11 @@ describe('Foundry admin end-to-end route flow', () => {
       value: createStorageMock(),
     })
 
+    ;({ usePublishedModulesStore } = await import('@/features/publishing/store/publishedModulesStore'))
     ;({ useFoundryDraftStore } = await import('@/features/foundry/store/foundryDraftStore'))
 
     act(() => {
+      usePublishedModulesStore.getState().resetPublishedModules()
       useFoundryDraftStore.getState().resetFoundryDraft()
     })
   })
@@ -143,6 +147,14 @@ describe('Foundry admin end-to-end route flow', () => {
     await user.click(await screen.findByRole('button', { name: 'Continue → Self-critique' }))
     await waitFor(() => expect(screen.getByTestId('location-path')).toHaveTextContent('/admin/foundry/critique'))
 
+    act(() => {
+      useFoundryDraftStore.getState().setCritique({
+        ...MOCK_SELF_CRITIQUE,
+        blocks_publish: false,
+        issues: MOCK_SELF_CRITIQUE.issues.map((issue) => ({ ...issue, ignored: true })),
+      })
+    })
+
     await user.click(await screen.findByRole('button', { name: 'Continue → Side-by-side review' }))
     await waitFor(() => expect(screen.getByTestId('location-path')).toHaveTextContent('/admin/foundry/sidebyside'))
 
@@ -167,6 +179,14 @@ describe('Foundry admin end-to-end route flow', () => {
     await waitFor(() => expect(screen.getByTestId('location-path')).toHaveTextContent('/admin/foundry/published'))
     expect(useFoundryDraftStore.getState().publishStatus).toBe('published')
     expect(useFoundryDraftStore.getState().publishedAt).toEqual(expect.any(String))
+    expect(usePublishedModulesStore.getState().getAllPublished()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          module_version_id: 'module-version-hr-basics-v1',
+          title: 'HR Basics at Redex',
+        }),
+      ]),
+    )
     expect(await screen.findByRole('heading', { name: 'HR Basics at Redex' })).toBeInTheDocument()
   })
 })

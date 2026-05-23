@@ -1,17 +1,21 @@
 import { Link, useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { ModuleStateBadge } from '@/features/foundry/components/ModuleStateBadge'
 import { PublishBlockerList } from '@/features/foundry/components/PublishBlockerList'
 import { MOCK_PUBLISH_BLOCKERS } from '@/features/foundry/data/mockMissingSource'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
+import { inferModuleState } from '@/features/publishing/lib/moduleStates'
 
 export function PublishBlockersPage() {
   const navigate = useNavigate()
 
   const currentDraft = useFoundryDraftStore((state) => state.currentDraft)
   const sourceMaterial = useFoundryDraftStore((state) => state.sourceMaterial)
+  const setupAnswers = useFoundryDraftStore((state) => state.setupAnswers)
   const critique = useFoundryDraftStore((state) => state.critique)
   const outline = useFoundryDraftStore((state) => state.outline)
+  const outlineStatus = useFoundryDraftStore((state) => state.outline_status)
   const generatedModule = useFoundryDraftStore((state) => state.generatedModule)
   const lessonReviews = useFoundryDraftStore((state) => state.lessonReviews)
   const publishStatus = useFoundryDraftStore((state) => state.publishStatus)
@@ -28,7 +32,19 @@ export function PublishBlockersPage() {
     lessonReviews.length > 0
 
   const blockers = storeBlockers.length === 0 && !hasAnyFoundryData ? MOCK_PUBLISH_BLOCKERS : storeBlockers
-  const canPublish = blockers.length === 0 && publishStatus !== 'published'
+  const moduleState = inferModuleState({
+    currentDraft,
+    sourceMaterial,
+    setupAnswers,
+    outline,
+    outlineStatus,
+    generatedModule,
+    critique,
+    lessonReviews,
+    blockerCount: storeBlockers.length,
+    publishStatus,
+  })
+  const canPublish = moduleState === 'approved'
 
   const handlePublish = () => {
     if (!canPublish) {
@@ -52,11 +68,7 @@ export function PublishBlockersPage() {
             </p>
           </div>
 
-          {publishStatus === 'published' ? (
-            <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
-              ✓ Published
-            </span>
-          ) : null}
+          <ModuleStateBadge state={moduleState} size="md" />
         </div>
 
         <div className="flex items-center">
@@ -71,7 +83,14 @@ export function PublishBlockersPage() {
 
       <PublishBlockerList blockers={blockers} onResolve={(blocker) => blocker.resolve_route && navigate(blocker.resolve_route)} />
 
-      {blockers.length === 0 ? (
+      {moduleState === 'published' ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900 shadow-sm">
+          <p className="text-sm font-semibold">✓ Module published.</p>
+          <Link to="/admin/foundry/published" className="mt-1 inline-flex text-sm font-medium underline">
+            View publish confirmation
+          </Link>
+        </div>
+      ) : moduleState === 'approved' ? (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900 shadow-sm">
           <p className="text-sm font-semibold">✓ Module is clear to publish.</p>
         </div>
@@ -82,7 +101,7 @@ export function PublishBlockersPage() {
           variant="brand"
           disabled={!canPublish}
           onClick={handlePublish}
-          title={blockers.length > 0 ? 'Resolve all blockers above to enable publishing' : undefined}
+          title={!canPublish ? 'Complete all approval requirements above to enable publishing' : undefined}
         >
           Publish module
         </Button>

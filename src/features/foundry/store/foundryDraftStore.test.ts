@@ -33,6 +33,7 @@ function createStorageMock(): Storage {
 
 describe('useFoundryDraftStore', () => {
   let useFoundryDraftStore: (typeof import('./foundryDraftStore'))['useFoundryDraftStore']
+  let usePublishedModulesStore: (typeof import('@/features/publishing/store/publishedModulesStore'))['usePublishedModulesStore']
 
   beforeEach(async () => {
     vi.resetModules()
@@ -42,9 +43,11 @@ describe('useFoundryDraftStore', () => {
       value: createStorageMock(),
     })
 
+    ;({ usePublishedModulesStore } = await import('@/features/publishing/store/publishedModulesStore'))
     ;({ useFoundryDraftStore } = await import('./foundryDraftStore'))
 
     act(() => {
+      usePublishedModulesStore.getState().resetPublishedModules()
       useFoundryDraftStore.getState().clearDraft()
       useFoundryDraftStore.getState().clearSourceMaterial()
       useFoundryDraftStore.getState().clearSetupAnswers()
@@ -55,6 +58,25 @@ describe('useFoundryDraftStore', () => {
       useFoundryDraftStore.getState().clearLibrarySelection()
     })
   })
+
+  function seedPublishReadyModule(title = 'HR Basics at Redex') {
+    useFoundryDraftStore.getState().setBasics({
+      title,
+      parent_course_id: 'standalone',
+      audience: 'New hires',
+      criticality: 'required',
+      training_type: 'general_informational',
+      estimated_minutes: 20,
+    })
+    useFoundryDraftStore.getState().setCritique({
+      ...MOCK_SELF_CRITIQUE,
+      blocks_publish: false,
+      issues: MOCK_SELF_CRITIQUE.issues.map((issue) => ({ ...issue, ignored: true })),
+    })
+    useFoundryDraftStore
+      .getState()
+      .setLessonReviews(MOCK_LESSON_REVIEWS.map((review) => ({ ...review, status: 'approved' as const })))
+  }
 
   it('starts with no current draft and draft publish state', () => {
     expect(useFoundryDraftStore.getState().currentDraft).toBeNull()
@@ -500,12 +522,36 @@ describe('useFoundryDraftStore', () => {
     expect(useFoundryDraftStore.getState().publishedAt).toBeNull()
   })
 
-  it('setPublished marks clear drafts published and records timestamp', () => {
+  it('setPublished marks approved drafts published, records timestamp, and registers assignable module', () => {
     let didPublish = false
 
     act(() => {
+      seedPublishReadyModule()
+      didPublish = useFoundryDraftStore.getState().setPublished()
+    })
+
+    expect(didPublish).toBe(true)
+    expect(useFoundryDraftStore.getState().publishStatus).toBe('published')
+    expect(useFoundryDraftStore.getState().publishedAt).toEqual(expect.any(String))
+    expect(new Date(useFoundryDraftStore.getState().publishedAt ?? '').toString()).not.toBe('Invalid Date')
+    expect(usePublishedModulesStore.getState().isAssignable('module-version-hr-basics-v1')).toBe(true)
+    expect(usePublishedModulesStore.getState().getAllPublished()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          module_version_id: 'module-version-hr-basics-v1',
+          title: 'HR Basics at Redex',
+          published_by: 'user-jordan-admin',
+        }),
+      ]),
+    )
+  })
+
+  it('setPublished rejects drafts that are not approved yet', () => {
+    let didPublish = true
+
+    act(() => {
       useFoundryDraftStore.getState().setBasics({
-        title: 'HR Basics at Redex',
+        title: 'Basics-only draft',
         parent_course_id: 'standalone',
         audience: 'New hires',
         criticality: 'required',
@@ -515,17 +561,35 @@ describe('useFoundryDraftStore', () => {
       didPublish = useFoundryDraftStore.getState().setPublished()
     })
 
-    expect(didPublish).toBe(true)
-    expect(useFoundryDraftStore.getState().publishStatus).toBe('published')
-    expect(useFoundryDraftStore.getState().publishedAt).toEqual(expect.any(String))
-    expect(new Date(useFoundryDraftStore.getState().publishedAt ?? '').toString()).not.toBe('Invalid Date')
+    expect(didPublish).toBe(false)
+    expect(useFoundryDraftStore.getState().publishStatus).toBe('draft')
+    expect(usePublishedModulesStore.getState().isAssignable('module-version-basics-only-draft-v1')).toBe(false)
+  })
+
+  it('setPublished assigns custom drafts a distinct module version id instead of overwriting HR Basics', () => {
+    act(() => {
+      seedPublishReadyModule('Field Safety Refresher')
+      useFoundryDraftStore.getState().setPublished()
+    })
+
+    expect(usePublishedModulesStore.getState().getAllPublished()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          module_version_id: 'module-version-hr-basics-v1',
+          title: 'HR Basics at Redex',
+        }),
+        expect.objectContaining({
+          module_version_id: 'module-version-field-safety-refresher-v1',
+          title: 'Field Safety Refresher',
+        }),
+      ]),
+    )
+    expect(usePublishedModulesStore.getState().isAssignable('module-version-field-safety-refresher-v1')).toBe(true)
   })
 
   it('review mutations reset a published draft back to draft status', () => {
-    const approvedReviews = MOCK_LESSON_REVIEWS.map((review) => ({ ...review, status: 'approved' as const }))
-
     act(() => {
-      useFoundryDraftStore.getState().setLessonReviews(approvedReviews)
+      seedPublishReadyModule()
       useFoundryDraftStore.getState().setPublished()
       useFoundryDraftStore.getState().rejectLessonReview(0, 0)
     })
@@ -536,15 +600,16 @@ describe('useFoundryDraftStore', () => {
 
   it('resetPublishStatus and resetFoundryDraft clear published state', () => {
     act(() => {
-      useFoundryDraftStore.getState().setBasics({
-        title: 'HR Basics at Redex',
-        parent_course_id: 'standalone',
-        audience: 'New hires',
-        criticality: 'required',
-        training_type: 'general_informational',
-        estimated_minutes: 20,
-      })
+      seedPublishReadyModule()
       useFoundryDraftStore.getState().setGeneratedModule(MOCK_GENERATED_MODULE)
+      useFoundryDraftStore.getState().setCritique({
+        ...MOCK_SELF_CRITIQUE,
+        blocks_publish: false,
+        issues: MOCK_SELF_CRITIQUE.issues.map((issue) => ({ ...issue, ignored: true })),
+      })
+      useFoundryDraftStore
+        .getState()
+        .setLessonReviews(MOCK_LESSON_REVIEWS.map((review) => ({ ...review, status: 'approved' as const })))
       useFoundryDraftStore.getState().setPublished()
       useFoundryDraftStore.getState().resetPublishStatus()
     })
@@ -554,6 +619,7 @@ describe('useFoundryDraftStore', () => {
     expect(useFoundryDraftStore.getState().currentDraft).not.toBeNull()
 
     act(() => {
+      seedPublishReadyModule()
       useFoundryDraftStore.getState().setPublished()
       useFoundryDraftStore.getState().resetFoundryDraft()
     })

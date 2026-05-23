@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
+import { usePublishedModulesStore } from '@/features/publishing/store/publishedModulesStore'
 import { MOCK_ASSIGNMENTS } from '@/lib/education/mockAssignments'
 import type { Assignment } from '@/types/training'
 
@@ -76,6 +77,10 @@ export const useAssignmentStore = create<AssignmentState>()(
     (set, get) => ({
       assignments: cloneSeedAssignments(),
       createAssignment: (input) => {
+        if (!usePublishedModulesStore.getState().isAssignable(input.module_version_id)) {
+          throw new Error(`Cannot assign unpublished module version: ${input.module_version_id}`)
+        }
+
         const assignment: Assignment = {
           id: createAssignmentId(),
           module_version_id: input.module_version_id,
