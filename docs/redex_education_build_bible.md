@@ -3250,3 +3250,49 @@ Lesson-level progress was already persisted in `EducationContext` (localStorage 
 
 ---
 
+## 2026-05-22 — Slice 6.3: Manager Team Training Dashboard
+
+**Status**: ✅ Completed. Phase 6 complete (6.1 / 6.2 / 6.3 all green).
+
+**Linear ticket**: `Manager: build team training dashboard`.
+
+**Context**:
+With assignments (6.1) and progress + attempt tracking (6.2) in place, this slice surfaces it to managers. Sarah Chen sees her three direct reports (Marcus, Ana, Devon), their HR Basics assignment status, computed progress %, best quiz score where applicable, due date, and an overdue indicator. Filter chips support quick triage by status.
+
+**Orchestration**: Single pair agent (Codex CLI · gpt-5.5 high) with an internal Oracle review pass (no actionable findings).
+
+**Files touched**:
+- `src/lib/education/mockManagerReports.ts` (new) — `MOCK_MANAGER_REPORTS: Record<UUID, UUID[]>` + `getDirectReports(managerId)` helper (Sarah → [Marcus, Ana, Devon]).
+- `src/features/manager/lib/teamProgress.ts` (new) — pure `computeTeamProgress(...)` → `TeamMemberTrainingStatus[]`. For Marcus: derives % from EducationContext lesson progress + best quiz score from `assessmentAttemptStore`. For Ana/Devon: derives % from assignment status only (placeholder, since EducationContext is single-learner). Handles overdue (`due_at < now && status !== 'completed'`), failed (attempts exist with best score below threshold), not-started, missing-assignment defaults.
+- `src/features/manager/components/ManagerSummaryCards.tsx` (new) — 4 metric cards (Team members / Completed / In progress / Overdue or failed), mirrors `AdminMetricCard` styling.
+- `src/features/manager/components/ManagerStatusFilter.tsx` (new) — horizontal chip row (`all | incomplete | overdue | failed | completed`); active chip uses Redex-red accent; counts surfaced inline.
+- `src/features/manager/components/TeamTrainingTable.tsx` (new) — columns: Name / Role / Module / Status (color badge) / Progress (% + bar) / Score / Due (humanized + overdue red indicator); incomplete-first then due-date asc sort.
+- `src/features/manager/pages/ManagerDashboardPage.tsx` (new) at `/manager` — composes the three components; subscribes to `assignmentStore` + `assessmentAttemptStore` + `EducationContext` and memoizes `statuses` via `computeTeamProgress`.
+- `src/App.tsx` — `/manager` route added lazily (preserves bundle posture).
+- Tests: `mockManagerReports.test.ts`, `teamProgress.test.ts` (Marcus partial/complete/with score + Ana pending + Devon completed + overdue + failed + missing-assignment), component tests for cards/filter/table, `ManagerDashboardPage.test.tsx` (Sarah view + Marcus-completes-table-updates), `App.routes.test.tsx` smoke.
+
+**Verification**:
+- ✅ typecheck green
+- ✅ lint 0/0
+- ✅ npm test: **317 passed, 1 skipped** (+17 vs Slice 6.2 baseline of 300)
+- ✅ build green
+- ✅ Oracle review pass — no actionable issues
+
+**Acceptance criteria** (master roadmap):
+- ✅ Manager dashboard renders mock team status (Sarah → Marcus / Ana / Devon, all three HR Basics assignment states surfaced)
+- ✅ Marcus completion updates in the table (reactive subscription to all three data sources; test proves the flow)
+- ✅ Build Bible updated
+
+**Known scope deferred**:
+- **Manager auth**: hardcoded to `MOCK_MANAGER_USER.id` at the page level. No role chooser exists in the welcome flow today, so no UI affordance was added. Phase 8 (Supabase + real auth) introduces the role gate.
+- **Non-current-learner progress**: Ana and Devon derive % from assignment status only (placeholder mapping `pending → 0`, `in_progress → 50`, `completed → 100`). EducationContext is single-learner; Phase 8 backend wiring resolves multi-user progress.
+- **Marcus `last_activity_at`**: approximate — EducationContext exposes lesson status but not a per-record updated_at timestamp. Acceptable for the mocked phase.
+
+**Naming guardrails honored**: Sarah Chen, Marcus, Ana, Devon — established personas only.
+
+**Phase 6 status**: COMPLETE. Assignments (6.1) + Progress (6.2) + Manager Visibility (6.3) all shipped. Phase 7 begins next.
+
+**Next**: Phase 7 / Slice 7.1 — Publish Workflow and Approval States. Formalize the module publication state machine (Draft → Source Added → Questions Complete → Outline Approved → Generated → Self-Critiqued → Needs Review → Blocked → Approved → Published → Archived) with gating rules and admin-visible state transitions. The existing `publishStatus` in `foundryDraftStore` (Slice 5.4) only covers the final transition; this slice formalizes the full lifecycle.
+
+---
+

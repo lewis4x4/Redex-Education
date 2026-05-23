@@ -288,6 +288,13 @@ describe('Redex Education routes', () => {
     expect(await screen.findByRole('heading', { name: 'Manage assignments' })).toBeInTheDocument()
   })
 
+  it('renders ManagerDashboardPage at /manager', async () => {
+    renderAt('/manager')
+
+    expect(await screen.findByRole('heading', { name: 'Team training progress' })).toBeInTheDocument()
+    expect(screen.getByRole('row', { name: /Marcus Chen/i })).toBeInTheDocument()
+  })
+
   it('renders FoundryStartPage at /admin/foundry/start', async () => {
     vi.stubEnv('VITE_MOCK_AUTH', 'true')
 

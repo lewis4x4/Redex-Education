@@ -141,6 +141,8 @@ export {
   MOCK_HR_ONBOARDING_ASSIGNMENT_COMPLETED,
 } from './mockAssignments'
 
+export { MOCK_MANAGER_REPORTS, getDirectReports } from './mockManagerReports'
+
 export {
   ASSESSMENT_STYLE_LABELS,
   CRITIQUE_CATEGORY_LABELS,
