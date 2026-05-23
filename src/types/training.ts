@@ -394,6 +394,41 @@ export type GenerationStatus =
   | 'published'
   | 'failed';
 
+export type LessonGenerationStatus =
+  | 'draft'
+  | 'needs_review'
+  | 'unsupported_claim'
+  | 'missing_source'
+  | 'ready_for_approval';
+
+export const LESSON_GENERATION_STATUS_LABELS: Record<LessonGenerationStatus, string> = {
+  draft: 'Draft',
+  needs_review: 'Needs review',
+  unsupported_claim: 'Unsupported claim',
+  missing_source: 'Missing source',
+  ready_for_approval: 'Ready for approval',
+};
+
+export interface GeneratedLessonContent {
+  lesson_index: number;
+  module_index: number;
+  title: string;
+  lesson_type: LessonType;
+  body_markdown?: string;
+  quiz_questions?: QuizQuestion[];
+  acknowledgment_text?: string;
+  status: LessonGenerationStatus;
+  status_note?: string;
+  source_refs?: { drive_file_id: string; section_count: number }[];
+}
+
+export interface GeneratedModulePreview {
+  module_title: string;
+  lessons: GeneratedLessonContent[];
+  generated_at: ISODateTime;
+  is_complete: boolean;
+}
+
 /**
  * A single parsed section of source material — typically derived from
  * a markdown heading and the text content underneath it until the next

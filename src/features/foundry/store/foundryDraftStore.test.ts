@@ -1,6 +1,7 @@
 import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { MOCK_GENERATED_MODULE } from '@/features/foundry/data/mockGeneratedModule'
 import { MOCK_GENERATED_OUTLINE } from '@/features/foundry/data/mockGeneratedOutline'
 
 function createStorageMock(): Storage {
@@ -46,6 +47,7 @@ describe('useFoundryDraftStore', () => {
       useFoundryDraftStore.getState().clearSourceMaterial()
       useFoundryDraftStore.getState().clearSetupAnswers()
       useFoundryDraftStore.getState().clearOutline()
+      useFoundryDraftStore.getState().clearGeneratedModule()
       useFoundryDraftStore.getState().clearLibrarySelection()
     })
   })
@@ -312,6 +314,41 @@ describe('useFoundryDraftStore', () => {
     })
 
     expect(useFoundryDraftStore.getState().outline_status).toBe('approved')
+  })
+
+  it('starts with generatedModule as null', () => {
+    expect(useFoundryDraftStore.getState().generatedModule).toBeNull()
+  })
+
+  it('setGeneratedModule writes generated module preview', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setGeneratedModule(MOCK_GENERATED_MODULE)
+    })
+
+    expect(useFoundryDraftStore.getState().generatedModule).toEqual(MOCK_GENERATED_MODULE)
+  })
+
+  it('updateLessonStatus updates the matching lesson status by lesson/module indices', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setGeneratedModule(MOCK_GENERATED_MODULE)
+      useFoundryDraftStore.getState().updateLessonStatus(2, 1, 'ready_for_approval')
+    })
+
+    const updatedLesson = useFoundryDraftStore
+      .getState()
+      .generatedModule?.lessons.find((lesson) => lesson.lesson_index === 2 && lesson.module_index === 1)
+
+    expect(updatedLesson?.title).toBe('Quick Check: PTO Basics')
+    expect(updatedLesson?.status).toBe('ready_for_approval')
+  })
+
+  it('clearGeneratedModule resets generatedModule to null', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setGeneratedModule(MOCK_GENERATED_MODULE)
+      useFoundryDraftStore.getState().clearGeneratedModule()
+    })
+
+    expect(useFoundryDraftStore.getState().generatedModule).toBeNull()
   })
 
   it('starts with selectedLibraryFileIds as an empty array', () => {

@@ -108,7 +108,7 @@ describe('OutlineReviewPage', () => {
     await user.click(screen.getByRole('button', { name: 'Approve outline' }))
 
     expect(useFoundryDraftStore.getState().outline_status).toBe('approved')
-    expect(screen.getByText(/Outline approved\. Continue → Module preview/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /continue.*module.*preview/i })).toBeInTheDocument()
     expect(toastSuccessMock).toHaveBeenCalledWith('Outline approved')
   })
 

@@ -6,6 +6,7 @@ import { AdminDashboardPage } from '@/features/admin/pages/AdminDashboardPage'
 import { FoundryQuestionsPage } from '@/features/foundry/pages/FoundryQuestionsPage'
 import { OutlineReviewPage } from '@/features/foundry/pages/OutlineReviewPage'
 import { FoundryStartPage } from '@/features/foundry/pages/FoundryStartPage'
+import { ModuleGenerationPreviewPage } from '@/features/foundry/pages/ModuleGenerationPreviewPage'
 import { SourceBinderInputPage } from '@/features/source-binder/pages/SourceBinderInputPage'
 import { SourceLibraryPage } from '@/features/source-binder/pages/SourceLibraryPage'
 import { LearnerDashboardPage } from '@/features/learner/pages/LearnerDashboardPage'
@@ -136,6 +137,16 @@ function SourceLibraryRoute() {
   )
 }
 
+function ModuleGenerationPreviewRoute() {
+  return (
+    <AppShell breadcrumb="Admin flow › Course Foundry › Module preview">
+      <AuthGate>
+        <ModuleGenerationPreviewPage />
+      </AuthGate>
+    </AppShell>
+  )
+}
+
 function NotFoundRoute() {
   return (
     <AppShell breadcrumb="Page not found">
@@ -157,6 +168,7 @@ export default function App() {
       <Route path="/admin/foundry/source" element={<FoundrySourceRoute />} />
       <Route path="/admin/foundry/questions" element={<FoundryQuestionsRoute />} />
       <Route path="/admin/foundry/outline" element={<OutlineReviewRoute />} />
+      <Route path="/admin/foundry/preview" element={<ModuleGenerationPreviewRoute />} />
       <Route path="/admin/foundry/library" element={<SourceLibraryRoute />} />
       <Route path="/admin/*" element={<AdminRoute />} />
       <Route path="*" element={<NotFoundRoute />} />

@@ -46,6 +46,9 @@ export type {
   CourseStatus,
   EnrollmentStatus,
   GenerationStatus,
+  GeneratedLessonContent,
+  GeneratedModulePreview,
+  LessonGenerationStatus,
   LessonType,
   ProgressStatus,
   TrainingType,
@@ -106,6 +109,7 @@ export {
 
 export {
   ASSESSMENT_STYLE_LABELS,
+  LESSON_GENERATION_STATUS_LABELS,
   TRAINING_TYPE_LABELS,
   WIZARD_CRITICALITY_LABELS,
 } from '@/types/training';

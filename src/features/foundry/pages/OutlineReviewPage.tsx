@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,7 @@ const OUTLINE_STATUS_LABELS = {
 } as const
 
 export function OutlineReviewPage() {
+  const navigate = useNavigate()
   const outline = useFoundryDraftStore((state) => state.outline)
   const outlineStatus = useFoundryDraftStore((state) => state.outline_status)
   const setOutline = useFoundryDraftStore((state) => state.setOutline)
@@ -93,9 +94,12 @@ export function OutlineReviewPage() {
 
           {outlineStatus === 'approved' ? (
             <Card className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
-              <p className="text-[15px] text-emerald-800 leading-[1.45]">
-                ✓ Outline approved. Continue → Module preview (Coming in Slice 3.2)
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-[15px] text-emerald-800 leading-[1.45]">✓ Outline approved.</p>
+                <Button variant="brand" onClick={() => navigate('/admin/foundry/preview')}>
+                  Continue → Module preview
+                </Button>
+              </div>
             </Card>
           ) : null}
 

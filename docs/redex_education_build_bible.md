@@ -2657,3 +2657,65 @@ Wires the previously-disabled "Continue → Outline preview" button on the Setup
 
 ---
 
+## 2026-05-22 — Slice 3.2: Full Module Generation Preview
+
+**Status**: ✅ Completed.
+
+**Master roadmap**: Phase 3 / Slice 3.2 (lines 1080–1133).
+**Linear ticket**: `Foundry: build full module generation preview`.
+
+**Context**:
+Wires the "Continue → Module preview" button on the approved OutlineReviewPage. Admin sees the AI-generated full module (8 lessons × 3 lesson types: text/quiz/acknowledgment) before approval, with per-lesson status badges (Draft / Needs review / Unsupported claim / Missing source / Ready for approval) and a "PREVIEW ONLY — not published" banner. AI still mocked; data structures match production shape.
+
+**Orchestration**: 4 engineer sub-agents (A blocking → B || C parallel → D). Zero file conflicts. Same proven pattern.
+
+**Summary**:
+
+### Item A — Foundation
+- Canonical `LessonGenerationStatus` enum + `LESSON_GENERATION_STATUS_LABELS` (kept separate from existing `GenerationStatus` used by source_files processing — different semantic domain)
+- `GeneratedLessonContent` + `GeneratedModulePreview` interfaces in canonical types
+- `foundryDraftStore` extended with `generatedModule` slice + `setGeneratedModule` / `clearGeneratedModule` / `updateLessonStatus(lessonIdx, moduleIdx, status)` actions
+- `mockGeneratedModule.ts` (124 lines) — realistic 8-lesson HR Basics module with body_markdown, quiz_questions, acknowledgment_text, status_note for missing-source flags, source_refs tied to real Drive IDs from the Library. Status mix: 4 draft, 1 needs_review, 1 missing_source (PTO Policy Overview), 2 ready_for_approval.
+
+### Item B — Components
+- `GenerationStatusBadge.tsx` (32 lines) — 5-variant pill with icons (CheckCircle2 / AlertTriangle / AlertCircle) and tooltip-via-`note` prop
+- `GeneratedAssessmentPreview.tsx` (47 lines) — Tier 1 card showing questions + options with the correct answer flagged in emerald + "PREVIEW ONLY — Correct answer shown for admin review" subtext
+- `GeneratedLessonPreview.tsx` (84 lines) — Tier 2 card with header (title + status badge), markdown body via `react-markdown` + `rehype-sanitize` for text/checklist; embedded `GeneratedAssessmentPreview` for quiz; acknowledgment text + disabled "Available when published" button for ack; amber status_note banner; "📎 N source references" with FileText icon; per-lesson approve/mark-needs-review actions
+
+### Item C — Page + route + Outline wire
+- `ModuleGenerationPreviewPage.tsx` (164 lines) — eyebrow "REDEX AI COURSE FOUNDRY · STEP 5" + H1 "Review generated module" + subhead + **prominent amber "PREVIEW ONLY" banner**. Magic Button "✨ Generate Full Module in One Click (Preview Mode)" wires to `setGeneratedModule(MOCK_GENERATED_MODULE)` with Sonner toast. Status summary chips appear after generation. Two-column layout: left sidebar nav (lg:col-span-3) with per-lesson status badges; right (lg:col-span-9) renders selected `GeneratedLessonPreview`. Footer: "← Back to outline" + disabled "Continue → Self-critique" (Slice 3.3 target). Empty state when generatedModule is null.
+- `src/App.tsx` — new `ModuleGenerationPreviewRoute` + `<Route path="/admin/foundry/preview">` before `/admin/*`
+- `OutlineReviewPage.tsx` — approved info card's text-only "Continue → Module preview (Coming in Slice 3.2)" replaced with a real navigation button
+- `docs/architecture.md` — new route table row for `/admin/foundry/preview`
+
+### Item D — Tests
+- **+18 new tests** across 4 new + 3 extended files; total **163 → 181 passing** across 36 test files
+- Coverage: Statements **90.16%** (+0.88 from 89.28%)
+
+**Files touched** (~15 total).
+
+**Verification**:
+- ✅ typecheck green, lint 0/0
+- ✅ npm test: 181/181 passing
+- ✅ build green
+- ✅ coverage 90.16% statements
+
+**Acceptance criteria** (master roadmap):
+- ✅ Admin can view generated lessons (left-side nav + right preview)
+- ✅ Admin can view generated quiz (via GeneratedAssessmentPreview embedded in GeneratedLessonPreview)
+- ✅ Preview mode is clearly NOT published (amber banner + "PREVIEW ONLY" copy throughout)
+- ✅ One-click generation exists as a mocked action (Magic Button)
+- ✅ Build Bible updated
+
+**Known gaps (deferred)**:
+- Real AI generation (Phase 3 explicitly mocks)
+- AI self-critique panel (Slice 3.3)
+- Continue from preview to next step disabled until Slice 3.3 ships
+- Real published-vs-preview status flow lands in publish workflow (Slice 7.1)
+
+**Naming guardrails honored**: Foundry context; no Academy.
+
+**Next**: Slice 3.3 — AI Self-Critique Review Step.
+
+---
+

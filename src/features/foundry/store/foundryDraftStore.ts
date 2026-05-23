@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import type { CourseOutlineDraft, SetupAnswers, SourceMaterial } from '@/lib/education';
+import type {
+  CourseOutlineDraft,
+  GeneratedModulePreview,
+  LessonGenerationStatus,
+  SetupAnswers,
+  SourceMaterial,
+} from '@/lib/education';
 import type { SetupAnswersInput } from '../schemas/foundrySchemas';
 import type { ModuleBasicsDraft, ModuleBasicsFormValues } from '../types';
 
@@ -19,6 +25,8 @@ interface FoundryDraftState {
   outline: CourseOutlineDraft | null;
   /** Local outline lifecycle status for review/regeneration UX */
   outline_status: 'draft' | 'approved' | 'regenerating';
+  /** Generated module preview for Slice 3.2 */
+  generatedModule: GeneratedModulePreview | null;
   /** Save parsed source material */
   setSourceMaterial: (material: SourceMaterial) => void;
   /** Clear source material draft */
@@ -35,6 +43,16 @@ interface FoundryDraftState {
   clearOutline: () => void;
   /** Set regenerating status for simulated loading */
   regenerateOutlineStart: () => void;
+  /** Set generated module preview */
+  setGeneratedModule: (preview: GeneratedModulePreview) => void;
+  /** Clear generated module preview */
+  clearGeneratedModule: () => void;
+  /** Update one generated lesson status by lesson/module indices (no-op if preview missing) */
+  updateLessonStatus: (
+    lessonIdx: number,
+    moduleIdx: number,
+    status: LessonGenerationStatus,
+  ) => void;
   /** Drive file IDs selected from the Source Library for this draft */
   selectedLibraryFileIds: string[];
   /** Toggle a Drive-backed source file selection */
@@ -51,6 +69,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
       setupAnswers: null,
       outline: null,
       outline_status: 'draft',
+      generatedModule: null,
       selectedLibraryFileIds: [],
       setBasics: (values) =>
         set({
@@ -89,6 +108,25 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
           outline_status: 'draft',
         }),
       regenerateOutlineStart: () => set({ outline_status: 'regenerating' }),
+      setGeneratedModule: (preview) => set({ generatedModule: preview }),
+      clearGeneratedModule: () => set({ generatedModule: null }),
+      updateLessonStatus: (lessonIdx, moduleIdx, status) =>
+        set((state) => {
+          if (state.generatedModule === null) {
+            return state;
+          }
+
+          return {
+            generatedModule: {
+              ...state.generatedModule,
+              lessons: state.generatedModule.lessons.map((lesson) =>
+                lesson.lesson_index === lessonIdx && lesson.module_index === moduleIdx
+                  ? { ...lesson, status }
+                  : lesson
+              ),
+            },
+          };
+        }),
       toggleLibraryFile: (driveFileId) =>
         set((state) => ({
           selectedLibraryFileIds: state.selectedLibraryFileIds.includes(driveFileId)
