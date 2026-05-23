@@ -1,0 +1,506 @@
+import { z } from "https://esm.sh/zod@3.25.76";
+
+export class ProviderNotConfiguredError extends Error {
+  constructor(provider: string) {
+    super(`AI_PROVIDER_API_KEY is required before ${provider} generation can run.`);
+    this.name = "ProviderNotConfiguredError";
+  }
+}
+
+class AiProviderError extends Error {
+  constructor(message: string, public status = 502) {
+    super(message);
+    this.name = "AiProviderError";
+  }
+}
+
+export type AiProvider = "anthropic" | "openai";
+
+type PromptKey =
+  | "source_analysis"
+  | "outline_generation"
+  | "lesson_generation.text"
+  | "assessment_generation"
+  | "self_critique"
+  | "regenerate_with_fixes"
+  | "regenerate_section";
+
+interface PromptDefinition {
+  id: { key: PromptKey; version: "v1" };
+  system: string;
+  user: string;
+}
+
+export interface CostedAiResult<T> {
+  output: T;
+  cost_cents: number;
+  estimated_cost_cents: number;
+  model_used: string;
+  prompt_version: string;
+}
+
+export interface AnalyzeSourceInput {
+  sources: unknown;
+}
+
+export interface GenerateOutlineInput {
+  basics: unknown;
+  sources: unknown;
+  setupAnswers: unknown;
+}
+
+export interface GenerateLessonsInput {
+  outline: unknown;
+  sources: unknown;
+  targetSectionId?: string | null;
+}
+
+export interface GenerateAssessmentInput {
+  module: unknown;
+  sources: unknown;
+}
+
+export interface CritiqueModuleInput {
+  module: unknown;
+  sources: unknown;
+  assessments?: unknown;
+}
+
+export interface RegenerateWithFixesInput {
+  module: unknown;
+  critique: unknown;
+  selectedFixes: string[];
+  sources: unknown;
+}
+
+export interface RegenerateSectionInput {
+  moduleVersionId: string;
+  sourceSectionId: string;
+  affectedLessonIds: string[];
+  sources: unknown;
+}
+
+const JSON_OUTPUT_RULE = "Return only valid JSON matching the requested schema. Do not wrap the JSON in markdown fences.";
+const REDEX_POLICY_GUARDRAIL = "You generate Redex Education training drafts only from supplied Redex source material. Do not invent Redex policy.";
+
+const PROMPTS: Record<PromptKey, PromptDefinition> = {
+  source_analysis: {
+    id: { key: "source_analysis", version: "v1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nAnalyze the supplied Redex source binder as evidence. Identify topic, authority, section count, placeholder status, and missing-source risks.`,
+    user: "Analyze this source binder and return AnalyzeSourceOutput.\n\nInput JSON:\n{{input}}",
+  },
+  outline_generation: {
+    id: { key: "outline_generation", version: "v1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nCreate a source-grounded CourseOutlineDraft. Unsupported lessons must be flagged in missing_source_notes instead of fabricated.`,
+    user: "Generate a CourseOutlineDraft.\n\nInput JSON:\n{{input}}",
+  },
+  "lesson_generation.text": {
+    id: { key: "lesson_generation.text", version: "v1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nGenerate source-grounded lesson drafts. Keep claims tied to supplied source sections and flag unsupported content.`,
+    user: "Generate lessons and return GenerateLessonsOutput.\n\nInput JSON:\n{{input}}",
+  },
+  assessment_generation: {
+    id: { key: "assessment_generation", version: "v1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nGenerate source-grounded assessment questions with plausible distractors and remediation guidance.`,
+    user: "Generate assessments and return GenerateAssessmentOutput.\n\nInput JSON:\n{{input}}",
+  },
+  self_critique: {
+    id: { key: "self_critique", version: "v1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nCritique generated Foundry content for unsupported claims, weak questions, missing citations, confusing language, and publish blockers.`,
+    user: "Critique generated artifacts and return CritiqueModuleOutput.\n\nInput JSON:\n{{input}}",
+  },
+  regenerate_with_fixes: {
+    id: { key: "regenerate_with_fixes", version: "v1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nRegenerate only the selected fixes and preserve unchanged source-grounded content.`,
+    user: "Regenerate with selected fixes and return GenerateLessonsOutput.\n\nInput JSON:\n{{input}}",
+  },
+  regenerate_section: {
+    id: { key: "regenerate_section", version: "v1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nRegenerate only lessons bound to the target source section. Do not alter unrelated lessons.`,
+    user: "Regenerate the target source section and return RegenerateSectionOutput.\n\nInput JSON:\n{{input}}",
+  },
+};
+
+const LessonTypeSchema = z.enum([
+  "text",
+  "checklist",
+  "acknowledgment",
+  "quiz",
+  "scenario",
+  "video",
+  "coach",
+  "assignment",
+  "reflection_prompt",
+]);
+const CriticalitySchema = z.enum(["required", "recommended", "optional", "bonus"]);
+const LessonGenerationStatusSchema = z.enum([
+  "draft",
+  "needs_review",
+  "unsupported_claim",
+  "missing_source",
+  "ready_for_approval",
+]);
+const LessonReviewStatusSchema = z.enum(["pending", "approved", "needs_regeneration"]);
+const LessonConfidenceLevelSchema = z.enum(["high", "medium", "low", "unsupported"]);
+const CritiqueSeveritySchema = z.enum(["low", "medium", "high"]);
+const CritiqueIssueCategorySchema = z.enum([
+  "unsupported_claim",
+  "weak_question",
+  "missing_source_reference",
+  "confusing_language",
+  "overly_corporate_wording",
+  "missing_critical_info",
+  "needs_admin_approval",
+]);
+
+export const AnalyzeSourceOutputSchema = z.object({
+  topic: z.string(),
+  authority: z.enum(["authoritative", "supporting", "context"]),
+  sections_detected: z.number().int().nonnegative(),
+  has_placeholders: z.boolean(),
+  missing_required_topics: z.array(z.string()),
+});
+
+const CourseOutlineLessonSchema = z.object({
+  title: z.string(),
+  lesson_type: LessonTypeSchema,
+  estimated_minutes: z.number().int().nonnegative(),
+});
+const CourseOutlineModuleSchema = z.object({
+  title: z.string(),
+  lessons: z.array(CourseOutlineLessonSchema),
+});
+export const GenerateOutlineOutputSchema = z.object({
+  course_title: z.string(),
+  description: z.string(),
+  learning_objectives: z.array(z.string()),
+  modules: z.array(CourseOutlineModuleSchema),
+  missing_source_notes: z.array(z.string()).optional(),
+});
+
+const QuizQuestionSchema = z.object({
+  id: z.string(),
+  question: z.string(),
+  options: z.array(z.string()),
+  correct_index: z.number().int().nonnegative().optional(),
+});
+const GeneratedLessonContentSchema = z.object({
+  lesson_index: z.number().int().nonnegative(),
+  module_index: z.number().int().nonnegative(),
+  title: z.string(),
+  lesson_type: LessonTypeSchema,
+  body_markdown: z.string().optional(),
+  quiz_questions: z.array(QuizQuestionSchema).optional(),
+  acknowledgment_text: z.string().optional(),
+  status: LessonGenerationStatusSchema,
+  status_note: z.string().optional(),
+  source_refs: z.array(z.object({
+    drive_file_id: z.string(),
+    section_count: z.number().int().nonnegative(),
+  })).optional(),
+});
+export const GenerateLessonsOutputSchema = z.object({
+  module_title: z.string(),
+  lessons: z.array(GeneratedLessonContentSchema),
+  generated_at: z.string(),
+  is_complete: z.boolean(),
+});
+export const GenerateAssessmentOutputSchema = z.object({
+  assessment_lesson_id: z.string(),
+  questions: z.array(QuizQuestionSchema),
+});
+
+const CritiqueIssueSchema = z.object({
+  id: z.string(),
+  category: CritiqueIssueCategorySchema,
+  severity: CritiqueSeveritySchema,
+  lesson_title: z.string().optional(),
+  module_index: z.number().int().nonnegative().optional(),
+  summary: z.string(),
+  detail: z.string(),
+  suggested_fix: z.string().optional(),
+  ignored: z.boolean(),
+  ignored_note: z.string().optional(),
+});
+export const CritiqueModuleOutputSchema = z.object({
+  module_title: z.string(),
+  generated_at: z.string(),
+  issues: z.array(CritiqueIssueSchema),
+  blocks_publish: z.boolean(),
+});
+export const RegenerateWithFixesOutputSchema = GenerateLessonsOutputSchema;
+
+const TextLessonContentSchema = z.object({ type: z.literal("text"), body_markdown: z.string(), estimated_read_minutes: z.number().optional() });
+const ChecklistLessonContentSchema = z.object({ type: z.literal("checklist"), intro_markdown: z.string().optional(), items: z.array(z.object({ id: z.string(), label: z.string(), details_markdown: z.string().optional() })), require_all: z.boolean().optional() });
+const AcknowledgmentLessonContentSchema = z.object({ type: z.literal("acknowledgment"), statement_markdown: z.string(), required_signature: z.enum(["click", "name"]).optional(), policy_ref: z.string().optional() });
+const QuizLessonContentSchema = z.object({ type: z.literal("quiz"), questions: z.array(QuizQuestionSchema), passing_threshold: z.number().optional(), allow_retakes: z.boolean().optional() });
+const ScenarioLessonContentSchema = z.object({ type: z.literal("scenario"), intro_markdown: z.string(), steps: z.array(z.object({ id: z.string(), prompt_markdown: z.string(), choices: z.array(z.object({ id: z.string(), label: z.string(), is_correct: z.boolean().optional(), feedback_markdown: z.string().optional() })) })), outcome_summary_markdown: z.string().optional() });
+const VideoLessonContentSchema = z.object({ type: z.literal("video"), video_url: z.string(), duration_seconds: z.number().optional(), transcript_markdown: z.string().optional(), poster_url: z.string().optional() });
+const CoachLessonContentSchema = z.object({ type: z.literal("coach"), intro_markdown: z.string(), prompts: z.array(z.string()).optional(), coach_id: z.string().optional() });
+const AssignmentLessonContentSchema = z.object({ type: z.literal("assignment"), instructions: z.string(), rubric: z.object({ criteria: z.array(z.object({ label: z.string(), description: z.string().optional(), weight: z.number().optional() })) }).optional() });
+const ReflectionPromptLessonContentSchema = z.object({ type: z.literal("reflection_prompt"), prompt: z.string() });
+const LessonContentSchema = z.discriminatedUnion("type", [
+  TextLessonContentSchema,
+  ChecklistLessonContentSchema,
+  AcknowledgmentLessonContentSchema,
+  QuizLessonContentSchema,
+  ScenarioLessonContentSchema,
+  VideoLessonContentSchema,
+  CoachLessonContentSchema,
+  AssignmentLessonContentSchema,
+  ReflectionPromptLessonContentSchema,
+]);
+const LessonSchema = z.object({
+  id: z.string(),
+  module_id: z.string(),
+  title: z.string(),
+  lesson_type: LessonTypeSchema,
+  criticality: CriticalitySchema,
+  order_index: z.number().int().nonnegative(),
+  estimated_minutes: z.number().int().nonnegative(),
+  content: LessonContentSchema,
+  resources: z.array(z.object({ label: z.string(), url: z.string(), type: z.enum(["pdf", "link", "video", "notion"]) })).optional(),
+});
+const SourceExcerptSchema = z.object({
+  drive_file_id: z.string(),
+  source_title: z.string(),
+  section_heading: z.string(),
+  section_body: z.string(),
+  highlighted_span: z.object({ start: z.number().int().nonnegative(), end: z.number().int().nonnegative() }).optional(),
+});
+const LessonReviewItemSchema = z.object({
+  lesson_index: z.number().int().nonnegative(),
+  module_index: z.number().int().nonnegative(),
+  lesson_title: z.string(),
+  confidence: LessonConfidenceLevelSchema,
+  has_unsupported_claim: z.boolean(),
+  unsupported_note: z.string().optional(),
+  status: LessonReviewStatusSchema,
+  source_excerpts: z.array(SourceExcerptSchema),
+});
+export const RegenerateSectionOutputSchema = z.object({
+  regeneratedLessons: z.array(LessonSchema),
+  newReviewItems: z.array(LessonReviewItemSchema),
+});
+
+type AnthropicResponse = {
+  content?: Array<{ type?: string; text?: string }>;
+  usage?: { input_tokens?: number; output_tokens?: number };
+};
+
+type OpenAiResponse = {
+  output_text?: string;
+  output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+  usage?: { input_tokens?: number; output_tokens?: number; prompt_tokens?: number; completion_tokens?: number };
+};
+
+function providerFromEnv(): AiProvider {
+  const provider = (Deno.env.get("AI_PROVIDER") ?? "anthropic").toLowerCase();
+
+  if (provider === "openai") {
+    return "openai";
+  }
+
+  return "anthropic";
+}
+
+function modelFor(provider: AiProvider): string {
+  return Deno.env.get("AI_MODEL") ?? (provider === "openai" ? "gpt-4.1-mini" : "claude-3-5-sonnet-20241022");
+}
+
+function apiKeyFor(provider: AiProvider): string {
+  const key = Deno.env.get("AI_PROVIDER_API_KEY");
+
+  if (!key) {
+    throw new ProviderNotConfiguredError(provider);
+  }
+
+  return key;
+}
+
+function buildUserPrompt(prompt: PromptDefinition, input: unknown): string {
+  return prompt.user.replace("{{input}}", JSON.stringify(input, null, 2));
+}
+
+function parseProviderJson(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch (_error) {
+    const jsonMatch = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/u);
+
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]) as unknown;
+    }
+
+    throw new AiProviderError("AI provider returned non-JSON output.");
+  }
+}
+
+function tokenEstimate(value: string): number {
+  return Math.max(1, Math.ceil(value.length / 4));
+}
+
+function costFromUsage(provider: AiProvider, inputTokens: number, outputTokens: number): number {
+  const defaultInputCentsPerMillion = provider === "openai" ? 15 : 300;
+  const defaultOutputCentsPerMillion = provider === "openai" ? 60 : 1500;
+  const inputRate = Number(Deno.env.get("AI_INPUT_COST_CENTS_PER_MILLION_TOKENS") ?? defaultInputCentsPerMillion);
+  const outputRate = Number(Deno.env.get("AI_OUTPUT_COST_CENTS_PER_MILLION_TOKENS") ?? defaultOutputCentsPerMillion);
+  const cost = (inputTokens / 1_000_000) * inputRate + (outputTokens / 1_000_000) * outputRate;
+
+  return Math.max(0, Math.round(cost));
+}
+
+async function readJsonResponse<T>(response: Response): Promise<T> {
+  const text = await response.text();
+
+  if (!response.ok) {
+    throw new AiProviderError(`AI provider request failed (${response.status}) ${text}`, 502);
+  }
+
+  return JSON.parse(text) as T;
+}
+
+async function callAnthropic(prompt: PromptDefinition, input: unknown): Promise<{ text: string; inputTokens: number; outputTokens: number; model: string }> {
+  const provider: AiProvider = "anthropic";
+  const model = modelFor(provider);
+  const userPrompt = buildUserPrompt(prompt, input);
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": apiKeyFor(provider),
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: Number(Deno.env.get("AI_MAX_TOKENS") ?? 4096),
+      system: prompt.system,
+      messages: [{ role: "user", content: userPrompt }],
+    }),
+  });
+  const payload = await readJsonResponse<AnthropicResponse>(response);
+  const text = payload.content?.find((item) => item.type === "text" && item.text)?.text;
+
+  if (!text) {
+    throw new AiProviderError("Anthropic response did not include text content.");
+  }
+
+  return {
+    text,
+    inputTokens: payload.usage?.input_tokens ?? tokenEstimate(`${prompt.system}\n${userPrompt}`),
+    outputTokens: payload.usage?.output_tokens ?? tokenEstimate(text),
+    model,
+  };
+}
+
+function openAiText(payload: OpenAiResponse): string | null {
+  if (payload.output_text) {
+    return payload.output_text;
+  }
+
+  for (const item of payload.output ?? []) {
+    const text = item.content?.find((content) => content.type === "output_text" || content.type === "text")?.text;
+
+    if (text) {
+      return text;
+    }
+  }
+
+  return null;
+}
+
+async function callOpenAi(prompt: PromptDefinition, input: unknown): Promise<{ text: string; inputTokens: number; outputTokens: number; model: string }> {
+  const provider: AiProvider = "openai";
+  const model = modelFor(provider);
+  const userPrompt = buildUserPrompt(prompt, input);
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "authorization": `Bearer ${apiKeyFor(provider)}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      input: [
+        { role: "system", content: prompt.system },
+        { role: "user", content: userPrompt },
+      ],
+      text: { format: { type: "json_object" } },
+    }),
+  });
+  const payload = await readJsonResponse<OpenAiResponse>(response);
+  const text = openAiText(payload);
+
+  if (!text) {
+    throw new AiProviderError("OpenAI response did not include output text.");
+  }
+
+  return {
+    text,
+    inputTokens: payload.usage?.input_tokens ?? payload.usage?.prompt_tokens ?? tokenEstimate(`${prompt.system}\n${userPrompt}`),
+    outputTokens: payload.usage?.output_tokens ?? payload.usage?.completion_tokens ?? tokenEstimate(text),
+    model,
+  };
+}
+
+async function invokeProvider<T>(promptKey: PromptKey, input: unknown, schema: z.ZodType<T>): Promise<CostedAiResult<T>> {
+  const provider = providerFromEnv();
+  const prompt = PROMPTS[promptKey];
+  const estimatedInputTokens = tokenEstimate(`${prompt.system}\n${buildUserPrompt(prompt, input)}`);
+  const estimatedCost = costFromUsage(provider, estimatedInputTokens, 1200);
+  const raw = provider === "openai"
+    ? await callOpenAi(prompt, input)
+    : await callAnthropic(prompt, input);
+  const parsed = schema.safeParse(parseProviderJson(raw.text));
+
+  if (!parsed.success) {
+    const details = parsed.error.issues
+      .map((issue) => `${issue.path.join(".") || "<root>"}: ${issue.message}`)
+      .join("; ");
+    throw new AiProviderError(`AI output validation failed: ${details}`);
+  }
+
+  return {
+    output: parsed.data,
+    cost_cents: costFromUsage(provider, raw.inputTokens, raw.outputTokens),
+    estimated_cost_cents: estimatedCost,
+    model_used: raw.model,
+    prompt_version: `${prompt.id.key}@${prompt.id.version}`,
+  };
+}
+
+export interface CourseFoundryAiClientServer {
+  analyzeSource(input: AnalyzeSourceInput): Promise<CostedAiResult<z.infer<typeof AnalyzeSourceOutputSchema>>>;
+  generateOutline(input: GenerateOutlineInput): Promise<CostedAiResult<z.infer<typeof GenerateOutlineOutputSchema>>>;
+  generateLessons(input: GenerateLessonsInput): Promise<CostedAiResult<z.infer<typeof GenerateLessonsOutputSchema>>>;
+  generateAssessment(input: GenerateAssessmentInput): Promise<CostedAiResult<z.infer<typeof GenerateAssessmentOutputSchema>>>;
+  critiqueModule(input: CritiqueModuleInput): Promise<CostedAiResult<z.infer<typeof CritiqueModuleOutputSchema>>>;
+  regenerateWithFixes(input: RegenerateWithFixesInput): Promise<CostedAiResult<z.infer<typeof RegenerateWithFixesOutputSchema>>>;
+  regenerateSection(input: RegenerateSectionInput): Promise<CostedAiResult<z.infer<typeof RegenerateSectionOutputSchema>>>;
+}
+
+export function createCourseFoundryAiClientServer(): CourseFoundryAiClientServer {
+  return {
+    analyzeSource(input) {
+      return invokeProvider("source_analysis", input, AnalyzeSourceOutputSchema);
+    },
+    generateOutline(input) {
+      return invokeProvider("outline_generation", input, GenerateOutlineOutputSchema);
+    },
+    generateLessons(input) {
+      return invokeProvider("lesson_generation.text", input, GenerateLessonsOutputSchema);
+    },
+    generateAssessment(input) {
+      return invokeProvider("assessment_generation", input, GenerateAssessmentOutputSchema);
+    },
+    critiqueModule(input) {
+      return invokeProvider("self_critique", input, CritiqueModuleOutputSchema);
+    },
+    regenerateWithFixes(input) {
+      return invokeProvider("regenerate_with_fixes", input, RegenerateWithFixesOutputSchema);
+    },
+    regenerateSection(input) {
+      return invokeProvider("regenerate_section", input, RegenerateSectionOutputSchema);
+    },
+  };
+}

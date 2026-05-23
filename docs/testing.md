@@ -134,7 +134,7 @@ it('updates state when moving from in_progress to completed', () => {
 
 ## 9) What's tested today
 
-Current Slice 9.2 baseline: **426 passing, 1 skipped, 86 test files**. Test files are co-located under `src/**/*.test.ts`, `src/**/*.test.tsx`, and `supabase/functions/**/*.test.ts`; the authoritative per-slice count lives in the latest completed-work entry in the [Build Bible](./redex_education_build_bible.md).
+Current AI Slice C baseline: **615 passing, 0 skipped Vitest tests, 2 skipped Deno-only test files under Vitest, 108 test files**. Server AI provider tests also run under Deno (`deno test --allow-env --allow-net=esm.sh supabase/functions/_shared/courseFoundryAiClientServer.test.ts`) with mocked `fetch`; no real AI provider is invoked. Test files are co-located under `src/**/*.test.ts`, `src/**/*.test.tsx`, and `supabase/functions/**/*.test.ts`; the authoritative per-slice count lives in the latest completed-work entry in the [Build Bible](./redex_education_build_bible.md).
 
 This guide intentionally avoids a per-file inventory table because that table drifted as Phases 5–8 expanded the suite. For area discovery, use the repo tree: learner, foundry, assignments, manager, publishing, source-binder, audit, auth/layout, Supabase client, and Supabase function parser tests all have active coverage.
 

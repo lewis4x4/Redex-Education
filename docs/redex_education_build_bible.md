@@ -3938,3 +3938,92 @@ AI Slice A is landing the prompt registry in parallel. This slice consumes `getP
 
 ---
 
+## 2026-05-23 — AI Slice C: Secure Staged Generation Pipeline
+
+**Status**: ✅ Completed. Remote migrations applied, edge functions deployed, and verification is green.
+
+**Context**:
+Slice C turns the Slice B real AI stub into a durable server-side generation job pipeline. Supabase Edge Functions have a short timeout, so generation is represented as a `redex.generation_jobs` row and processed stage-by-stage by a service-role worker intended to be invoked by `pg_cron`. Provider keys remain server-side only.
+
+**Files touched**:
+- `supabase/migrations/20260523130000_generation_jobs.sql` — creates `redex.generation_jobs`, cost telemetry columns, section-regeneration columns, RLS policies, grants, indexes, updated-at trigger, and the atomic `redex.claim_next_generation_job()` worker claim RPC using `FOR UPDATE SKIP LOCKED`.
+- `supabase/migrations/20260523133000_generation_jobs_hardening.sql` — adds `operation` + `idempotency_key`, active-job unique idempotency, service-role-only RPC execute grants, and queued-only worker claiming to avoid duplicate provider calls.
+- `supabase/functions/submit-generation-job/index.ts` — authenticated user-facing edge function; verifies the caller JWT, checks `redex.profiles.role` for `admin` / `foundry_author`, applies idempotency for active `(module_id, job_type, target_section_id)` jobs, and inserts queued jobs without running generation synchronously.
+- `supabase/functions/generation-worker/index.ts` — service-role-only worker; claims one queued/running job, runs one incomplete stage per invocation, persists stage output/cost, skips completed stages on retry, supports section jobs, and records clean provider errors.
+- `supabase/functions/_shared/courseFoundryAiClientServer.ts` — Deno server-side AI client with Anthropic/OpenAI provider switch, `AI_PROVIDER_API_KEY` secret guard, prompt-version metadata, Zod output validation, and per-call cost estimates/actuals.
+- `supabase/functions/_shared/courseFoundryAiClientServer.test.ts` — Deno-only provider switch and missing-secret tests with mocked `fetch`; no real provider calls.
+- `src/features/foundry/ai/realAiClient.ts` — submits authenticated durable jobs and polls `redex.generation_jobs` via the configured Supabase client until terminal status.
+- `src/features/foundry/ai/realAiClient.test.ts` — mocked submit/poll coverage including running→succeeded, failed jobs, section regeneration payloads, and 404 not-deployed behavior.
+- `src/integrations/supabase/types.ts` — updated generated-type mirror for `generation_jobs` and `claim_next_generation_job` until the next Supabase type generation.
+- `docs/redex_education_build_bible.md` — this Slice C entry.
+- `docs/testing.md` — current test baseline updated for AI Slice C plus Deno-only server AI tests.
+
+**Pipeline behavior**:
+- Full jobs support stages: `parse → outline → generate_lessons → generate_assessments → self_critique → assemble`.
+- Section jobs mark non-applicable stages as skipped/succeeded and run only `parse → generate_lessons → self_critique → assemble`.
+- Worker invocations process one stage at a time so full module generation can advance across cron ticks instead of a single long edge-function request.
+- Succeeded stage entries are never rerun; if an operator requeues a failed job, the worker resumes from the first non-succeeded stage.
+- Active idempotency keys include module/job/section/operation/prompt/input hash so concurrent duplicate submissions return the same active job without reusing unrelated operations.
+- `actual_cost_cents` and `cost_breakdown` are updated after every completed provider stage and finalized at `assemble`.
+
+**Security / CSP**:
+- No provider key is present in the browser bundle. Browser code sends only the user JWT to `submit-generation-job` and reads job rows through RLS.
+- Provider calls happen only from Supabase Edge Functions using `AI_PROVIDER_API_KEY`.
+- `netlify.toml` already allows `connect-src` to the deployed Supabase project origin (`https://toghxeuhgkcrbrdxewdw.supabase.co`), which covers `/functions/v1/submit-generation-job` and PostgREST polling. No new browser endpoint or provider origin was added, so CSP required no code change.
+
+**Verification**:
+- ✅ `npm run typecheck -- --pretty false` — green.
+- ✅ `npm run lint` — 0 errors / 0 warnings.
+- ✅ `npm test -- --run` — **615 passed, 2 skipped Deno-only files under Vitest, 108 test files** (**+2 Vitest tests** versus the AI Slice B 613 baseline).
+- ✅ `deno test --allow-env --allow-net=esm.sh supabase/functions/_shared/courseFoundryAiClientServer.test.ts` — **3 passed**, mocked provider fetch only.
+- ✅ `deno check supabase/functions/submit-generation-job/index.ts supabase/functions/generation-worker/index.ts` — green.
+- ✅ `npm run build` — green.
+- ✅ `supabase db push --linked` — applied `20260523130000_generation_jobs.sql` and `20260523133000_generation_jobs_hardening.sql` to Redex_App (`toghxeuhgkcrbrdxewdw`).
+- ✅ Remote verification query returned `redex.generation_jobs` and `redex.generation_jobs_active_idempotency_idx`.
+- ✅ Remote function privilege check returned `anon=false`, `authenticated=false`, `service_role=true` for `redex.claim_next_generation_job()`.
+- ✅ `supabase functions deploy submit-generation-job` — deployed with JWT verification ON.
+- ✅ `supabase functions deploy generation-worker --no-verify-jwt` — deployed for cron/service-role invocation.
+- ✅ Oracle review pass completed; hardening follow-ups applied for RPC privileges, queued-only worker claims, active idempotency, and longer browser polling.
+
+**Manual operator steps required**:
+1. Set provider secrets after choosing the deployed provider/model:
+   ```bash
+   supabase secrets set AI_PROVIDER=anthropic AI_PROVIDER_API_KEY="<provider-key>" AI_MODEL="<model-id>"
+   ```
+   `AI_PROVIDER` accepts `anthropic` (default) or `openai`. Optional cost override secrets: `AI_INPUT_COST_CENTS_PER_MILLION_TOKENS`, `AI_OUTPUT_COST_CENTS_PER_MILLION_TOKENS`, `AI_MAX_TOKENS`.
+2. Schedule cron manually in Supabase Dashboard SQL editor after both functions deploy. Do **not** commit service-role secrets to git:
+   ```sql
+   create extension if not exists pg_cron with schema extensions;
+   create extension if not exists pg_net with schema extensions;
+
+   select cron.schedule(
+     'redex-generation-worker',
+     '* * * * *',
+     $$
+       select net.http_post(
+         url := 'https://<project-ref>.supabase.co/functions/v1/generation-worker',
+         headers := jsonb_build_object(
+           'Authorization', 'Bearer <SUPABASE_SERVICE_ROLE_KEY>',
+           'Content-Type', 'application/json'
+         ),
+         body := '{}'::jsonb
+       );
+     $$
+   );
+   ```
+3. To retry a failed stage after fixing configuration/source data, requeue the job without clearing `stage_map`:
+   ```sql
+   update redex.generation_jobs
+   set status = 'queued', last_error_message = null, last_error_stage = null
+   where id = '<job-id>';
+   ```
+
+**Known scope deferred**:
+- The cron schedule is intentionally manual because it requires the project URL and service-role key.
+- Real provider quality/eval harness remains Slice D; Slice C validates shapes and records cost but does not add prompt eval CI.
+- UI still consumes the existing AI client methods; richer live stage visualization can build on `stage_map` polling without changing the job schema.
+
+**Next**: AI Slice D — Real Wiring + Source Bindings + Eval Harness.
+
+---
+

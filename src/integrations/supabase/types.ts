@@ -352,6 +352,99 @@ export type Database = {
           },
         ]
       }
+      generation_jobs: {
+        Row: {
+          actual_cost_cents: number
+          attempt_count: number
+          completed_at: string | null
+          cost_breakdown: Json
+          created_at: string
+          current_stage: string | null
+          estimated_cost_cents: number | null
+          id: string
+          idempotency_key: string | null
+          input_payload: Json
+          job_type: string
+          last_error_message: string | null
+          last_error_stage: string | null
+          model_used: string | null
+          module_id: string
+          operation: string | null
+          output_payload: Json
+          prompt_version: string | null
+          stage_map: Json
+          status: string
+          submitted_by: string | null
+          target_section_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          actual_cost_cents?: number
+          attempt_count?: number
+          completed_at?: string | null
+          cost_breakdown?: Json
+          created_at?: string
+          current_stage?: string | null
+          estimated_cost_cents?: number | null
+          id?: string
+          idempotency_key?: string | null
+          input_payload: Json
+          job_type: string
+          last_error_message?: string | null
+          last_error_stage?: string | null
+          model_used?: string | null
+          module_id: string
+          operation?: string | null
+          output_payload?: Json
+          prompt_version?: string | null
+          stage_map?: Json
+          status?: string
+          submitted_by?: string | null
+          target_section_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          actual_cost_cents?: number
+          attempt_count?: number
+          completed_at?: string | null
+          cost_breakdown?: Json
+          created_at?: string
+          current_stage?: string | null
+          estimated_cost_cents?: number | null
+          id?: string
+          idempotency_key?: string | null
+          input_payload?: Json
+          job_type?: string
+          last_error_message?: string | null
+          last_error_stage?: string | null
+          model_used?: string | null
+          module_id?: string
+          operation?: string | null
+          output_payload?: Json
+          prompt_version?: string | null
+          stage_map?: Json
+          status?: string
+          submitted_by?: string | null
+          target_section_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generation_jobs_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generation_jobs_target_section_id_fkey"
+            columns: ["target_section_id"]
+            isOneToOne: false
+            referencedRelation: "source_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       module_source_bindings: {
         Row: {
           binding_kind: string
@@ -1006,7 +1099,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      claim_next_generation_job: {
+        Args: Record<PropertyKey, never>
+        Returns: Database["redex"]["Tables"]["generation_jobs"]["Row"][]
+      }
     }
     Enums: {
       source_authority_level: "authoritative" | "supporting" | "context"
