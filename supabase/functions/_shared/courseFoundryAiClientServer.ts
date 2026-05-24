@@ -174,7 +174,7 @@ const PROMPTS: Record<PromptKey, PromptDefinition> = {
     id: { key: "self_critique", version: "v1" },
     system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nCritique generated Foundry content for unsupported claims, weak questions, missing citations, confusing language, and publish blockers.`,
     user: "Critique generated artifacts and return CritiqueModuleOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nPrompt ids:\n{{promptIds}}\n\nCourse outline:\n{{courseOutline}}\n\nGenerated assessments:\n{{generatedAssessments}}\n\nInput JSON:\n{{input}}",
-  }
+  },
   regenerate_with_fixes: {
     id: { key: "regenerate_with_fixes", version: "v1" },
     system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nRegenerate only the selected fixes and preserve unchanged source-grounded content.`,
