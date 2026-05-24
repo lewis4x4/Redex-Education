@@ -153,7 +153,7 @@ export { getAssignmentsForUser, getAssignmentsForModule } from './assignments'
 export { getProgressForUser, getEnrollmentsForUser, getAttemptsForLesson } from './progress'
 export { getSourceFiles, getSourceFileVersions, getSourceSections, getModuleSourceBindings } from './sources'
 export { getAdminSummary } from './admin'
-export { getModuleVersionId, getModuleVersionHistory, archiveModuleVersion } from './moduleVersions'
+export { getModuleVersionId, getModuleVersionHistory, archiveModuleVersion, forkModuleVersion } from './moduleVersions'
 
 export {
   AUDIT_EVENT_TYPES,

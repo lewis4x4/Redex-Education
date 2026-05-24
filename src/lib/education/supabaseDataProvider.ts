@@ -105,6 +105,11 @@ export async function archiveModuleVersion(versionId: string): Promise<ModuleVer
   return archiveSupabaseModuleVersion(versionId)
 }
 
+export async function forkModuleVersion(sourceVersionId: string): Promise<ModuleVersion> {
+  const { forkModuleVersion: forkSupabaseModuleVersion } = await import('@/integrations/supabase/mutations/foundry')
+  return forkSupabaseModuleVersion(sourceVersionId)
+}
+
 export async function getAdminSummary(): Promise<AdminDashboardSummary> {
   const { fetchAdminSummary } = await import('@/integrations/supabase/queries/admin')
   return fetchAdminSummary()

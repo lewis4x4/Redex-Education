@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 function createStorageMock(): Storage {
   const store = new Map<string, string>()
@@ -59,6 +59,7 @@ describe('ModuleVersionHistoryPage', () => {
       <MemoryRouter initialEntries={[`/admin/modules/${moduleId}/versions`]}>
         <Routes>
           <Route path="/admin/modules/:moduleId/versions" element={<ModuleVersionHistoryPage />} />
+          <Route path="/admin/foundry/start" element={<div>Foundry Start</div>} />
         </Routes>
       </MemoryRouter>,
     )
@@ -111,6 +112,12 @@ describe('ModuleVersionHistoryPage', () => {
     expect(screen.getByRole('heading', { name: 'No versions yet' })).toBeInTheDocument()
   })
 
+  it('shows create new version for non-archived versions', () => {
+    renderPage()
+
+    expect(screen.getByRole('button', { name: 'Create new version' })).toBeInTheDocument()
+  })
+
   it('shows archive confirmation on click and hides it on cancel', async () => {
     const user = userEvent.setup()
     renderPage()
@@ -145,7 +152,29 @@ describe('ModuleVersionHistoryPage', () => {
     expect(screen.queryByRole('button', { name: 'Archive version' })).not.toBeInTheDocument()
   })
 
-  it('hides the archive affordance for already archived versions', () => {
+  it('forks the selected version and navigates to foundry start', async () => {
+    const user = userEvent.setup()
+    const originalForkVersion = useModuleVersionsStore.getState().forkNewDraftVersion
+    const forkVersionSpy = vi.fn(originalForkVersion)
+    const { useFoundryDraftStore } = await import('@/features/foundry/store/foundryDraftStore')
+    const resetSpy = vi.spyOn(useFoundryDraftStore.getState(), 'resetFoundryDraft')
+    const seedSpy = vi.spyOn(useFoundryDraftStore.getState(), 'seedDraftFromModuleVersion')
+
+    act(() => {
+      useModuleVersionsStore.setState({ forkNewDraftVersion: forkVersionSpy })
+    })
+
+    renderPage()
+
+    await user.click(screen.getByRole('button', { name: 'Create new version' }))
+
+    expect(forkVersionSpy).toHaveBeenCalledWith('module-version-hr-basics-v1')
+    expect(resetSpy).toHaveBeenCalled()
+    expect(seedSpy).toHaveBeenCalled()
+    expect(await screen.findByText('Foundry Start')).toBeInTheDocument()
+  })
+
+  it('hides create new version for already archived versions', () => {
     act(() => {
       useModuleVersionsStore.getState().archiveVersion('module-version-hr-basics-v1')
     })
@@ -153,6 +182,7 @@ describe('ModuleVersionHistoryPage', () => {
     renderPage()
 
     expect(screen.getByText('Archived')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Create new version' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Archive version' })).not.toBeInTheDocument()
   })
 })
@@ -177,6 +207,7 @@ describe('ModuleVersionHistoryPage supabase states', () => {
     vi.doMock('@/lib/education/moduleVersions', () => ({
       getModuleVersionHistory: vi.fn().mockRejectedValue(new Error('network down')),
       archiveModuleVersion: vi.fn(),
+      forkModuleVersion: vi.fn(),
     }))
 
     const { ModuleVersionHistoryPage } = await import('./ModuleVersionHistoryPage')
@@ -197,5 +228,52 @@ describe('ModuleVersionHistoryPage supabase states', () => {
     expect(screen.getByText('Unable to update version history')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'No versions yet' })).not.toBeInTheDocument()
     warnSpy.mockRestore()
+  })
+})
+
+describe('ModuleVersionHistoryPage action disabled states', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    vi.doUnmock('@/features/publishing/hooks/useModuleVersionHistory')
+  })
+
+  it('disables fork and archive controls while forking is in flight', async () => {
+    vi.doMock('@/features/publishing/hooks/useModuleVersionHistory', () => ({
+      useModuleVersionHistory: () => ({
+        versions: [
+          {
+            id: 'v1',
+            module_id: 'm1',
+            module_title: 'Module',
+            version_number: 1,
+            status: 'published',
+            created_at: '2026-05-20T00:00:00.000Z',
+          },
+        ],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+        archiveVersion: vi.fn(),
+        forkVersion: vi.fn(),
+        archivingVersionId: null,
+        forkingVersionId: 'v1',
+      }),
+    }))
+
+    const { ModuleVersionHistoryPage } = await import('./ModuleVersionHistoryPage')
+
+    render(
+      <MemoryRouter initialEntries={['/admin/modules/m1/versions']}>
+        <Routes>
+          <Route path="/admin/modules/:moduleId/versions" element={<ModuleVersionHistoryPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('button', { name: 'Create new version' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Archive version' })).toBeDisabled()
   })
 })

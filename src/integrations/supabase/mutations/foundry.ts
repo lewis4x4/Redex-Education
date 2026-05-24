@@ -223,3 +223,47 @@ export async function archiveModuleVersion(versionId: UUID): Promise<ModuleVersi
   throwOnMutationError('archive module version', result.error)
   return mapModuleVersionRow(requireMutationData('archive module version', result.data))
 }
+
+export async function forkModuleVersion(sourceVersionId: UUID): Promise<ModuleVersion> {
+  const sourceResult = await safeRetry(() =>
+    supabase
+      .from('module_versions')
+      .select('*')
+      .eq('id', sourceVersionId)
+      .single(),
+  )
+
+  throwOnMutationError('load module version for fork', sourceResult.error)
+  const source = requireMutationData('load module version for fork', sourceResult.data)
+
+  const maxVersionResult = await safeRetry(() =>
+    supabase
+      .from('module_versions')
+      .select('version_number')
+      .eq('module_id', source.module_id)
+      .order('version_number', { ascending: false })
+      .limit(1),
+  )
+
+  throwOnMutationError('load latest module version for fork', maxVersionResult.error)
+  const maxVersionNumber = (maxVersionResult.data ?? [])[0]?.version_number ?? source.version_number ?? 0
+  const now = new Date().toISOString()
+
+  const result = await safeRetry(() =>
+    supabase
+      .from('module_versions')
+      .insert({
+        module_id: source.module_id,
+        module_title: source.module_title,
+        version_number: maxVersionNumber + 1,
+        status: 'draft',
+        created_at: now,
+        updated_at: now,
+      })
+      .select('*')
+      .single(),
+  )
+
+  throwOnMutationError('fork module version', result.error)
+  return mapModuleVersionRow(requireMutationData('fork module version', result.data))
+}

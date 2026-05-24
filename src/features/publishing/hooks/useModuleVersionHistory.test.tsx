@@ -7,10 +7,12 @@ import { useModuleVersionHistory } from './useModuleVersionHistory'
 
 const getModuleVersionHistoryMock = vi.hoisted(() => vi.fn<(moduleId: string) => Promise<ModuleVersion[]>>())
 const archiveModuleVersionMock = vi.hoisted(() => vi.fn<(versionId: string) => Promise<ModuleVersion>>())
+const forkModuleVersionMock = vi.hoisted(() => vi.fn<(versionId: string) => Promise<ModuleVersion>>())
 
 vi.mock('@/lib/education/moduleVersions', () => ({
   getModuleVersionHistory: getModuleVersionHistoryMock,
   archiveModuleVersion: archiveModuleVersionMock,
+  forkModuleVersion: forkModuleVersionMock,
 }))
 
 function createStorageMock(): Storage {
@@ -112,6 +114,21 @@ describe('useModuleVersionHistory', () => {
     expect(archiveModuleVersionMock).not.toHaveBeenCalled()
   })
 
+  it('forks through the module versions store in mock mode', async () => {
+    vi.stubEnv('VITE_DATA_SOURCE', '')
+    const { result } = renderHook(() => useModuleVersionHistory('hr-basics-mod-001'))
+
+    let forked!: ModuleVersion
+    await act(async () => {
+      forked = await result.current.forkVersion('module-version-hr-basics-v1')
+    })
+
+    expect(result.current.forkingVersionId).toBeNull()
+    expect(forked.status).toBe('draft')
+    expect(result.current.versions.map((version) => version.version_number)).toEqual([2, 1])
+    expect(forkModuleVersionMock).not.toHaveBeenCalled()
+  })
+
   it('loads version history from the facade in supabase mode', async () => {
     vi.stubEnv('VITE_DATA_SOURCE', 'supabase')
     getModuleVersionHistoryMock.mockResolvedValueOnce([REMOTE_V2, REMOTE_V1])
@@ -166,5 +183,29 @@ describe('useModuleVersionHistory', () => {
     expect(getModuleVersionHistoryMock).toHaveBeenCalledTimes(2)
     expect(result.current.versions[0]).toEqual(archivedV2)
     expect(result.current.archivingVersionId).toBeNull()
+  })
+
+  it('forks through the facade in supabase mode and refreshes history', async () => {
+    vi.stubEnv('VITE_DATA_SOURCE', 'supabase')
+    const forkedV3: ModuleVersion = { ...REMOTE_V2, id: 'remote-v3', version_number: 3, status: 'draft' }
+    getModuleVersionHistoryMock.mockResolvedValueOnce([REMOTE_V2, REMOTE_V1]).mockResolvedValueOnce([forkedV3, REMOTE_V2, REMOTE_V1])
+    forkModuleVersionMock.mockResolvedValueOnce(forkedV3)
+
+    const { result } = renderHook(() => useModuleVersionHistory('remote-module'))
+
+    await waitFor(() => {
+      expect(result.current.versions).toEqual([REMOTE_V2, REMOTE_V1])
+    })
+
+    let forked: ModuleVersion | null = null
+    await act(async () => {
+      forked = await result.current.forkVersion('remote-v2')
+    })
+
+    expect(forkModuleVersionMock).toHaveBeenCalledWith('remote-v2')
+    expect(getModuleVersionHistoryMock).toHaveBeenCalledTimes(2)
+    expect(forked).toEqual(forkedV3)
+    expect(result.current.versions[0]).toEqual(forkedV3)
+    expect(result.current.forkingVersionId).toBeNull()
   })
 })

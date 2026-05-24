@@ -10,7 +10,9 @@ export interface UseModuleVersionHistoryResult {
   error: Error | null
   refetch: () => void
   archiveVersion: (versionId: string) => Promise<void>
+  forkVersion: (versionId: string) => Promise<ModuleVersion>
   archivingVersionId: string | null
+  forkingVersionId: string | null
 }
 
 const noop = () => undefined
@@ -38,6 +40,7 @@ export function useModuleVersionHistory(moduleId: string): UseModuleVersionHisto
   const [error, setError] = useState<Error | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   const [archivingVersionId, setArchivingVersionId] = useState<string | null>(null)
+  const [forkingVersionId, setForkingVersionId] = useState<string | null>(null)
 
   const mockVersions = useMemo(
     () => sortNewestFirst(storeVersions.filter((version) => version.module_id === moduleId)),
@@ -109,6 +112,34 @@ export function useModuleVersionHistory(moduleId: string): UseModuleVersionHisto
     [archiveStoreVersion, isSupabase, moduleId],
   )
 
+  const forkVersion = useCallback(
+    async (versionId: string) => {
+      setForkingVersionId(versionId)
+
+      try {
+        if (!isSupabase) {
+          const next = useModuleVersionsStore.getState().forkNewDraftVersion(versionId)
+          return next
+        }
+
+        const { forkModuleVersion, getModuleVersionHistory } = await import('@/lib/education/moduleVersions')
+        const forked = await forkModuleVersion(versionId)
+        const next = await getModuleVersionHistory(moduleId)
+        setRemoteVersions(next)
+        setError(null)
+        return forked
+      } catch (cause: unknown) {
+        const wrapped = toError(cause)
+        console.warn('[publishing] Unable to fork module version.', wrapped)
+        setError(wrapped)
+        throw wrapped
+      } finally {
+        setForkingVersionId(null)
+      }
+    },
+    [isSupabase, moduleId],
+  )
+
   if (!isSupabase) {
     return {
       versions: mockVersions,
@@ -116,7 +147,9 @@ export function useModuleVersionHistory(moduleId: string): UseModuleVersionHisto
       error: null,
       refetch: noop,
       archiveVersion,
+      forkVersion,
       archivingVersionId,
+      forkingVersionId,
     }
   }
 
@@ -126,6 +159,8 @@ export function useModuleVersionHistory(moduleId: string): UseModuleVersionHisto
     error,
     refetch,
     archiveVersion,
+    forkVersion,
     archivingVersionId,
+    forkingVersionId,
   }
 }

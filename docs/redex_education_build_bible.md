@@ -4335,3 +4335,35 @@ Resulting `Exposed schemas`: `public, graphql_public, redex`
 **Next**: Run the live AI-generation smoke test against Brian's Drive `_library/` HR content, verifying generation job creation, worker completion, publish, dashboard visibility, and archive/version-history behavior against real data.
 
 ---
+
+## 2026-05-24 — Slice: Module Revision Affordance (fork-to-new-draft from version history)
+
+**Status**: ✅ Completed.
+
+**Context**: Follow-up to Module Management UI. Added a per-version "Create new version" action on module version history cards (non-archived only) so admins can fork any selected version into a fresh draft and jump directly into Foundry.
+
+**Files added/modified**:
+- `src/features/publishing/hooks/useModuleVersionHistory.ts` — added `forkVersion(versionId)` and `forkingVersionId`; mock mode uses `useModuleVersionsStore.getState().forkNewDraftVersion`, Supabase mode uses new facade `forkModuleVersion` then refreshes history.
+- `src/integrations/supabase/mutations/foundry.ts` — added `forkModuleVersion(sourceVersionId)` mutation: loads source row, derives next version number from highest existing module version, inserts new draft row, maps/returns inserted version.
+- `src/integrations/supabase/mutations/foundry.test.ts` — added success, version increment, and error propagation coverage for `forkModuleVersion`.
+- `src/lib/education/supabaseDataProvider.ts` — added lazy passthrough `forkModuleVersion`.
+- `src/lib/education/moduleVersions.ts` — added dispatch helper `forkModuleVersion` (Supabase delegates; mock throws the same direct-store guidance error pattern as archive).
+- `src/lib/education/index.ts` — exported `forkModuleVersion` from the education facade.
+- `src/features/publishing/pages/ModuleVersionHistoryPage.tsx` — added "Create new version" button next to archive controls on non-archived cards, wired fork→reset/seed Foundry draft→navigate to `/admin/foundry/start`; disabled fork/archive controls on that card while fork is pending.
+- `src/features/publishing/hooks/useModuleVersionHistory.test.tsx` — added fork flow tests for mock and Supabase modes.
+- `src/features/publishing/pages/ModuleVersionHistoryPage.test.tsx` — added create-button render/hide coverage, fork+navigate coverage, and in-flight disable coverage.
+
+**Verification**:
+- `npm run typecheck` — pass
+- `npm run lint` — pass
+- `npm test -- --run` — pass
+- `npm run build` — pass
+
+**Acceptance criteria**:
+- ✅ Non-archived version cards show "Create new version".
+- ✅ Clicking forks selected version into a new draft, resets/seeds Foundry draft, and routes to `/admin/foundry/start`.
+- ✅ Archived cards hide the new-version affordance.
+- ✅ While forking a card, both fork and archive controls on that card are disabled.
+- ✅ Supabase and mock paths are both covered in hook/mutation/page tests.
+
+**Next**: Run the live AI-generation smoke test against Brian's Drive `_library/` HR content.

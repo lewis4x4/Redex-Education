@@ -2,10 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fromMock = vi.hoisted(() => vi.fn())
 const upsertMock = vi.hoisted(() => vi.fn())
+const insertMock = vi.hoisted(() => vi.fn())
 const updateMock = vi.hoisted(() => vi.fn())
 const selectMock = vi.hoisted(() => vi.fn())
 const singleMock = vi.hoisted(() => vi.fn())
 const eqMock = vi.hoisted(() => vi.fn())
+const orderMock = vi.hoisted(() => vi.fn())
+const limitMock = vi.hoisted(() => vi.fn())
 const mapTrainingCourseRowMock = vi.hoisted(() => vi.fn((row: unknown) => ({ id: `course-${(row as { id: string }).id}` })))
 const mapTrainingModuleRowMock = vi.hoisted(() => vi.fn((row: unknown) => ({ id: `module-${(row as { id: string }).id}` })))
 const mapTrainingLessonRowMock = vi.hoisted(() => vi.fn((row: unknown) => ({ id: `lesson-${(row as { id: string }).id}` })))
@@ -22,12 +25,23 @@ vi.mock('@/integrations/supabase/db-rows', () => ({
 }))
 
 function wireBuilder() {
-  const builder = { upsert: upsertMock, update: updateMock, select: selectMock, single: singleMock, eq: eqMock }
+  const builder = {
+    upsert: upsertMock,
+    insert: insertMock,
+    update: updateMock,
+    select: selectMock,
+    single: singleMock,
+    eq: eqMock,
+    order: orderMock,
+    limit: limitMock,
+  }
   fromMock.mockReturnValue(builder)
   upsertMock.mockReturnValue(builder)
+  insertMock.mockReturnValue(builder)
   updateMock.mockReturnValue(builder)
   selectMock.mockReturnValue(builder)
   eqMock.mockReturnValue(builder)
+  orderMock.mockReturnValue(builder)
 }
 
 const draft = {
@@ -179,5 +193,60 @@ describe('foundry mutations', () => {
     const { archiveModuleVersion } = await import('./foundry')
 
     await expect(archiveModuleVersion('module-version-1')).rejects.toThrow('Failed to archive module version: archive failed')
+  })
+
+  it('forkModuleVersion clones to the next draft version number', async () => {
+    singleMock
+      .mockResolvedValueOnce({
+        data: {
+          id: 'source-row',
+          module_id: 'module-1',
+          module_title: 'Intro',
+          version_number: 2,
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: { id: 'forked-row' }, error: null })
+    limitMock.mockResolvedValueOnce({ data: [{ version_number: 7 }], error: null })
+    const { forkModuleVersion } = await import('./foundry')
+
+    await expect(forkModuleVersion('source-row')).resolves.toEqual({ id: 'version-forked-row' })
+    expect(fromMock).toHaveBeenCalledWith('module_versions')
+    expect(orderMock).toHaveBeenCalledWith('version_number', { ascending: false })
+    expect(limitMock).toHaveBeenCalledWith(1)
+    expect(insertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        module_id: 'module-1',
+        module_title: 'Intro',
+        status: 'draft',
+        version_number: 8,
+      }),
+    )
+  })
+
+  it('forkModuleVersion increments from source version when max query is empty', async () => {
+    singleMock
+      .mockResolvedValueOnce({
+        data: {
+          id: 'source-row',
+          module_id: 'module-1',
+          module_title: 'Intro',
+          version_number: 3,
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: { id: 'forked-row' }, error: null })
+    limitMock.mockResolvedValueOnce({ data: [], error: null })
+    const { forkModuleVersion } = await import('./foundry')
+
+    await forkModuleVersion('source-row')
+    expect(insertMock).toHaveBeenCalledWith(expect.objectContaining({ version_number: 4 }))
+  })
+
+  it('forkModuleVersion throws descriptive Supabase errors', async () => {
+    singleMock.mockResolvedValueOnce({ data: null, error: new Error('load failed') })
+    const { forkModuleVersion } = await import('./foundry')
+
+    await expect(forkModuleVersion('source-row')).rejects.toThrow('Failed to load module version for fork: load failed')
   })
 })

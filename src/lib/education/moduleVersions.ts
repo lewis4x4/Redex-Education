@@ -29,3 +29,11 @@ export async function archiveModuleVersion(versionId: UUID): Promise<ModuleVersi
 
   throw mockModeNotSupported()
 }
+
+export async function forkModuleVersion(sourceVersionId: UUID): Promise<ModuleVersion> {
+  if (getDataSource() === 'supabase') {
+    return supabaseDataProvider.forkModuleVersion(sourceVersionId)
+  }
+
+  throw mockModeNotSupported()
+}
