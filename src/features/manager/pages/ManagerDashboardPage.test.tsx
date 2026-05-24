@@ -4,14 +4,26 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ManagerDashboardPage } from './ManagerDashboardPage'
 import { useAssignmentStore } from '@/features/assignments/store/assignmentStore'
 import { useAssessmentAttemptStore } from '@/features/progress/store/assessmentAttemptStore'
+import { useAuth } from '@/hooks/useAuth'
 import { useEducation } from '@/hooks/useEducation'
-import { DEMO_HR_BASICS_LESSONS, MOCK_HR_ONBOARDING_ASSIGNMENT } from '@/lib/education'
+import { useProfile } from '@/hooks/useProfile'
+import { DEMO_HR_BASICS_LESSONS, MOCK_HR_ONBOARDING_ASSIGNMENT, MOCK_MANAGER_USER } from '@/lib/education'
 
 vi.mock('@/hooks/useEducation', () => ({
   useEducation: vi.fn(),
 }))
 
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: vi.fn(),
+}))
+
+vi.mock('@/hooks/useProfile', () => ({
+  useProfile: vi.fn(),
+}))
+
 const useEducationMock = vi.mocked(useEducation)
+const useAuthMock = vi.mocked(useAuth)
+const useProfileMock = vi.mocked(useProfile)
 let completedLessonIds = new Set<string>()
 
 function mockEducation() {
@@ -42,6 +54,15 @@ describe('ManagerDashboardPage', () => {
   beforeEach(() => {
     completedLessonIds = new Set(['hr-basics-lesson-1-welcome', 'hr-basics-lesson-2-contact', 'hr-basics-lesson-3-payroll-timekeeping'])
     mockEducation()
+    useAuthMock.mockReturnValue({
+      user: { id: MOCK_MANAGER_USER.id, email: MOCK_MANAGER_USER.email },
+      session: { access_token: 'token' },
+      loading: false,
+      role: 'manager',
+      refreshSession: vi.fn(),
+      signOut: vi.fn(),
+    } as never)
+    useProfileMock.mockReturnValue({ profile: MOCK_MANAGER_USER, loading: false, refetch: vi.fn() })
 
     act(() => {
       useAssignmentStore.getState().resetAssignments()
@@ -49,12 +70,12 @@ describe('ManagerDashboardPage', () => {
     })
   })
 
-  it('renders Sarah Chen manager view with Marcus, Ana, and Devon initial statuses', () => {
+  it('renders Sarah Chen manager view with Marcus, Ana, and Devon initial statuses', async () => {
     render(<ManagerDashboardPage />)
 
     expect(screen.getByRole('heading', { name: 'Team training progress' })).toBeInTheDocument()
     expect(screen.getByText(/Sarah Chen can see/i)).toBeInTheDocument()
-    expect(screen.getByRole('row', { name: /Marcus Chen/i })).toBeInTheDocument()
+    expect(await screen.findByRole('row', { name: /Marcus Chen/i })).toBeInTheDocument()
     expect(screen.getByRole('row', { name: /Ana Rodriguez/i })).toBeInTheDocument()
     expect(screen.getByRole('row', { name: /Devon Lee/i })).toBeInTheDocument()
 
@@ -65,6 +86,8 @@ describe('ManagerDashboardPage', () => {
 
   it('updates Marcus to completed when assignment, lesson progress, and quiz attempt complete', async () => {
     render(<ManagerDashboardPage />)
+
+    await screen.findByRole('row', { name: /Marcus Chen/i })
 
     act(() => {
       completedLessonIds = new Set(DEMO_HR_BASICS_LESSONS.map((lesson) => lesson.id))

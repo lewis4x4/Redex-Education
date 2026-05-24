@@ -10,6 +10,7 @@ import type {
 } from '@/lib/education';
 import { EducationContext, type EducationContextValue } from './education-context';
 import { getDataSource } from '@/lib/education/dataSource';
+import * as supabaseDataProvider from '@/lib/education/supabaseDataProvider';
 import { toWriteError, type WriteError } from '@/lib/education/writeErrors';
 import {
   DEMO_ORIENTATION_COURSE,
@@ -33,13 +34,15 @@ import {
 const LS_KEY = 'redex-education-progress-v1';
 const ALL_DEMO_LESSONS = [...DEMO_LESSONS, ...DEMO_HR_BASICS_LESSONS];
 
-function getEnrollmentIdForLesson(lessonId: UUID): UUID {
+function getDemoEnrollmentForLesson(lessonId: UUID): Enrollment {
   const lesson = ALL_DEMO_LESSONS.find((candidate) => candidate.id === lessonId);
   const module = lesson ? DEMO_MODULES.find((candidate) => candidate.id === lesson.module_id) : undefined;
 
-  return module?.course_id === DEMO_HR_BASICS_COURSE.id
-    ? DEMO_HR_BASICS_ENROLLMENT.id
-    : DEMO_ENROLLMENT.id;
+  return module?.course_id === DEMO_HR_BASICS_COURSE.id ? DEMO_HR_BASICS_ENROLLMENT : DEMO_ENROLLMENT;
+}
+
+function getEnrollmentIdForLesson(lessonId: UUID): UUID {
+  return getDemoEnrollmentForLesson(lessonId).id;
 }
 
 interface StoredLessonProgress {
@@ -89,13 +92,72 @@ function restoreLessonProgress(): Record<string, LessonProgress> {
   }
 }
 
-export function EducationProvider({ children }: { children: React.ReactNode }) {
+interface EducationProviderProps {
+  children: React.ReactNode;
+  userId?: string | null;
+}
+
+export function EducationProvider({ children, userId = null }: EducationProviderProps) {
+  const dataSource = getDataSource();
   const [lessonProgress, setLessonProgress] = useState<Record<string, LessonProgress>>(() => restoreLessonProgress());
+  const [realEnrollments, setRealEnrollments] = useState<Enrollment[]>([]);
   const [lastWriteError, setLastWriteError] = useState<WriteError | null>(null);
   const clearLastWriteError = useCallback(() => setLastWriteError(null), []);
 
-  // Persist on every change (local-first, instant)
   useEffect(() => {
+    if (dataSource !== 'supabase') {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    if (!userId) {
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setRealEnrollments([]);
+          setLessonProgress({});
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+
+    Promise.all([
+      supabaseDataProvider.getEnrollmentsForUser(userId),
+      supabaseDataProvider.getProgressForUser(userId),
+    ])
+      .then(([enrollments, progressRows]) => {
+        if (cancelled) {
+          return;
+        }
+
+        setRealEnrollments(enrollments);
+        setLessonProgress(
+          Object.fromEntries(progressRows.map((progress) => [progress.lesson_id, progress]))
+        );
+        setLastWriteError(null);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setRealEnrollments([]);
+          setLessonProgress({});
+          setLastWriteError(toWriteError('loadProgressForUser', error));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dataSource, userId]);
+
+  // Persist mock-mode progress on every change (local-first, instant)
+  useEffect(() => {
+    if (dataSource === 'supabase') {
+      return;
+    }
+
     try {
       const toStore: StoredProgress = {
         lessonProgress: Object.fromEntries(
@@ -113,7 +175,7 @@ export function EducationProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.warn('[EducationContext] Failed to persist progress to localStorage', error);
     }
-  }, [lessonProgress]);
+  }, [dataSource, lessonProgress]);
 
   const recordLessonProgress = useCallback(
     (lessonId: UUID, status: ProgressStatus, timeSpent = 0) => {
@@ -124,8 +186,19 @@ export function EducationProvider({ children }: { children: React.ReactNode }) {
       }
 
       const now = new Date().toISOString();
-      const enrollmentId = getEnrollmentIdForLesson(lessonId);
-      const enrollment = enrollmentId === DEMO_HR_BASICS_ENROLLMENT.id ? DEMO_HR_BASICS_ENROLLMENT : DEMO_ENROLLMENT;
+      const lesson = ALL_DEMO_LESSONS.find((candidate) => candidate.id === lessonId);
+      const module = lesson ? DEMO_MODULES.find((candidate) => candidate.id === lesson.module_id) : undefined;
+      const enrollment =
+        dataSource === 'supabase'
+          ? realEnrollments.find((candidate) => candidate.course_id === module?.course_id) ?? realEnrollments[0]
+          : getDemoEnrollmentForLesson(lessonId);
+
+      if (!enrollment) {
+        setLastWriteError(toWriteError('recordLessonProgress', new Error('No enrollment found for the signed-in user.')));
+        return;
+      }
+
+      const enrollmentId = enrollment.id;
       const nextTimeSpent = (existingSnapshot?.time_spent_seconds || 0) + timeSpent;
       const nextCompletedAt = status === 'completed' ? now : existingSnapshot?.completed_at;
 
@@ -149,7 +222,7 @@ export function EducationProvider({ children }: { children: React.ReactNode }) {
         };
       });
 
-      if (getDataSource() === 'supabase') {
+      if (dataSource === 'supabase') {
         void import('@/integrations/supabase/mutations')
           .then(({ upsertLessonProgress }) =>
             upsertLessonProgress({
@@ -164,7 +237,6 @@ export function EducationProvider({ children }: { children: React.ReactNode }) {
           .then(() => setLastWriteError(null))
           .catch((error: unknown) => setLastWriteError(toWriteError('upsertLessonProgress', error)));
 
-        const lesson = ALL_DEMO_LESSONS.find((candidate) => candidate.id === lessonId);
         const isAcknowledgmentLesson = lesson?.lesson_type === 'acknowledgment' || lessonId.includes('acknowledgment');
         if (status === 'completed' && isAcknowledgmentLesson) {
           const statementText = lesson?.content.type === 'acknowledgment' ? lesson.content.statement_markdown : '';
@@ -181,7 +253,7 @@ export function EducationProvider({ children }: { children: React.ReactNode }) {
         }
       }
     },
-    [lessonProgress]
+    [dataSource, lessonProgress, realEnrollments]
   );
 
   const completeLesson = useCallback(
@@ -214,12 +286,16 @@ export function EducationProvider({ children }: { children: React.ReactNode }) {
   );
 
   const currentEnrollment = useMemo<Enrollment | null>(() => {
+    if (dataSource === 'supabase') {
+      return realEnrollments.find((enrollment) => enrollment.course_id === DEMO_HR_BASICS_COURSE.id) ?? realEnrollments[0] ?? null;
+    }
+
     const summary = getProgressSummary(DEMO_HR_BASICS_COURSE.id);
     return {
       ...DEMO_HR_BASICS_ENROLLMENT,
       progress_percentage: summary.percentage,
     };
-  }, [getProgressSummary]);
+  }, [dataSource, getProgressSummary, realEnrollments]);
 
   const orientationEnrollment = useMemo<Enrollment>(() => {
     const summary = getProgressSummary(DEMO_ORIENTATION_COURSE.id);
@@ -230,8 +306,12 @@ export function EducationProvider({ children }: { children: React.ReactNode }) {
   }, [getProgressSummary]);
 
   const getMyEnrollments = useCallback((): Enrollment[] => {
+    if (dataSource === 'supabase') {
+      return realEnrollments;
+    }
+
     return currentEnrollment ? [currentEnrollment, orientationEnrollment] : [orientationEnrollment];
-  }, [currentEnrollment, orientationEnrollment]);
+  }, [currentEnrollment, dataSource, orientationEnrollment, realEnrollments]);
 
   const getCourse = useCallback((courseId: UUID): Course | undefined => {
     if (courseId === DEMO_ORIENTATION_COURSE.id) {

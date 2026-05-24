@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { ManagerStatusFilter, type StatusFilter } from '../components/ManagerStatusFilter'
 import { ManagerSummaryCards } from '../components/ManagerSummaryCards'
@@ -6,10 +6,11 @@ import { TeamTrainingTable } from '../components/TeamTrainingTable'
 import { computeTeamProgress, type TeamMemberTrainingStatus } from '../lib/teamProgress'
 import { useAssignmentStore } from '@/features/assignments/store/assignmentStore'
 import { useAssessmentAttemptStore } from '@/features/progress/store/assessmentAttemptStore'
+import { useAuth } from '@/hooks/useAuth'
 import { useEducation } from '@/hooks/useEducation'
-import { DEMO_HR_BASICS_MODULE, MOCK_LEARNER_MARCUS, MOCK_MANAGER_USER } from '@/lib/education'
-import { getDirectReports } from '@/lib/education/mockManagerReports'
-import type { LessonProgress } from '@/types/training'
+import { useProfile } from '@/hooks/useProfile'
+import { DEMO_HR_BASICS_MODULE, MOCK_LEARNER_MARCUS, getDirectReports } from '@/lib/education'
+import type { LessonProgress, User } from '@/types/training'
 
 function getFilterCounts(statuses: TeamMemberTrainingStatus[]): Record<StatusFilter, number> {
   return {
@@ -38,10 +39,45 @@ export function ManagerDashboardPage() {
   const assignments = useAssignmentStore((state) => state.assignments)
   const attempts = useAssessmentAttemptStore((state) => state.attempts)
   const education = useEducation()
+  const { user } = useAuth()
+  const { profile } = useProfile()
+  const [directReports, setDirectReports] = useState<User[]>([])
 
-  const managerId = MOCK_MANAGER_USER.id
-  const directReports = useMemo(() => getDirectReports(managerId), [managerId])
+  const managerId = user?.id ?? profile?.id ?? null
+  const managerName = profile?.display_name ?? user?.email?.split('@')[0] ?? 'your manager'
   const currentLearnerId = education.currentEnrollment?.user_id ?? MOCK_LEARNER_MARCUS.id
+
+  useEffect(() => {
+    let cancelled = false
+
+    if (!managerId) {
+      queueMicrotask(() => {
+        if (!cancelled) {
+          setDirectReports([])
+        }
+      })
+      return () => {
+        cancelled = true
+      }
+    }
+
+    getDirectReports(managerId)
+      .then((reports) => {
+        if (!cancelled) {
+          setDirectReports(reports)
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          console.warn('[manager] Unable to load direct reports.', error)
+          setDirectReports([])
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [managerId])
 
   const currentLearnerLessonProgress = useMemo<LessonProgress[]>(() => {
     const enrollmentId = education.currentEnrollment?.id ?? 'enroll-marcus-hr-basics-001'
@@ -63,7 +99,7 @@ export function ManagerDashboardPage() {
   const statuses = useMemo(
     () =>
       computeTeamProgress({
-        managerId,
+        managerId: managerId ?? '',
         learners: directReports,
         assignments,
         attempts,
@@ -83,8 +119,7 @@ export function ManagerDashboardPage() {
         <div className="mt-3 max-w-3xl">
           <h1 className="text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">Team training progress</h1>
           <p className="mt-3 text-base leading-7 text-slate-600">
-            Sarah Chen can see each direct report's assigned HR Basics module, completion status, score, and due date.
-            Manager authentication is deferred; this demo uses Sarah's mock manager profile.
+            {managerName} can see each direct report's assigned HR Basics module, completion status, score, and due date.
           </p>
         </div>
       </section>
@@ -104,7 +139,7 @@ export function ManagerDashboardPage() {
               No assignments are available yet. Team members will appear here once HR Basics is assigned.
             </section>
           ) : (
-            <TeamTrainingTable statuses={filteredStatuses} />
+            <TeamTrainingTable statuses={filteredStatuses} managerName={managerName} />
           )}
         </>
       )}

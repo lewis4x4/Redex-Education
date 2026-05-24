@@ -3,6 +3,7 @@ import type { TeamMemberTrainingStatus, TeamTrainingStatus } from '../lib/teamPr
 
 interface TeamTrainingTableProps {
   statuses: TeamMemberTrainingStatus[]
+  managerName?: string
 }
 
 const STATUS_LABELS: Record<TeamTrainingStatus, string> = {
@@ -61,14 +62,14 @@ function sortStatuses(statuses: TeamMemberTrainingStatus[]): TeamMemberTrainingS
   })
 }
 
-export function TeamTrainingTable({ statuses }: TeamTrainingTableProps) {
+export function TeamTrainingTable({ statuses, managerName = 'your manager' }: TeamTrainingTableProps) {
   const sortedStatuses = sortStatuses(statuses)
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 px-5 py-4">
         <h2 className="text-lg font-semibold tracking-tight text-slate-900">Team training status</h2>
-        <p className="mt-1 text-sm text-slate-600">Assigned HR Basics progress for Sarah Chen's direct reports.</p>
+        <p className="mt-1 text-sm text-slate-600">Assigned HR Basics progress for {managerName}'s direct reports.</p>
       </div>
 
       {sortedStatuses.length === 0 ? (

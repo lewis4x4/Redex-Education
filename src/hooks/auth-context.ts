@@ -8,6 +8,7 @@ export interface AuthContextType {
   loading: boolean
   role: Role | null
   refreshSession: () => Promise<void>
+  signOut: () => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined)

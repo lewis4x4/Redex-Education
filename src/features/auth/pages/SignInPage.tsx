@@ -1,11 +1,25 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { supabase } from '@/integrations/supabase/client'
 
+function getSafeRedirectPath(value: string | null): string | null {
+  if (!value) {
+    return null
+  }
+
+  try {
+    const decoded = decodeURIComponent(value)
+    return decoded.startsWith('/') && !decoded.startsWith('//') ? decoded : null
+  } catch {
+    return value.startsWith('/') && !value.startsWith('//') ? value : null
+  }
+}
+
 export function SignInPage() {
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -17,10 +31,17 @@ export function SignInPage() {
     setMessage(null)
     setErrorMessage(null)
 
+    const callbackUrl = new URL('/auth/callback', window.location.origin)
+    const redirectTo = getSafeRedirectPath(new URLSearchParams(location.search).get('redirect_to'))
+
+    if (redirectTo) {
+      callbackUrl.searchParams.set('redirect_to', redirectTo)
+    }
+
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: callbackUrl.toString(),
       },
     })
 

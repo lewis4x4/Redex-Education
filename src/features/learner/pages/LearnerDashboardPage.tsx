@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAssignmentStore } from '@/features/assignments/store/assignmentStore';
 import { useMyProgress } from '@/hooks/useEducation';
-import { DEMO_HR_BASICS_COURSE, MOCK_LEARNER_MARCUS } from '@/lib/education';
+import { DEMO_HR_BASICS_COURSE } from '@/lib/education';
 import type { Assignment, Course, Enrollment, LearnerProfile, Lesson } from '@/lib/education';
 import { ArrowRight, CheckCircle2, Circle, Clock, HelpCircle, Lock } from 'lucide-react';
 
@@ -69,16 +69,18 @@ interface LearnerDashboardPageProps {
 export function LearnerDashboardPage({ learner, onContinue }: LearnerDashboardPageProps) {
   const { percentage, completed, total } = useMyProgress();
   const assignments = useAssignmentStore((state) => state.assignments);
-  const displayName = learner?.preferred_name ?? learner?.display_name ?? 'Marcus';
-  const learnerUserId = learner?.user_id ?? MOCK_LEARNER_MARCUS.id;
+  const displayName = learner?.preferred_name ?? learner?.display_name ?? 'Learner';
+  const learnerUserId = learner?.user_id ?? null;
   const primaryAssignment = useMemo(
     () =>
-      assignments.find(
-        (assignment) =>
-          assignment.assignee_user_id === learnerUserId &&
-          assignment.module_version_id === HR_BASICS_MODULE_VERSION_ID &&
-          assignment.status !== 'completed',
-      ),
+      learnerUserId
+        ? assignments.find(
+            (assignment) =>
+              assignment.assignee_user_id === learnerUserId &&
+              assignment.module_version_id === HR_BASICS_MODULE_VERSION_ID &&
+              assignment.status !== 'completed',
+          )
+        : undefined,
     [assignments, learnerUserId],
   );
   const dueState = getDueState(primaryAssignment);

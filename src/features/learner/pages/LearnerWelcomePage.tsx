@@ -14,7 +14,7 @@ interface LearnerWelcomePageProps {
 }
 
 export function LearnerWelcomePage({ learner, onStartJourney }: LearnerWelcomePageProps) {
-  const displayName = learner?.preferred_name ?? learner?.display_name ?? 'Marcus';
+  const displayName = learner?.preferred_name ?? learner?.display_name ?? 'Learner';
 
   return (
     <div className="max-w-4xl mx-auto">

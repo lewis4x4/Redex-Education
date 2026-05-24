@@ -140,6 +140,24 @@ set role = 'admin'
 where lower(email) = lower('new.owner@goredex.com');
 ```
 
+### Netlify production environment
+
+Production deploys auto-build from `main`, but the operator must set the browser-safe Vite env vars in Netlify before cutting over real auth/data/AI. The agent cannot set these values.
+
+Netlify Dashboard → Site configuration → Environment variables (must set **all**):
+
+```dotenv
+VITE_SUPABASE_URL=https://toghxeuhgkcrbrdxewdw.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJh... # public anon key only; never service_role
+VITE_MOCK_AUTH=false
+VITE_DATA_SOURCE=supabase
+VITE_AI_MODE=real
+```
+
+Then trigger a redeploy: Deploys tab → Trigger deploy → **Clear cache and deploy site**.
+
+The production build guard fails Netlify builds with a clear error when mock/demo settings are missing or active (`VITE_MOCK_AUTH=true`, `VITE_DATA_SOURCE` unset/non-`supabase`, or `VITE_AI_MODE` unset/non-`real`). Local dev builds are not blocked unless `NODE_ENV=production` or `NETLIFY=true` is set.
+
 ### `.env` setup
 
 Frontend `.env` values are public Vite configuration only. Copy the template, fill in the Supabase public URL and anon key, and switch to real backends for production-like usage.
@@ -180,7 +198,7 @@ VITE_AI_MODE=real
 | `VITE_MOCK_AUTH` | Defaults to `false` | When `true`, AuthGate bypasses session checks for demo/dev; production builds are blocked |
 | `VITE_MOCK_AUTH_ROLE` | Defaults to `admin` | Mock-mode role used by AuthGate required-role checks (`admin`, `foundry_author`, `manager`, or `learner`) |
 
-See [`.env.example`](./.env.example) for the template. `npm run build` rejects production builds when `VITE_MOCK_AUTH=true`.
+See [`.env.example`](./.env.example) for the template. `npm run build` runs the production guard; when `NODE_ENV=production` or `NETLIFY=true`, it rejects mock auth, mock/unset data source, and mock/unset AI mode.
 
 ## Source Library setup (Slice 2.4)
 

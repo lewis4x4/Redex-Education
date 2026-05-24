@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import App from '@/App'
 import { useEducation, useMyProgress } from '@/hooks/useEducation'
 import { useAuth } from '@/hooks/useAuth'
+import { useProfile } from '@/hooks/useProfile'
 import { useAssignmentStore } from '@/features/assignments/store/assignmentStore'
 import { useAuditLogStore } from '@/features/audit/store/auditLogStore'
 import { useAssessmentAttemptStore } from '@/features/progress/store/assessmentAttemptStore'
@@ -20,11 +21,33 @@ vi.mock('@/hooks/useAuth', () => ({
   useAuth: vi.fn(),
 }))
 
+vi.mock('@/hooks/useProfile', () => ({
+  useProfile: vi.fn(),
+}))
+
+const supabaseAuthMocks = vi.hoisted(() => ({
+  exchangeCodeForSession: vi.fn(() => new Promise(() => undefined)),
+  onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
+}))
+
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: {
+    auth: {
+      exchangeCodeForSession: supabaseAuthMocks.exchangeCodeForSession,
+      onAuthStateChange: supabaseAuthMocks.onAuthStateChange,
+      signInWithOtp: vi.fn(),
+    },
+  },
+}))
+
 const useEducationMock = vi.mocked(useEducation)
 const useMyProgressMock = vi.mocked(useMyProgress)
 const useAuthMock = vi.mocked(useAuth)
+const useProfileMock = vi.mocked(useProfile)
 
 function renderAt(path: string) {
+  window.history.pushState({}, '', path)
+
   return render(
     <MemoryRouter initialEntries={[path]}>
       <App />
@@ -85,10 +108,18 @@ describe('Redex Education routes', () => {
 
     useAuthMock.mockReturnValue({
       loading: false,
-      session: null,
-      user: null,
-      role: null,
+      session: { access_token: 'token' },
+      user: { id: 'user-marcus', email: 'marcus.chen@redex.example' },
+      role: 'learner',
+      refreshSession: vi.fn(),
+      signOut: vi.fn(),
     } as never)
+
+    useProfileMock.mockReturnValue({
+      profile: null,
+      loading: false,
+      refetch: vi.fn(),
+    })
 
     act(() => {
       useAuditLogStore.getState().resetEvents()
@@ -321,17 +352,40 @@ describe('Redex Education routes', () => {
   })
 
   it('renders ManagerDashboardPage at /manager for manager roles', async () => {
+    vi.stubEnv('VITE_DATA_SOURCE', 'mock')
     useAuthMock.mockReturnValue({
       loading: false,
       session: { access_token: 'token' },
-      user: null,
+      user: { id: 'user-sarah-manager', email: 'sarah.chen@redex.example' },
       role: 'manager',
+      refreshSession: vi.fn(),
+      signOut: vi.fn(),
     } as never)
+    useProfileMock.mockReturnValue({
+      profile: {
+        id: 'user-sarah-manager',
+        org_id: 'org-redex',
+        email: 'sarah.chen@redex.example',
+        display_name: 'Sarah Chen',
+        role: 'manager',
+        created_at: '2026-05-23T00:00:00.000Z',
+        updated_at: '2026-05-24T00:00:00.000Z',
+      },
+      loading: false,
+      refetch: vi.fn(),
+    })
 
     renderAt('/manager')
 
     expect(await screen.findByRole('heading', { name: 'Team training progress' })).toBeInTheDocument()
     expect(screen.getByRole('row', { name: /Marcus Chen/i })).toBeInTheDocument()
+  })
+
+  it('renders the auth callback route without redirecting through /', async () => {
+    renderAt('/auth/callback?code=pkce-code&state=pkce-state')
+
+    expect(await screen.findByText(/Completing secure sign-in/i)).toBeInTheDocument()
+    expect(supabaseAuthMocks.exchangeCodeForSession).toHaveBeenCalledWith('pkce-code')
   })
 
   it('renders SignInPage at /sign-in', async () => {

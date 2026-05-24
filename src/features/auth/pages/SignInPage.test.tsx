@@ -36,6 +36,26 @@ describe('SignInPage', () => {
     expect(screen.getByRole('button', { name: /Send magic link/i })).toBeInTheDocument()
   })
 
+  it('preserves a safe redirect_to parameter in the callback URL', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <MemoryRouter initialEntries={['/sign-in?redirect_to=%2Fadmin']}>
+        <SignInPage />
+      </MemoryRouter>,
+    )
+
+    await user.type(screen.getByLabelText(/Email/i), 'admin@redex.example')
+    await user.click(screen.getByRole('button', { name: /Send magic link/i }))
+
+    await waitFor(() => {
+      expect(signInWithOtpMock).toHaveBeenCalledWith({
+        email: 'admin@redex.example',
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback?redirect_to=%2Fadmin` },
+      })
+    })
+  })
+
   it('submits the email to Supabase magic-link auth', async () => {
     const user = userEvent.setup()
 
@@ -51,7 +71,7 @@ describe('SignInPage', () => {
     await waitFor(() => {
       expect(signInWithOtpMock).toHaveBeenCalledWith({
         email: 'admin@redex.example',
-        options: { emailRedirectTo: window.location.origin },
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
       })
     })
     expect(await screen.findByText(/Check your email/i)).toBeInTheDocument()

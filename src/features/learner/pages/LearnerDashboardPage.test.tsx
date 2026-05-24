@@ -5,7 +5,12 @@ import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-rou
 import { LearnerDashboardPage } from './LearnerDashboardPage';
 import { useAssignmentStore } from '@/features/assignments/store/assignmentStore';
 import { useMyProgress } from '@/hooks/useEducation';
-import { MOCK_HR_ONBOARDING_ASSIGNMENT, MOCK_HR_ONBOARDING_ASSIGNMENT_ANA, MOCK_LEARNER_ANA_PROFILE } from '@/lib/education';
+import {
+  MOCK_HR_ONBOARDING_ASSIGNMENT,
+  MOCK_HR_ONBOARDING_ASSIGNMENT_ANA,
+  MOCK_LEARNER_ANA_PROFILE,
+  MOCK_LEARNER_MARCUS_PROFILE,
+} from '@/lib/education';
 
 vi.mock('@/hooks/useEducation', () => ({
   useMyProgress: vi.fn(),
@@ -23,7 +28,7 @@ function DashboardRouteHarness() {
 
   return (
     <>
-      <LearnerDashboardPage onContinue={() => navigate('/learn/player/hr-basics-mod-001')} />
+      <LearnerDashboardPage learner={MOCK_LEARNER_MARCUS_PROFILE} onContinue={() => navigate('/learn/player/hr-basics-mod-001')} />
       <LocationProbe />
     </>
   );
@@ -45,7 +50,7 @@ describe('LearnerDashboardPage HR Basics assignment', () => {
   });
 
   it('shows HR Basics as Marcus primary assignment with six lessons and 20 minutes remaining', () => {
-    render(<LearnerDashboardPage />);
+    render(<LearnerDashboardPage learner={MOCK_LEARNER_MARCUS_PROFILE} />);
 
     expect(screen.getByText('HR Basics at Redex')).toBeInTheDocument();
     expect(screen.getByText(/0 of 6 lessons complete/i)).toBeInTheDocument();
@@ -64,7 +69,7 @@ describe('LearnerDashboardPage HR Basics assignment', () => {
       });
     });
 
-    render(<LearnerDashboardPage />);
+    render(<LearnerDashboardPage learner={MOCK_LEARNER_MARCUS_PROFILE} />);
 
     expect(screen.getByText('Due in 2 days')).toBeInTheDocument();
   });
@@ -100,7 +105,7 @@ describe('LearnerDashboardPage HR Basics assignment', () => {
       });
     });
 
-    render(<LearnerDashboardPage />);
+    render(<LearnerDashboardPage learner={MOCK_LEARNER_MARCUS_PROFILE} />);
 
     expect(screen.getByText('Overdue')).toBeInTheDocument();
   });

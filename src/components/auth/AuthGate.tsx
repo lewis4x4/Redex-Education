@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/hooks/useAuth'
+import { getMockRole } from '@/hooks/mock-role'
 import type { Role } from '@/types/training'
 
 interface AuthGateProps {
@@ -19,13 +20,6 @@ const ROLE_LABELS: Record<Role, string> = {
 
 function normalizeRequiredRoles(requiredRole: Role | Role[] | undefined): Role[] {
   return Array.isArray(requiredRole) ? requiredRole : requiredRole ? [requiredRole] : []
-}
-
-function mockAuthRole(): Role {
-  const configuredRole = import.meta.env.VITE_MOCK_AUTH_ROLE
-  return configuredRole === 'foundry_author' || configuredRole === 'manager' || configuredRole === 'learner'
-    ? configuredRole
-    : 'admin'
 }
 
 function hasRequiredRole(role: Role | null, requiredRole: Role | Role[] | undefined): boolean {
@@ -81,9 +75,10 @@ export function SignInRequiredPlaceholder() {
 
 export default function AuthGate({ children, fallback = <DefaultFallback />, requiredRole }: AuthGateProps) {
   const { loading, role, session } = useAuth()
+  const location = useLocation()
 
   if (import.meta.env.VITE_MOCK_AUTH === 'true') {
-    return hasRequiredRole(mockAuthRole(), requiredRole) ? <>{children}</> : <AccessDeniedCard requiredRole={requiredRole} />
+    return hasRequiredRole(getMockRole(), requiredRole) ? <>{children}</> : <AccessDeniedCard requiredRole={requiredRole} />
   }
 
   if (loading) {
@@ -91,7 +86,8 @@ export default function AuthGate({ children, fallback = <DefaultFallback />, req
   }
 
   if (!session) {
-    return <Navigate to="/sign-in" replace />
+    const redirectTo = `${location.pathname}${location.search}`
+    return <Navigate to={`/sign-in?redirect_to=${encodeURIComponent(redirectTo)}`} replace />
   }
 
   if (!hasRequiredRole(role, requiredRole)) {

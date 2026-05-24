@@ -8,6 +8,7 @@ const supabaseAuthMocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   onAuthStateChange: vi.fn(),
   refreshSession: vi.fn(),
+  signOut: vi.fn(),
   unsubscribe: vi.fn(),
 }))
 
@@ -17,6 +18,7 @@ vi.mock('@/integrations/supabase/client', () => ({
       getSession: supabaseAuthMocks.getSession,
       onAuthStateChange: supabaseAuthMocks.onAuthStateChange,
       refreshSession: supabaseAuthMocks.refreshSession,
+      signOut: supabaseAuthMocks.signOut,
     },
   },
 }))
@@ -35,6 +37,7 @@ describe('useAuth role claims', () => {
     supabaseAuthMocks.getSession.mockReset()
     supabaseAuthMocks.onAuthStateChange.mockReset()
     supabaseAuthMocks.refreshSession.mockReset()
+    supabaseAuthMocks.signOut.mockReset()
     supabaseAuthMocks.unsubscribe.mockReset()
     supabaseAuthMocks.onAuthStateChange.mockReturnValue({
       data: { subscription: { unsubscribe: supabaseAuthMocks.unsubscribe } },
@@ -99,6 +102,22 @@ describe('useAuth role claims', () => {
     const { result } = renderHook(() => useAuth(), { wrapper })
 
     expect(result.current.role).toBe('admin')
+  })
+
+  it('signs out through Supabase auth', async () => {
+    vi.stubEnv('VITE_MOCK_AUTH', 'false')
+    supabaseAuthMocks.getSession.mockResolvedValue({ data: { session: null }, error: null })
+    supabaseAuthMocks.signOut.mockResolvedValue({ error: null })
+
+    const { result } = renderHook(() => useAuth(), { wrapper })
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => {
+      await result.current.signOut()
+    })
+
+    expect(supabaseAuthMocks.signOut).toHaveBeenCalledTimes(1)
   })
 
   it('refreshes the Supabase session and updates role claims', async () => {

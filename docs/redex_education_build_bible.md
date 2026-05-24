@@ -4137,3 +4137,47 @@ Slice C turns the Slice B real AI stub into a durable server-side generation job
 
 ---
 
+## 2026-05-24 — Foundation Production Fix
+
+**Status**: ✅ Completed locally; commit pending operator review. Based on `main` at `e9f429c`; final commit hash to be filled by operator after review.
+
+**Scope shipped**:
+1. Added dedicated `/auth/callback` PKCE landing route so magic-link `code`/`state` parameters are exchanged before any root redirect can strip them.
+2. Updated magic-link `emailRedirectTo` to `/auth/callback` and preserved safe `redirect_to` destinations from `AuthGate`.
+3. Protected learner dashboard/welcome routes with `AuthGate`.
+4. Added `signOut()` to auth context/provider.
+5. Added shadcn/Radix `DropdownMenu` and `Avatar` UI components.
+6. Added signed-in top-nav user menu with avatar, email, role pill, and sign-out action.
+7. Made learner/admin/manager nav tabs role-aware and removed the “Interactive UI Mockup - v3” label.
+8. Added `useProfile()` to load signed-in profile identity while keeping mock personas.
+9. Refactored `EducationProvider` to accept `userId`, load real Supabase enrollments/progress, and write progress/acknowledgments against the real enrollment in Supabase mode.
+10. Wired learner dashboard/welcome pages to signed-in profile identity instead of hardcoded Marcus fallback.
+11. Refactored manager dashboard to use signed-in manager identity/profile and data-source direct reports.
+12. Updated admin greeting to use signed-in profile display name while leaving metrics mock-scoped.
+13. Hardened production build guard against mock auth, mock/unset data source, and mock/unset AI mode on Netlify/production builds.
+14. Centralized mock-role resolution via exported `getMockRole` and removed the duplicate `AuthGate` implementation.
+15. Updated breadcrumbs to concise user-facing copy.
+
+**Tests added/updated**:
+- Added `AuthCallbackPage.test.tsx`, `useProfile.test.tsx`, and `TopNav.test.tsx`.
+- Extended route, auth, manager, admin, learner, sign-in, and Supabase education-context tests for real identity/enrollment behavior.
+- Test delta from brief baseline: **619 → 631 (+12)**.
+
+**Local verification**:
+- ✅ `npm run typecheck` — green.
+- ✅ `npm run lint` — 0 errors / 0 warnings.
+- ✅ `npm test -- --run` — **631 passed, 113 test files**.
+- ✅ `npm run build` — green.
+- ✅ Production guard negative check: `VITE_DATA_SOURCE=mock NODE_ENV=production npm run build` fails before build with a clear guard error.
+
+**Manual operator steps still required**:
+1. Netlify Dashboard → Site configuration → Environment variables: set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_MOCK_AUTH=false`, `VITE_DATA_SOURCE=supabase`, and `VITE_AI_MODE=real`.
+2. Netlify Deploys → Trigger deploy → Clear cache and deploy site.
+3. Supabase Auth redirect URLs must include `https://redex.education/**` and local dev callback URLs.
+
+**Known scope / remaining risks**:
+- Admin dashboard metric cards intentionally remain mock-backed; full admin analytics wire-up is a follow-up.
+- `supabase.auth.exchangeCodeForSession` in `@supabase/supabase-js` v2 expects the auth code string, so the callback extracts `code` from `window.location.search` before exchange.
+
+---
+

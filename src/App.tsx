@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
 import AuthGate from '@/components/auth/AuthGate'
 import { AppShell } from '@/components/layout/AppShell'
 import { NotFoundPage } from '@/components/layout/NotFoundPage'
@@ -9,9 +10,11 @@ import { LearnerWelcomePage } from '@/features/learner/pages/LearnerWelcomePage'
 import { useAssignmentStore } from '@/features/assignments/store/assignmentStore'
 import { ModulePlayer } from '@/features/learner/components/ModulePlayer'
 import { useAssessmentAttemptStore } from '@/features/progress/store/assessmentAttemptStore'
+import { useAuth } from '@/hooks/useAuth'
 import { useEducation } from '@/hooks/useEducation'
+import { useProfile } from '@/hooks/useProfile'
 import { getModuleVersionId } from '@/lib/education/moduleVersions'
-import type { ProgressStatus } from '@/lib/education'
+import type { LearnerProfile, ProgressStatus, User as DomainUser } from '@/lib/education'
 
 const AdminDashboardPage = lazy(() =>
   import('@/features/admin/pages/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })),
@@ -31,6 +34,10 @@ const ManagerDashboardPage = lazy(() =>
 
 const SignInPage = lazy(() =>
   import('@/features/auth/pages/SignInPage').then((m) => ({ default: m.SignInPage })),
+)
+
+const AuthCallbackPage = lazy(() =>
+  import('@/features/auth/pages/AuthCallbackPage').then((m) => ({ default: m.AuthCallbackPage })),
 )
 
 const SourceBinderInputPage = lazy(() =>
@@ -82,27 +89,61 @@ const ModuleVersionHistoryPage = lazy(() =>
 )
 
 // Redex Academy - Active Build
-// Phase 2 routes: learner demo stays open; admin shell is protected by AuthGate.
+// Phase 2 routes: learner and operator shells are protected by AuthGate.
+
+function toLearnerProfile(profile: DomainUser | null, authUser: SupabaseUser | null): LearnerProfile | undefined {
+  const userId = profile?.id ?? authUser?.id
+
+  if (!userId) {
+    return undefined
+  }
+
+  const displayName = profile?.display_name ?? authUser?.email?.split('@')[0] ?? 'Learner'
+  const preferredName = displayName.split(' ').filter(Boolean)[0] ?? displayName
+
+  return {
+    id: `learner-profile-${userId}`,
+    user_id: userId,
+    org_id: profile?.org_id ?? 'org-redex',
+    display_name: displayName,
+    preferred_name: preferredName,
+    role: profile?.role,
+    current_streak_days: 0,
+    total_learning_minutes: 0,
+    certificates_earned: 0,
+  }
+}
 
 function LearnerDashboardRoute() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const { profile } = useProfile()
+  const learner = toLearnerProfile(profile, user)
 
   return (
-    <AppShell breadcrumb="Learner flow › My Learning Dashboard">
-      <LearnerDashboardPage
-        onContinue={() => navigate('/learn/player/hr-basics-mod-001')}
-        onStartJourney={() => navigate('/learn/player/hr-basics-mod-001')}
-      />
+    <AppShell breadcrumb="Learning › My Learning Dashboard">
+      <AuthGate>
+        <LearnerDashboardPage
+          learner={learner}
+          onContinue={() => navigate('/learn/player/hr-basics-mod-001')}
+          onStartJourney={() => navigate('/learn/player/hr-basics-mod-001')}
+        />
+      </AuthGate>
     </AppShell>
   )
 }
 
 function LearnerWelcomeRoute() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const { profile } = useProfile()
+  const learner = toLearnerProfile(profile, user)
 
   return (
-    <AppShell breadcrumb="Learner flow › First-day welcome">
-      <LearnerWelcomePage onStartJourney={() => navigate('/learn/player/hr-basics-mod-001')} />
+    <AppShell breadcrumb="Learning › First-day welcome">
+      <AuthGate>
+        <LearnerWelcomePage learner={learner} onStartJourney={() => navigate('/learn/player/hr-basics-mod-001')} />
+      </AuthGate>
     </AppShell>
   )
 }
@@ -149,7 +190,7 @@ function LearnerModuleRoute() {
   const completedLessonIdSet = new Set(completedLessonIds)
 
   return (
-    <AppShell breadcrumb="Learner flow › Module Player" playerMode>
+    <AppShell breadcrumb="Learning › Module Player" playerMode>
       <ModulePlayer
         key={routeModule.id}
         module={routeModule}
@@ -193,7 +234,7 @@ function LearnerModuleRoute() {
 
 function AdminRoute() {
   return (
-    <AppShell breadcrumb="Admin flow › Course Foundry">
+    <AppShell breadcrumb="Course Foundry">
       <AuthGate requiredRole={['admin', 'foundry_author']}>
         <Suspense fallback={<RouteLoadingFallback />}>
           <AdminDashboardPage />
@@ -205,7 +246,7 @@ function AdminRoute() {
 
 function AssignmentAdminRoute() {
   return (
-    <AppShell breadcrumb="Admin flow › Assignments">
+    <AppShell breadcrumb="Assignments">
       <AuthGate requiredRole={['admin', 'foundry_author']}>
         <Suspense fallback={<RouteLoadingFallback />}>
           <AssignmentAdminPage />
@@ -217,7 +258,7 @@ function AssignmentAdminRoute() {
 
 function AuditLogRoute() {
   return (
-    <AppShell breadcrumb="Admin flow › Audit log">
+    <AppShell breadcrumb="Audit Log">
       <AuthGate requiredRole={['admin', 'foundry_author']}>
         <Suspense fallback={<RouteLoadingFallback />}>
           <AuditLogPage />
@@ -229,7 +270,7 @@ function AuditLogRoute() {
 
 function ManagerRoute() {
   return (
-    <AppShell breadcrumb="Manager flow › Team training">
+    <AppShell breadcrumb="Team Training">
       <AuthGate requiredRole={['manager', 'admin']}>
         <Suspense fallback={<RouteLoadingFallback />}>
           <ManagerDashboardPage />
@@ -249,9 +290,19 @@ function SignInRoute() {
   )
 }
 
+function AuthCallbackRoute() {
+  return (
+    <AppShell breadcrumb="Signing in">
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <AuthCallbackPage />
+      </Suspense>
+    </AppShell>
+  )
+}
+
 function FoundryStartRoute() {
   return (
-    <AppShell breadcrumb="Admin flow › Course Foundry › New module">
+    <AppShell breadcrumb="Course Foundry › New Module">
       <AuthGate requiredRole={['admin', 'foundry_author']}>
         <Suspense fallback={<RouteLoadingFallback />}>
           <FoundryStartPage />
@@ -263,7 +314,7 @@ function FoundryStartRoute() {
 
 function FoundrySourceRoute() {
   return (
-    <AppShell breadcrumb="Admin flow › Course Foundry › Source material">
+    <AppShell breadcrumb="Course Foundry › Source Material">
       <AuthGate requiredRole={['admin', 'foundry_author']}>
         <Suspense fallback={<RouteLoadingFallback />}>
           <SourceBinderInputPage />
@@ -275,7 +326,7 @@ function FoundrySourceRoute() {
 
 function FoundryQuestionsRoute() {
   return (
-    <AppShell breadcrumb="Admin flow › Course Foundry › Setup questions">
+    <AppShell breadcrumb="Course Foundry › Setup Questions">
       <AuthGate requiredRole={['admin', 'foundry_author']}>
         <Suspense fallback={<RouteLoadingFallback />}>
           <FoundryQuestionsPage />
@@ -287,7 +338,7 @@ function FoundryQuestionsRoute() {
 
 function OutlineReviewRoute() {
   return (
-    <AppShell breadcrumb="Admin flow › Course Foundry › Outline review">
+    <AppShell breadcrumb="Course Foundry › Outline Review">
       <AuthGate requiredRole={['admin', 'foundry_author']}>
         <Suspense fallback={<RouteLoadingFallback />}>
           <OutlineReviewPage />
@@ -299,7 +350,7 @@ function OutlineReviewRoute() {
 
 function SourceLibraryRoute() {
   return (
-    <AppShell breadcrumb="Admin flow › Course Foundry › Source Library">
+    <AppShell breadcrumb="Course Foundry › Source Library">
       <AuthGate requiredRole={['admin', 'foundry_author']}>
         <Suspense fallback={<RouteLoadingFallback />}>
           <SourceLibraryPage />
@@ -311,7 +362,7 @@ function SourceLibraryRoute() {
 
 function ModuleGenerationPreviewRoute() {
   return (
-    <AppShell breadcrumb="Admin flow › Course Foundry › Module preview">
+    <AppShell breadcrumb="Course Foundry › Module Preview">
       <AuthGate requiredRole={['admin', 'foundry_author']}>
         <Suspense fallback={<RouteLoadingFallback />}>
           <ModuleGenerationPreviewPage />
@@ -323,7 +374,7 @@ function ModuleGenerationPreviewRoute() {
 
 function SelfCritiqueReviewRoute() {
   return (
-    <AppShell breadcrumb="Admin flow › Course Foundry › Self-critique">
+    <AppShell breadcrumb="Course Foundry › Self-Critique">
       <AuthGate requiredRole={['admin', 'foundry_author']}>
         <Suspense fallback={<RouteLoadingFallback />}>
           <SelfCritiqueReviewPage />
@@ -335,7 +386,7 @@ function SelfCritiqueReviewRoute() {
 
 function SideBySideReviewRoute() {
   return (
-    <AppShell breadcrumb="Admin flow › Course Foundry › Side-by-side review">
+    <AppShell breadcrumb="Course Foundry › Side-by-side Review">
       <AuthGate requiredRole={['admin', 'foundry_author']}>
         <Suspense fallback={<RouteLoadingFallback />}>
           <SideBySideReviewPage />
@@ -347,7 +398,7 @@ function SideBySideReviewRoute() {
 
 function PublishBlockersRoute() {
   return (
-    <AppShell breadcrumb="Admin flow › Course Foundry › Publish blockers">
+    <AppShell breadcrumb="Course Foundry › Publish Blockers">
       <AuthGate requiredRole={['admin', 'foundry_author']}>
         <Suspense fallback={<RouteLoadingFallback />}>
           <PublishBlockersPage />
@@ -359,7 +410,7 @@ function PublishBlockersRoute() {
 
 function PublishConfirmationRoute() {
   return (
-    <AppShell breadcrumb="Admin flow › Course Foundry › Published">
+    <AppShell breadcrumb="Course Foundry › Published">
       <AuthGate requiredRole={['admin', 'foundry_author']}>
         <Suspense fallback={<RouteLoadingFallback />}>
           <PublishConfirmationPage />
@@ -371,7 +422,7 @@ function PublishConfirmationRoute() {
 
 function ModuleVersionHistoryRoute() {
   return (
-    <AppShell breadcrumb="Admin flow › Module versions">
+    <AppShell breadcrumb="Module Versions">
       <AuthGate requiredRole={['admin', 'foundry_author']}>
         <Suspense fallback={<RouteLoadingFallback />}>
           <ModuleVersionHistoryPage />
@@ -383,7 +434,7 @@ function ModuleVersionHistoryRoute() {
 
 function SourceImpactReviewRoute() {
   return (
-    <AppShell breadcrumb="Admin flow › Source impact">
+    <AppShell breadcrumb="Source Impact">
       <AuthGate requiredRole={['admin', 'foundry_author']}>
         <Suspense fallback={<RouteLoadingFallback />}>
           <SourceImpactReviewPage />
@@ -410,6 +461,7 @@ export default function App() {
       <Route path="/learn/player" element={<LearnerModuleRoute />} />
       <Route path="/learn/player/:moduleId" element={<LearnerModuleRoute />} />
       <Route path="/sign-in" element={<SignInRoute />} />
+      <Route path="/auth/callback" element={<AuthCallbackRoute />} />
       <Route path="/admin" element={<AdminRoute />} />
       <Route path="/admin/assignments" element={<AssignmentAdminRoute />} />
       <Route path="/admin/audit" element={<AuditLogRoute />} />

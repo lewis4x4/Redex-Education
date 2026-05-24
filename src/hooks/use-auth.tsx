@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/integrations/supabase/client'
 import type { Role } from '@/types/training'
+import { getMockRole } from './mock-role'
 import { AuthContext } from './auth-context'
 
 const ROLES: Role[] = ['admin', 'foundry_author', 'manager', 'learner']
@@ -42,9 +43,8 @@ function getRoleFromSession(session: Session | null): Role | null {
   return normalizeRole(tokenClaims?.redex_role)
 }
 
-function getMockRole(): Role {
-  return normalizeRole(import.meta.env.VITE_MOCK_AUTH_ROLE, 'admin') ?? 'admin'
-}
+// eslint-disable-next-line react-refresh/only-export-components
+export { getMockRole } from './mock-role'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const mockAuthEnabled = import.meta.env.VITE_MOCK_AUTH === 'true'
@@ -124,11 +124,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(session?.user ?? null)
   }, [mockAuthEnabled])
 
+  const signOut = useCallback(async () => {
+    if (mockAuthEnabled) {
+      return
+    }
+
+    const { error } = await supabase.auth.signOut()
+
+    if (error) {
+      console.warn('[auth] Unable to sign out of Supabase.', error)
+      throw error
+    }
+  }, [mockAuthEnabled])
+
   const role = mockAuthEnabled ? getMockRole() : getRoleFromSession(session)
 
   const value = useMemo(
-    () => ({ user, session, loading, role, refreshSession }),
-    [user, session, loading, role, refreshSession],
+    () => ({ user, session, loading, role, refreshSession, signOut }),
+    [user, session, loading, role, refreshSession, signOut],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

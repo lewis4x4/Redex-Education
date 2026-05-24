@@ -6,16 +6,19 @@ import { AssignmentsEntryCard } from '@/features/admin/components/AssignmentsEnt
 import { CourseStatusList } from '@/features/admin/components/CourseStatusList'
 import { FoundryEntryCard } from '@/features/admin/components/FoundryEntryCard'
 import { MOCK_ADMIN_SUMMARY } from '@/features/admin/data/mockAdmin'
+import { useProfile } from '@/hooks/useProfile'
 
 export function AdminDashboardPage() {
   const navigate = useNavigate()
+  const { profile } = useProfile()
   const summary = MOCK_ADMIN_SUMMARY
+  const displayName = profile?.display_name ?? 'Admin'
 
   return (
     <section className="space-y-6">
       <header className="space-y-2">
         <p className="text-sm font-semibold uppercase tracking-[3px] text-redex-red">REDEX AI COURSE FOUNDRY</p>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Welcome back, Admin</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Welcome back, {displayName}</h1>
         <p className="text-sm text-slate-600">Your training operations at a glance</p>
       </header>
 
