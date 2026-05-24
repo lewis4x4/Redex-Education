@@ -490,7 +490,7 @@ export default function App() {
       <Route path="/admin/foundry/blockers" element={<PublishBlockersRoute />} />
       <Route path="/admin/foundry/published" element={<PublishConfirmationRoute />} />
       <Route path="/admin/foundry/library" element={<SourceLibraryRoute />} />
-      <Route path="/admin/*" element={<AdminRoute />} />
+      <Route path="/admin/*" element={<NotFoundRoute />} />
         <Route path="*" element={<NotFoundRoute />} />
       </Routes>
     </RouteErrorBoundary>

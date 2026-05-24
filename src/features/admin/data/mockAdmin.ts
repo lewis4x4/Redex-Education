@@ -5,7 +5,9 @@ export const MOCK_ADMIN_SUMMARY: AdminDashboardSummary = {
     drafts: 3,
     needs_review: 1,
     published: 5,
+    archived: 0,
     learners_in_progress: 14,
+    pending_generation_jobs: 0,
   },
   drafts: [
     {

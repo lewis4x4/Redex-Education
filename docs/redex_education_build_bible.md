@@ -4367,3 +4367,86 @@ Resulting `Exposed schemas`: `public, graphql_public, redex`
 - ✅ Supabase and mock paths are both covered in hook/mutation/page tests.
 
 **Next**: Run the live AI-generation smoke test against Brian's Drive `_library/` HR content.
+
+---
+
+## 2026-05-24 — Slice: Admin Dashboard End-to-End Overhaul (audit-driven, four sub-slices)
+
+**Status**: ✅ Completed.
+
+**Context**: After the Real Admin Dashboard + Module Management UI slices landed, the user discovered three orthogonal gaps in production: (a) the Drafts bucket was permanently empty because the Foundry workflow only persisted to browser `localStorage`, never to `redex.module_versions`; (b) the two CTA cards at the top of the dashboard were visually asymmetric ("horrible" was the user's word — the Foundry card had no eyebrow, used a raw-className button missing the design-system shadow/active state, while Assignments used `variant="brand"`); (c) numerous functional gaps including wrong empty-state copy, mock copy leaking to production, no generation-job visibility, no source-library shortcut, the `/admin/*` wildcard silently rendering the dashboard for broken URLs, raw UUIDs in version-history "Approved by" fields, etc. Rather than continue shipping piecemeal slices, the orchestrator commissioned two read-only audits (functional + design) and then dispatched coordinated parallel builders.
+
+### Sub-slice 1 — Foundry Draft Persistence (server-side draft rows)
+
+Closes the gap that made the Drafts bucket dead-on-arrival: every Foundry stage advancement now writes to `redex.module_versions` with `status='draft'` so the dashboard's Drafts count populates as users author, drafts survive cross-browser/cross-device sessions, and "Resume draft" works for real Supabase drafts (not just localStorage ones).
+
+**Files added**:
+- `supabase/migrations/20260524160000_draft_metadata.sql` — adds `redex.module_versions.draft_metadata jsonb` column (no schema collision; tracks `{ current_stage, last_actor, ... }`).
+- `src/integrations/supabase/queries/moduleVersions.ts` — new `fetchDraftByModuleVersionId(id)` query for resume hydration.
+
+**Files modified**:
+- `src/integrations/supabase/types.ts` + `src/integrations/supabase/db-rows.ts` — `draft_metadata` row + domain types.
+- `src/types/training.ts` — `ModuleVersion.draft_metadata`, foundry draft stage union types.
+- `src/integrations/supabase/mutations/foundry.ts` — new `upsertModuleDraft({ module_id, module_title, current_stage, actor })` insert-or-update mutation following the established `safeRetry` / `throwOnMutationError` pattern.
+- `src/lib/education/supabaseDataProvider.ts` + `src/lib/education/moduleVersions.ts` + `src/lib/education/index.ts` — facade passthroughs (mock mode throws `"mock mode: use useFoundryDraftStore directly"` per the established pattern).
+- `src/features/foundry/store/foundryDraftStore.ts` — new `persistDraftStage(stage, actor?)` action. Each stage transition fires `upsertModuleDraft` in supabase mode; captures the returned `module_version_id` on the local draft; errors populate `lastWriteError` without blocking flow.
+- `src/features/foundry/lib/resumeRoute.ts` — `inferResumeRoute` now honors `draft_metadata.current_stage` first, with existing state-based fallback preserved.
+- `src/features/foundry/pages/FoundryStartPage.tsx` — misleading "Your draft is saved automatically" → truthful "Saved as you go".
+
+### Sub-slice 2 — Admin Dashboard Visual + Copy Polish (v1.1)
+
+The user-visible fix for the "horrible" CTA row. Implemented from the design audit's batched slice.
+
+**Files modified**:
+- `src/features/admin/components/FoundryEntryCard.tsx` — added "Course Foundry" eyebrow, shortened heading to "Create a new module", migrated button to `variant="brand"` (gains `shadow-sm` + `active:bg-redex-red-active`), standardized disabled badge copy to "Coming soon", renamed `FOUNDRY_DISABLED_TITLE` to user-facing copy.
+- `src/features/admin/components/AssignmentsEntryCard.tsx` — replaced mock copy ("Marcus Chen … local mock assignment state") with production-appropriate description.
+- `src/features/admin/components/AdminMetricCard.tsx` — accent (red) value treatment now gates on `value !== 0 && Number.isFinite(numericValue)` so a red "0" never renders (per `docs/design-bar.md §11`).
+- `src/features/admin/pages/AdminDashboardPage.tsx` — eyebrow changed to "ADMIN DASHBOARD" (was misleadingly "REDEX AI COURSE FOUNDRY"); time-based greeting helper ("Good morning/afternoon/evening, {first-name}"); first-name fallback for `display_name`; per-list empty messages (Drafts: "No drafts in flight…", Published: "No published modules yet…", Needs review unchanged); bottom links promoted from naked text to outlined chips (Source Impact Review brand-red, Source library + Audit log slate); assignment-summary icons harmonized to plain `text-slate-400` glyphs (no rounded color chips); "Manage assignments →" CTA added; "Source library →" chip added; headings re-toned to `text-2xl md:text-3xl` and subhead to `text-[15px] leading-[1.45]`.
+- `docs/design-bar.md` — removed the stale "update eyebrow" TODO for `AdminDashboardPage` (now compliant).
+
+### Sub-slice 3 — Admin Dashboard Functional/Data Additions
+
+Net-new dashboard surface area driven by the functional audit. All parallel to sub-slice 2 (different files where possible; AdminDashboardPage coordinated sequentially).
+
+**Files added**: none (extensions only).
+
+**Files modified**:
+- `src/integrations/supabase/queries/admin.ts` — added `fetchPendingGenerationJobCount()` (counts `generation_jobs` with status `queued|running`); added `archived` count to the bucketing pass; `completion_rate_percent` now returns `null` when zero assignments exist (previously returned `0%` which was misleading).
+- `src/integrations/supabase/queries/profiles.ts` — new exported `fetchProfilesByIds(ids)` returning a `Map<id, { display_name, preferred_name? }>` for batch resolution.
+- `src/types/training.ts` — `AdminDashboardMetrics.pending_generation_jobs` and `archived` fields added; `assignment_summary.completion_rate_percent` widened to `number | null`.
+- `src/features/admin/data/mockAdmin.ts` — added the new metric fields to the mock fixture so mock-mode behavior remains stable.
+- `src/features/admin/pages/AdminDashboardPage.tsx` — amber banner above the metric strip when `pending_generation_jobs > 0` (with proper plural agreement); `{n} archived` badge under the Published list; "—" rendering for null completion rate; loading skeleton replaces the bare loading card (4 metric placeholders + 2 list placeholders + 1 summary placeholder, `animate-pulse`); welcome-back "Admin" flash mitigation via auth email local-part fallback while profile resolves.
+- `src/features/publishing/hooks/useModuleVersionHistory.ts` — extended return shape with `profileNameById: Map<string, string>` populated by batch `fetchProfilesByIds` call in supabase mode (mock mode skips).
+- `src/features/publishing/pages/ModuleVersionHistoryPage.tsx` — `personName()` now consults the resolved profile map first, falls back to `MOCK_ORG_PEOPLE` for mock tests, then to "Unknown user" — never a raw UUID.
+- `src/App.tsx` — replaced the silently-permissive `/admin/*` wildcard with explicit child routes; unmatched `/admin/...` paths now route to NotFoundPage.
+- `src/App.routes.test.tsx` — added route test asserting `/admin/does-not-exist` renders NotFound.
+
+### Sub-slice 4 — Audit reports as durable docs
+
+Both read-only audit reports are committed under `docs/reviews/` as the durable record of what was audited, found, and triaged:
+- `docs/reviews/admin-dashboard-design-audit-2026-05-24.md` (531 lines; 15 issues catalogued by severity with file:line refs and acceptance tests).
+- `docs/reviews/admin-dashboard-functional-audit-2026-05-24.md` (385 lines; 6 P1 gaps + 8 P2 improvements + full route table + states audit + copy audit).
+
+**Verification (entire push)**:
+- ✅ `npm run typecheck` — 0 errors.
+- ✅ `npm run lint` — 0 errors / 0 warnings.
+- ✅ `npm test -- --run` — **712 passed / 118 test files** (**+18 tests** versus the 694 baseline before this push: 705 after persistence → 708 after visual polish → 712 after functional additions).
+- ✅ `npm run build` — green.
+
+**Acceptance**:
+- ✅ CTA card row reads at visual parity (matching eyebrows, headings on the same baseline, both buttons share `variant="brand"` with identical shadow/hover/active states).
+- ✅ Empty-state copy is bucket-appropriate (Drafts ≠ Needs review ≠ Published).
+- ✅ Drafts bucket now populates as authors progress through the Foundry workflow in supabase mode; clicking "Resume draft" routes to the correct stored stage.
+- ✅ Generation jobs in flight show an amber banner; archived module count is visible; completion rate is `—` not `0%` when no assignments exist.
+- ✅ `/admin/does-not-exist` → NotFoundPage, not a silent dashboard render.
+- ✅ Version-history shows real display names, not raw UUIDs.
+- ✅ Mock mode unchanged; all prior tests remain green.
+
+**Known scope deferred** (intentionally):
+- P2-4 design — top metric strip + bottom assignment summary duplicate the "stat zone" role. Information-architecture decision; needs PM input on relabel-vs-restructure.
+- P2-5 design — data-state reassurance footer. Defer until enough operational signals exist on the page to make a "Live data. Drafts save automatically." footer meaningful.
+- Functional P2.7 — all-modules / filter / search view. New page; separate slice.
+- Functional P2.8 — manage learners / manage roles. Future slice.
+- `preferred_name` Supabase column — `fetchProfilesByIds` uses `select('*')` + safe extraction because the generated TS types don't yet include `preferred_name`. Re-generate types after the next migration that adds the column for full type safety.
+
+**Next**: The live AI-generation smoke test against Brian's Drive `_library/` HR content. With per-stage draft persistence in place, the smoke test now also validates the new Drafts-bucket populate behavior on the dashboard end-to-end.

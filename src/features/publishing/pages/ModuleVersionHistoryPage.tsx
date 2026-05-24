@@ -34,12 +34,16 @@ function statusToApprovalState(status: ModuleVersion['status']): ModuleApprovalS
   return status
 }
 
-function personName(userId: string | undefined): string {
+function personName(userId: string | undefined, profileNameById: Map<string, string>): string {
   if (!userId) {
     return 'Approval pending'
   }
 
-  return MOCK_ORG_PEOPLE.find((person) => person.id === userId)?.display_name ?? userId
+  return (
+    profileNameById.get(userId) ??
+    MOCK_ORG_PEOPLE.find((person) => person.id === userId)?.display_name ??
+    'Unknown user'
+  )
 }
 
 function getLatestVersionId(versions: ModuleVersion[]): string | undefined {
@@ -50,8 +54,17 @@ export function ModuleVersionHistoryPage() {
   const navigate = useNavigate()
   const actor = useActorInfo()
   const { moduleId = '' } = useParams<{ moduleId: string }>()
-  const { versions, loading, error, refetch, archiveVersion, forkVersion, archivingVersionId, forkingVersionId } =
-    useModuleVersionHistory(moduleId)
+  const {
+    versions,
+    loading,
+    error,
+    refetch,
+    archiveVersion,
+    forkVersion,
+    archivingVersionId,
+    forkingVersionId,
+    profileNameById,
+  } = useModuleVersionHistory(moduleId)
   const assignments = useAssignmentStore((state) => state.assignments)
   const attempts = useAssessmentAttemptStore((state) => state.attempts)
   const [expandedVersionIds, setExpandedVersionIds] = useState<Set<string>>(new Set())
@@ -185,7 +198,7 @@ export function ModuleVersionHistoryPage() {
                       </div>
                       <div>
                         <dt className="font-semibold text-slate-900">Approved by</dt>
-                        <dd>{personName(version.approved_by ?? version.published_by)}</dd>
+                        <dd>{personName(version.approved_by ?? version.published_by, profileNameById)}</dd>
                       </div>
                       <div>
                         <dt className="font-semibold text-slate-900">Source binder version</dt>
@@ -259,7 +272,7 @@ export function ModuleVersionHistoryPage() {
                       <ul className="space-y-2" aria-label={`Learners completed v${version.version_number}`}>
                         {learners.map((learnerId) => (
                           <li key={learnerId} className="text-sm font-medium text-slate-700">
-                            {personName(learnerId)}
+                            {personName(learnerId, profileNameById)}
                           </li>
                         ))}
                       </ul>

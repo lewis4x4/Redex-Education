@@ -53,6 +53,21 @@ export type Database = {
           },
         ]
       }
+      allowed_owner_emails: {
+        Row: {
+          created_at: string
+          email: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+        }
+        Relationships: []
+      }
       assessment_attempts: {
         Row: {
           answers: Json
@@ -187,7 +202,7 @@ export type Database = {
       assignments: {
         Row: {
           assigned_at: string
-          assigned_by: string
+          assigned_by: string | null
           assignee_role: string | null
           assignee_user_id: string | null
           due_at: string | null
@@ -197,7 +212,7 @@ export type Database = {
         }
         Insert: {
           assigned_at?: string
-          assigned_by: string
+          assigned_by?: string | null
           assignee_role?: string | null
           assignee_user_id?: string | null
           due_at?: string | null
@@ -207,7 +222,7 @@ export type Database = {
         }
         Update: {
           assigned_at?: string
-          assigned_by?: string
+          assigned_by?: string | null
           assignee_role?: string | null
           assignee_user_id?: string | null
           due_at?: string | null
@@ -430,13 +445,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "generation_jobs_submitted_by_fkey"
-            columns: ["submitted_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "generation_jobs_target_section_id_fkey"
             columns: ["target_section_id"]
             isOneToOne: false
@@ -521,10 +529,11 @@ export type Database = {
       }
       module_versions: {
         Row: {
-          approval_state: string | null
+          approval_state: string
           approved_by: string | null
           assessment_version: string | null
           completed_count: number | null
+          draft_metadata: Json | null
           created_at: string
           id: string
           module_id: string
@@ -539,10 +548,11 @@ export type Database = {
           version_number: number
         }
         Insert: {
-          approval_state?: string | null
+          approval_state?: string
           approved_by?: string | null
           assessment_version?: string | null
           completed_count?: number | null
+          draft_metadata?: Json | null
           created_at?: string
           id?: string
           module_id: string
@@ -557,10 +567,11 @@ export type Database = {
           version_number: number
         }
         Update: {
-          approval_state?: string | null
+          approval_state?: string
           approved_by?: string | null
           assessment_version?: string | null
           completed_count?: number | null
+          draft_metadata?: Json | null
           created_at?: string
           id?: string
           module_id?: string
@@ -1100,9 +1111,49 @@ export type Database = {
     }
     Functions: {
       claim_next_generation_job: {
-        Args: Record<PropertyKey, never>
-        Returns: Database["redex"]["Tables"]["generation_jobs"]["Row"][]
+        Args: never
+        Returns: {
+          actual_cost_cents: number
+          attempt_count: number
+          completed_at: string | null
+          cost_breakdown: Json
+          created_at: string
+          current_stage: string | null
+          estimated_cost_cents: number | null
+          id: string
+          idempotency_key: string | null
+          input_payload: Json
+          job_type: string
+          last_error_message: string | null
+          last_error_stage: string | null
+          model_used: string | null
+          module_id: string
+          operation: string | null
+          output_payload: Json
+          prompt_version: string | null
+          stage_map: Json
+          status: string
+          submitted_by: string | null
+          target_section_id: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "generation_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
+      current_role: { Args: never; Returns: string }
+      enrollment_user_id: {
+        Args: { target_enrollment_id: string }
+        Returns: string
+      }
+      is_admin: { Args: never; Returns: boolean }
+      is_foundry_author: { Args: never; Returns: boolean }
+      is_learner: { Args: never; Returns: boolean }
+      is_manager: { Args: never; Returns: boolean }
+      is_manager_of: { Args: { target_user_id: string }; Returns: boolean }
     }
     Enums: {
       source_authority_level: "authoritative" | "supporting" | "context"

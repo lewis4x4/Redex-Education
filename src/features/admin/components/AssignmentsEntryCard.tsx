@@ -24,7 +24,7 @@ export function AssignmentsEntryCard({ onStart, isDisabled }: AssignmentsEntryCa
       </div>
 
       <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-600">
-        Send published onboarding modules to Marcus Chen or a new-hire group using local mock assignment state.
+        Send published modules to individual learners or groups. Set a due date and track completion from the Assignments page.
       </p>
 
       <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-slate-700 marker:text-redex-red" aria-label="Assignment workflow steps">

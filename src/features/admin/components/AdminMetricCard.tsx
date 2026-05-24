@@ -27,6 +27,10 @@ const DELTA_TONE_CLASS: Record<MetricDeltaTone, string> = {
 }
 
 export function AdminMetricCard({ label, value, delta, icon, variant = 'default' }: AdminMetricCardProps) {
+  const numericValue = typeof value === 'number' ? value : Number(value)
+  const showAccent =
+    variant === 'accent' && Number.isFinite(numericValue) && value !== 0 && value !== '0' && numericValue !== 0
+
   return (
     <Card className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -36,7 +40,7 @@ export function AdminMetricCard({ label, value, delta, icon, variant = 'default'
 
       <p
         className={`mt-3 text-3xl font-semibold tabular-nums tracking-tight ${
-          variant === 'accent' ? 'text-redex-red' : 'text-slate-900'
+          showAccent ? 'text-redex-red' : 'text-slate-900'
         }`}
       >
         {value}

@@ -979,7 +979,12 @@ describe('useFoundryDraftStore', () => {
 })
 
 describe('useFoundryDraftStore Supabase dispatch', () => {
-  async function loadStore(mode: 'mock' | 'supabase', createModuleDraft = vi.fn()) {
+  async function loadStore(
+    mode: 'mock' | 'supabase',
+    createModuleDraft = vi.fn(),
+    upsertModuleDraft = vi.fn().mockResolvedValue({ id: 'module-version-1', module_id: 'module-1', version_number: 1 }),
+    fetchDraftByModuleVersionId = vi.fn().mockResolvedValue(null),
+  ) {
     vi.resetModules()
     Object.defineProperty(globalThis, 'localStorage', {
       configurable: true,
@@ -994,6 +999,12 @@ describe('useFoundryDraftStore Supabase dispatch', () => {
       saveGeneratedLessons: vi.fn().mockResolvedValue([]),
       publishModuleVersion: vi.fn().mockResolvedValue({}),
     }))
+    vi.doMock('@/lib/education/moduleVersions', () => ({
+      upsertModuleDraft,
+    }))
+    vi.doMock('@/integrations/supabase/queries/moduleVersions', () => ({
+      fetchDraftByModuleVersionId,
+    }))
 
     const { useAuditLogStore } = await import('@/features/audit/store/auditLogStore')
     const { useModuleVersionsStore } = await import('@/features/publishing/store/moduleVersionsStore')
@@ -1007,7 +1018,7 @@ describe('useFoundryDraftStore Supabase dispatch', () => {
       useFoundryDraftStore.getState().resetFoundryDraft()
     })
 
-    return { useFoundryDraftStore, createModuleDraft }
+    return { useFoundryDraftStore, createModuleDraft, upsertModuleDraft, fetchDraftByModuleVersionId }
   }
 
   const basics = {
@@ -1032,7 +1043,8 @@ describe('useFoundryDraftStore Supabase dispatch', () => {
 
   it('persists basics in supabase mode and records returned course id', async () => {
     const createModuleDraft = vi.fn().mockResolvedValue({ id: 'course-1' })
-    const { useFoundryDraftStore } = await loadStore('supabase', createModuleDraft)
+    const upsertModuleDraft = vi.fn().mockResolvedValue({ id: 'module-version-2', module_id: 'module-2', version_number: 1 })
+    const { useFoundryDraftStore } = await loadStore('supabase', createModuleDraft, upsertModuleDraft)
 
     act(() => {
       useFoundryDraftStore.getState().setBasics(basics)
@@ -1044,6 +1056,12 @@ describe('useFoundryDraftStore Supabase dispatch', () => {
     })
     await vi.waitFor(() => {
       expect(useFoundryDraftStore.getState().currentDraft?.persisted_course_id).toBe('course-1')
+    })
+    await vi.waitFor(() => {
+      expect(upsertModuleDraft).toHaveBeenCalledWith(expect.objectContaining({ current_stage: 'basics' }))
+    })
+    await vi.waitFor(() => {
+      expect(useFoundryDraftStore.getState().currentDraft?.id).toBe('module-version-2')
     })
   })
 
@@ -1058,5 +1076,56 @@ describe('useFoundryDraftStore Supabase dispatch', () => {
     await vi.waitFor(() => {
       expect(useFoundryDraftStore.getState().lastWriteError).toEqual(expect.objectContaining({ action: 'setBasics', message: 'draft rejected' }))
     })
+  })
+
+  it('resumeDraftFromAdminItem fetches supabase draft metadata and hydrates local state', async () => {
+    const fetchDraftByModuleVersionId = vi.fn().mockResolvedValue({
+      id: 'module-version-1',
+      module_id: 'module-1',
+      version_number: 1,
+      draft_metadata: {
+        current_stage: 'questions',
+        selectedLibraryFileIds: ['drive-file-99'],
+      },
+    })
+    const { useFoundryDraftStore } = await loadStore('supabase', vi.fn().mockResolvedValue({ id: 'course-1' }), vi.fn().mockResolvedValue({ id: 'module-version-1', module_id: 'module-1', version_number: 1 }), fetchDraftByModuleVersionId)
+
+    let route = ''
+    act(() => {
+      route = useFoundryDraftStore.getState().resumeDraftFromAdminItem({
+        module_version_id: 'module-version-1',
+        module_id: 'module-1',
+        module_title: 'Supabase Safety',
+        version_number: 1,
+      })
+    })
+
+    expect(route).toBe('/admin/foundry/source')
+    await vi.waitFor(() => {
+      expect(fetchDraftByModuleVersionId).toHaveBeenCalledWith('module-version-1')
+    })
+    await vi.waitFor(() => {
+      expect(useFoundryDraftStore.getState().selectedLibraryFileIds).toEqual(['drive-file-99'])
+    })
+  })
+
+  it('records persistDraftStage errors without blocking stage writes', async () => {
+    const upsertModuleDraft = vi.fn().mockRejectedValue(new Error('upsert failed'))
+    const { useFoundryDraftStore } = await loadStore('supabase', vi.fn().mockResolvedValue({ id: 'course-1' }), upsertModuleDraft)
+
+    act(() => {
+      useFoundryDraftStore.setState({
+        currentDraft: {
+          ...basics,
+          updated_at: '2026-05-24T00:00:00.000Z',
+        },
+      })
+    })
+
+    await useFoundryDraftStore.getState().persistDraftStage('basics')
+
+    expect(useFoundryDraftStore.getState().lastWriteError).toEqual(
+      expect.objectContaining({ action: 'persistDraftStage', message: 'upsert failed' }),
+    )
   })
 })

@@ -10,6 +10,7 @@ import type { Json } from '@/integrations/supabase/types'
 import type {
   Course,
   CourseOutlineDraft,
+  FoundryDraftStage,
   Lesson,
   Module,
   ModuleVersion,
@@ -23,6 +24,13 @@ import { normalizeClientUUID, safeRetry, stableClientUUID } from './_idempotency
 import { requireMutationData, throwOnMutationError } from './_response'
 
 const DEFAULT_ORG_ID = 'org-redex'
+
+export interface UpsertModuleDraftInput {
+  module_id?: UUID
+  module_title: string
+  current_stage: FoundryDraftStage
+  actor?: { user_id: UUID; display_name: string }
+}
 
 function slugify(value: string): string {
   return value
@@ -208,6 +216,65 @@ export async function publishModuleVersion(input: {
 
   throwOnMutationError('publish module version', result.error)
   return mapModuleVersionRow(requireMutationData('publish module version', result.data))
+}
+
+export async function upsertModuleDraft(input: UpsertModuleDraftInput): Promise<ModuleVersion> {
+  const moduleId = input.module_id ?? stableClientUUID(`module-draft:${input.module_title}`)
+  const now = new Date().toISOString()
+  const draftMetadata = {
+    current_stage: input.current_stage,
+    ...(input.actor ? { last_actor: input.actor } : {}),
+  } as Json
+
+  const existingResult = await safeRetry(() =>
+    supabase
+      .from('module_versions')
+      .select('*')
+      .eq('module_id', moduleId)
+      .eq('status', 'draft')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  )
+
+  throwOnMutationError('load module draft', existingResult.error)
+  const existingRow = existingResult.data
+
+  if (existingRow) {
+    const updateResult = await safeRetry(() =>
+      supabase
+        .from('module_versions')
+        .update({
+          module_title: input.module_title,
+          draft_metadata: draftMetadata,
+          updated_at: now,
+        })
+        .eq('id', existingRow.id)
+        .select('*')
+        .single(),
+    )
+
+    throwOnMutationError('update module draft', updateResult.error)
+    return mapModuleVersionRow(requireMutationData('update module draft', updateResult.data))
+  }
+
+  const insertResult = await safeRetry(() =>
+    supabase
+      .from('module_versions')
+      .insert({
+        module_id: moduleId,
+        module_title: input.module_title,
+        version_number: 1,
+        status: 'draft',
+        draft_metadata: draftMetadata,
+        updated_at: now,
+      })
+      .select('*')
+      .single(),
+  )
+
+  throwOnMutationError('create module draft row', insertResult.error)
+  return mapModuleVersionRow(requireMutationData('create module draft row', insertResult.data))
 }
 
 export async function archiveModuleVersion(versionId: UUID): Promise<ModuleVersion> {

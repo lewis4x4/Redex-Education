@@ -80,7 +80,7 @@ describe('ModuleVersionHistoryPage', () => {
     expect(within(versionRegion).getByRole('heading', { name: 'v1' })).toBeInTheDocument()
     expect(screen.getAllByText('sbv-1')).toHaveLength(2)
     expect(screen.getAllByText('av-1')).toHaveLength(2)
-    expect(screen.getByText('system')).toBeInTheDocument()
+    expect(screen.getByText('Unknown user')).toBeInTheDocument()
   })
 
   it('shows completed count and expands learner names', async () => {
@@ -231,6 +231,65 @@ describe('ModuleVersionHistoryPage supabase states', () => {
   })
 })
 
+describe('ModuleVersionHistoryPage profile name resolution', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    vi.doUnmock('@/features/publishing/hooks/useModuleVersionHistory')
+  })
+
+  it('uses resolved profile names first and falls back to Unknown user instead of raw UUIDs', async () => {
+    vi.doMock('@/features/publishing/hooks/useModuleVersionHistory', () => ({
+      useModuleVersionHistory: () => ({
+        versions: [
+          {
+            id: 'v2',
+            module_id: 'm1',
+            module_title: 'Module',
+            version_number: 2,
+            status: 'published',
+            approved_by: 'known-profile-id',
+            created_at: '2026-05-21T00:00:00.000Z',
+          },
+          {
+            id: 'v1',
+            module_id: 'm1',
+            module_title: 'Module',
+            version_number: 1,
+            status: 'published',
+            approved_by: 'unknown-profile-id',
+            created_at: '2026-05-20T00:00:00.000Z',
+          },
+        ],
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+        archiveVersion: vi.fn(),
+        forkVersion: vi.fn(),
+        archivingVersionId: null,
+        forkingVersionId: null,
+        profileNameById: new Map([['known-profile-id', 'Known Person']]),
+      }),
+    }))
+
+    const { ModuleVersionHistoryPage } = await import('./ModuleVersionHistoryPage')
+
+    render(
+      <MemoryRouter initialEntries={['/admin/modules/m1/versions']}>
+        <Routes>
+          <Route path="/admin/modules/:moduleId/versions" element={<ModuleVersionHistoryPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText('Known Person')).toBeInTheDocument()
+    expect(screen.getByText('Unknown user')).toBeInTheDocument()
+    expect(screen.queryByText('unknown-profile-id')).not.toBeInTheDocument()
+  })
+})
+
 describe('ModuleVersionHistoryPage action disabled states', () => {
   beforeEach(() => {
     vi.resetModules()
@@ -260,6 +319,7 @@ describe('ModuleVersionHistoryPage action disabled states', () => {
         forkVersion: vi.fn(),
         archivingVersionId: null,
         forkingVersionId: 'v1',
+        profileNameById: new Map(),
       }),
     }))
 

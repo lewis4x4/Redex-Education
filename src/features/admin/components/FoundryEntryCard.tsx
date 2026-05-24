@@ -8,16 +8,19 @@ export interface FoundryEntryCardProps {
   isDisabled?: boolean
 }
 
-const FOUNDRY_DISABLED_TITLE = 'Coming next slice — Course Foundry start flow'
+const FOUNDRY_DISABLED_TITLE = 'Coming soon — Course Foundry start flow'
 
 export function FoundryEntryCard({ onStart, isDisabled = false }: FoundryEntryCardProps) {
   return (
     <Card className="rounded-2xl border border-redex-red/20 bg-redex-red/[0.04] p-6 shadow-sm md:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-2xl font-semibold tracking-tight text-slate-900">Create a new module in Course Foundry</h3>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[2px] text-redex-red">Course Foundry</p>
+          <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Create a new module</h3>
+        </div>
         {isDisabled ? (
           <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-500">
-            Coming next slice
+            Coming soon
           </span>
         ) : null}
       </div>
@@ -37,7 +40,8 @@ export function FoundryEntryCard({ onStart, isDisabled = false }: FoundryEntryCa
         onClick={onStart}
         disabled={isDisabled}
         title={isDisabled ? FOUNDRY_DISABLED_TITLE : undefined}
-        className="mt-6 bg-redex-red text-white hover:bg-redex-red-hover focus-visible:ring-redex-red disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+        variant="brand"
+        className="mt-6 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
       >
         Start new module →
       </Button>

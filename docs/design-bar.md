@@ -106,7 +106,6 @@ These constraints come from `docs/Redex_Education_Phase10-13_Roadmap_v2_20260523
 - [ ] **OPTIONAL**: Add subtle "Progress saves automatically" text below the Continue Training button.
 
 ### `src/features/admin/pages/AdminDashboardPage.tsx`
-- [ ] **CRITICAL**: Update eyebrow to match brand red eyebrow style (`text-sm font-semibold uppercase tracking-[3px] text-redex-red`) instead of `text-slate-500`.
 - [ ] **CRITICAL**: Upgrade the assignment summary footer (currently a plain text line) to a Tier 1 card, as it contains important metrics.
 - [ ] **RECOMMENDED**: Ensure card depth tiers are consistent (AdminMetricCard and CourseStatusList are Tier 1).
 

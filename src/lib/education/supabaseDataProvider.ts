@@ -100,6 +100,16 @@ export async function getModuleVersionHistory(moduleId: string): Promise<ModuleV
   return fetchModuleVersionHistory(moduleId)
 }
 
+export async function upsertModuleDraft(input: {
+  module_id?: string
+  module_title: string
+  current_stage: import('@/types/training').FoundryDraftStage
+  actor?: { user_id: string; display_name: string }
+}): Promise<ModuleVersion> {
+  const { upsertModuleDraft: upsertSupabaseModuleDraft } = await import('@/integrations/supabase/mutations/foundry')
+  return upsertSupabaseModuleDraft(input)
+}
+
 export async function archiveModuleVersion(versionId: string): Promise<ModuleVersion> {
   const { archiveModuleVersion: archiveSupabaseModuleVersion } = await import('@/integrations/supabase/mutations/foundry')
   return archiveSupabaseModuleVersion(versionId)

@@ -14,6 +14,7 @@ import type {
   Criticality,
   Enrollment,
   EnrollmentStatus,
+  FoundryDraftMetadata,
   Lesson,
   LessonContent,
   LessonProgress,
@@ -443,6 +444,18 @@ export function mapModuleSourceBindingRow(row: ModuleSourceBindingRow): ModuleSo
   }
 }
 
+function optionalDraftMetadata(value: Json | null, context: string): FoundryDraftMetadata | undefined {
+  if (value === null) {
+    return undefined
+  }
+
+  if (Array.isArray(value) || typeof value !== 'object') {
+    throw new Error(`${context}: invalid draft_metadata value`)
+  }
+
+  return value as FoundryDraftMetadata
+}
+
 export function mapModuleVersionRow(row: ModuleVersionRow): ModuleVersion {
   const context = `module_versions row ${String(row.id)}`
 
@@ -460,6 +473,7 @@ export function mapModuleVersionRow(row: ModuleVersionRow): ModuleVersion {
     source_stale: requiredBoolean(row.source_stale, context, 'source_stale'),
     stale_since: optionalString(row.stale_since),
     completed_count: row.completed_count ?? undefined,
+    draft_metadata: optionalDraftMetadata(row.draft_metadata, context),
     created_at: requiredString(row.created_at, context, 'created_at'),
   }
 }

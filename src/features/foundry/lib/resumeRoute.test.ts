@@ -69,6 +69,11 @@ function makeState(overrides: Partial<FoundryResumeState> = {}): FoundryResumeSt
 }
 
 describe('inferResumeRoute', () => {
+  it('uses draft_metadata.current_stage when present', () => {
+    expect(inferResumeRoute(makeState({ draft_metadata: { current_stage: 'source' } }))).toBe('/admin/foundry/source')
+    expect(inferResumeRoute(makeState({ draft_metadata: { current_stage: 'sidebyside' } }))).toBe('/admin/foundry/sidebyside')
+  })
+
   it.each([
     ['no current draft', { currentDraft: null }, '/admin/foundry/start'],
     ['draft without source or selected files', { sourceMaterial: null, selectedLibraryFileIds: [] }, '/admin/foundry/source'],

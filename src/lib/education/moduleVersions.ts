@@ -1,4 +1,4 @@
-import type { ModuleVersion, UUID } from '@/types/training'
+import type { FoundryDraftStage, ModuleVersion, UUID } from '@/types/training'
 import { getDataSource } from './dataSource'
 import * as supabaseDataProvider from './supabaseDataProvider'
 
@@ -12,6 +12,10 @@ export function getModuleVersionId(moduleId: string): string | undefined {
 
 function mockModeNotSupported(): Error {
   return new Error('mock mode: use useModuleVersionsStore directly')
+}
+
+function mockFoundryDraftModeNotSupported(): Error {
+  return new Error('mock mode: use useFoundryDraftStore directly')
 }
 
 export async function getModuleVersionHistory(moduleId: UUID): Promise<ModuleVersion[]> {
@@ -28,6 +32,19 @@ export async function archiveModuleVersion(versionId: UUID): Promise<ModuleVersi
   }
 
   throw mockModeNotSupported()
+}
+
+export async function upsertModuleDraft(input: {
+  module_id?: UUID
+  module_title: string
+  current_stage: FoundryDraftStage
+  actor?: { user_id: UUID; display_name: string }
+}): Promise<ModuleVersion> {
+  if (getDataSource() === 'supabase') {
+    return supabaseDataProvider.upsertModuleDraft(input)
+  }
+
+  throw mockFoundryDraftModeNotSupported()
 }
 
 export async function forkModuleVersion(sourceVersionId: UUID): Promise<ModuleVersion> {

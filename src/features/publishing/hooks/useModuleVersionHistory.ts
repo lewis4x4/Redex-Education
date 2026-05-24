@@ -13,6 +13,7 @@ export interface UseModuleVersionHistoryResult {
   forkVersion: (versionId: string) => Promise<ModuleVersion>
   archivingVersionId: string | null
   forkingVersionId: string | null
+  profileNameById: Map<string, string>
 }
 
 const noop = () => undefined
@@ -31,6 +32,31 @@ function toError(cause: unknown): Error {
   return cause instanceof Error ? cause : new Error(String(cause))
 }
 
+async function resolveProfileNameById(versions: ModuleVersion[]): Promise<Map<string, string>> {
+  const ids = Array.from(
+    new Set(
+      versions
+        .flatMap((version) => [version.approved_by, version.published_by])
+        .filter((id): id is string => typeof id === 'string' && id.length > 0),
+    ),
+  )
+
+  if (ids.length === 0) {
+    return new Map()
+  }
+
+  const { fetchProfilesByIds } = await import('@/integrations/supabase/queries/profiles')
+  const profileById = await fetchProfilesByIds(ids)
+
+  return new Map(
+    ids.map((id) => {
+      const profile = profileById.get(id)
+      const resolvedName = profile?.preferred_name ?? profile?.display_name ?? null
+      return [id, resolvedName ?? id]
+    }),
+  )
+}
+
 export function useModuleVersionHistory(moduleId: string): UseModuleVersionHistoryResult {
   const isSupabase = getDataSource() === 'supabase'
   const storeVersions = useModuleVersionsStore((state) => state.versions)
@@ -41,6 +67,7 @@ export function useModuleVersionHistory(moduleId: string): UseModuleVersionHisto
   const [reloadKey, setReloadKey] = useState(0)
   const [archivingVersionId, setArchivingVersionId] = useState<string | null>(null)
   const [forkingVersionId, setForkingVersionId] = useState<string | null>(null)
+  const [profileNameById, setProfileNameById] = useState<Map<string, string>>(new Map())
 
   const mockVersions = useMemo(
     () => sortNewestFirst(storeVersions.filter((version) => version.module_id === moduleId)),
@@ -65,20 +92,24 @@ export function useModuleVersionHistory(moduleId: string): UseModuleVersionHisto
       setError(null)
     })
 
-    import('@/lib/education/moduleVersions')
-      .then(({ getModuleVersionHistory }) => getModuleVersionHistory(moduleId))
-      .then((next) => {
+    void (async () => {
+      try {
+        const { getModuleVersionHistory } = await import('@/lib/education/moduleVersions')
+        const nextVersions = await getModuleVersionHistory(moduleId)
+        const nextProfileNameById = await resolveProfileNameById(nextVersions)
+
         if (cancelled) return
-        setRemoteVersions(next)
+        setRemoteVersions(nextVersions)
+        setProfileNameById(nextProfileNameById)
         setLoading(false)
-      })
-      .catch((cause: unknown) => {
+      } catch (cause: unknown) {
         if (cancelled) return
         const wrapped = toError(cause)
         console.warn('[publishing] Unable to load module version history.', wrapped)
         setError(wrapped)
         setLoading(false)
-      })
+      }
+    })()
 
     return () => {
       cancelled = true
@@ -99,6 +130,7 @@ export function useModuleVersionHistory(moduleId: string): UseModuleVersionHisto
         await archiveModuleVersion(versionId)
         const next = await getModuleVersionHistory(moduleId)
         setRemoteVersions(next)
+        setProfileNameById(await resolveProfileNameById(next))
         setError(null)
       } catch (cause: unknown) {
         const wrapped = toError(cause)
@@ -126,6 +158,7 @@ export function useModuleVersionHistory(moduleId: string): UseModuleVersionHisto
         const forked = await forkModuleVersion(versionId)
         const next = await getModuleVersionHistory(moduleId)
         setRemoteVersions(next)
+        setProfileNameById(await resolveProfileNameById(next))
         setError(null)
         return forked
       } catch (cause: unknown) {
@@ -150,6 +183,7 @@ export function useModuleVersionHistory(moduleId: string): UseModuleVersionHisto
       forkVersion,
       archivingVersionId,
       forkingVersionId,
+      profileNameById: new Map(),
     }
   }
 
@@ -162,5 +196,6 @@ export function useModuleVersionHistory(moduleId: string): UseModuleVersionHisto
     forkVersion,
     archivingVersionId,
     forkingVersionId,
+    profileNameById,
   }
 }

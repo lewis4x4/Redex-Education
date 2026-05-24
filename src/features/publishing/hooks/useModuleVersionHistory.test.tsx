@@ -8,11 +8,18 @@ import { useModuleVersionHistory } from './useModuleVersionHistory'
 const getModuleVersionHistoryMock = vi.hoisted(() => vi.fn<(moduleId: string) => Promise<ModuleVersion[]>>())
 const archiveModuleVersionMock = vi.hoisted(() => vi.fn<(versionId: string) => Promise<ModuleVersion>>())
 const forkModuleVersionMock = vi.hoisted(() => vi.fn<(versionId: string) => Promise<ModuleVersion>>())
+const fetchProfilesByIdsMock = vi.hoisted(
+  () => vi.fn<(ids: string[]) => Promise<Map<string, { display_name: string | null; preferred_name: string | null }>>>(),
+)
 
 vi.mock('@/lib/education/moduleVersions', () => ({
   getModuleVersionHistory: getModuleVersionHistoryMock,
   archiveModuleVersion: archiveModuleVersionMock,
   forkModuleVersion: forkModuleVersionMock,
+}))
+
+vi.mock('@/integrations/supabase/queries/profiles', () => ({
+  fetchProfilesByIds: fetchProfilesByIdsMock,
 }))
 
 function createStorageMock(): Storage {
@@ -46,12 +53,14 @@ const REMOTE_V1: ModuleVersion = {
   module_title: 'Remote Module',
   version_number: 1,
   status: 'published',
+  approved_by: 'approver-1',
   created_at: '2026-05-20T00:00:00.000Z',
 }
 
 const REMOTE_V2: ModuleVersion = {
   ...REMOTE_V1,
   id: 'remote-v2',
+  published_by: 'publisher-1',
   version_number: 2,
   status: 'draft',
   created_at: '2026-05-21T00:00:00.000Z',
@@ -59,6 +68,7 @@ const REMOTE_V2: ModuleVersion = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  fetchProfilesByIdsMock.mockResolvedValue(new Map())
 
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
@@ -86,6 +96,8 @@ describe('useModuleVersionHistory', () => {
     expect(result.current.loading).toBe(false)
     expect(result.current.error).toBeNull()
     expect(result.current.versions.map((version) => version.version_number)).toEqual([2, 1])
+    expect(result.current.profileNameById.size).toBe(0)
+    expect(fetchProfilesByIdsMock).not.toHaveBeenCalled()
     expect(getModuleVersionHistoryMock).not.toHaveBeenCalled()
   })
 
@@ -129,9 +141,15 @@ describe('useModuleVersionHistory', () => {
     expect(forkModuleVersionMock).not.toHaveBeenCalled()
   })
 
-  it('loads version history from the facade in supabase mode', async () => {
+  it('loads version history from the facade in supabase mode and resolves profile names', async () => {
     vi.stubEnv('VITE_DATA_SOURCE', 'supabase')
     getModuleVersionHistoryMock.mockResolvedValueOnce([REMOTE_V2, REMOTE_V1])
+    fetchProfilesByIdsMock.mockResolvedValueOnce(
+      new Map([
+        ['approver-1', { display_name: 'Approver Display', preferred_name: null }],
+        ['publisher-1', { display_name: 'Publisher Display', preferred_name: 'Publisher Preferred' }],
+      ]),
+    )
 
     const { result } = renderHook(() => useModuleVersionHistory('remote-module'))
 
@@ -145,6 +163,9 @@ describe('useModuleVersionHistory', () => {
     expect(result.current.versions).toEqual([REMOTE_V2, REMOTE_V1])
     expect(result.current.error).toBeNull()
     expect(getModuleVersionHistoryMock).toHaveBeenCalledWith('remote-module')
+    expect(fetchProfilesByIdsMock).toHaveBeenCalledWith(expect.arrayContaining(['approver-1', 'publisher-1']))
+    expect(result.current.profileNameById.get('approver-1')).toBe('Approver Display')
+    expect(result.current.profileNameById.get('publisher-1')).toBe('Publisher Preferred')
   })
 
   it('captures supabase fetch errors', async () => {

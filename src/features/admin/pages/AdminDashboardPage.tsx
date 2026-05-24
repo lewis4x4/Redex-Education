@@ -7,13 +7,34 @@ import { CourseStatusList } from '@/features/admin/components/CourseStatusList'
 import { FoundryEntryCard } from '@/features/admin/components/FoundryEntryCard'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
 import { useAdminSummary } from '@/hooks/useAdminSummary'
+import { useAuth } from '@/hooks/useAuth'
 import { useProfile } from '@/hooks/useProfile'
+
+function greetingFor(hour: number): string {
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
+}
+
+function firstNameFromEmail(email: string | undefined): string | null {
+  if (!email) return null
+  const localPart = email.split('@')[0]?.trim()
+  if (!localPart) return null
+  const [firstChunk] = localPart.split(/[._-]+/)
+  return firstChunk ? firstChunk.charAt(0).toUpperCase() + firstChunk.slice(1) : null
+}
 
 export function AdminDashboardPage() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const { profile } = useProfile()
   const { summary, loading, error, refetch } = useAdminSummary()
-  const displayName = profile?.display_name ?? 'Admin'
+  const preferredName = (profile as { preferred_name?: string } | null)?.preferred_name
+  const displayName =
+    preferredName ??
+    (profile?.display_name?.includes(' ') ? profile.display_name.split(' ')[0] : profile?.display_name) ??
+    firstNameFromEmail(user?.email) ??
+    'Admin'
   const getModuleVersionHistoryHref = (item: { module_id: string }) => `/admin/modules/${item.module_id}/versions`
   const resumeDraft = (item: {
     module_version_id: string
@@ -35,19 +56,30 @@ export function AdminDashboardPage() {
     return (
       <section className="space-y-6">
         <header className="space-y-2">
-          <p className="text-sm font-semibold uppercase tracking-[3px] text-redex-red">REDEX AI COURSE FOUNDRY</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Welcome back, {displayName}</h1>
-          <p className="text-sm text-slate-600">Your training operations at a glance</p>
+          <p className="text-sm font-semibold uppercase tracking-[3px] text-redex-red">ADMIN DASHBOARD</p>
+          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-slate-900">
+            {greetingFor(new Date().getHours())}, {displayName}
+          </h1>
+          <p className="text-[15px] leading-[1.45] text-slate-600">Your training operations at a glance</p>
         </header>
 
         {error === null ? (
-          <div
-            className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-500 shadow-sm"
-            role="status"
-            aria-live="polite"
-            aria-busy={loading}
-          >
-            Loading dashboard…
+          <div role="status" aria-live="polite" aria-busy={loading} className="space-y-6">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="h-40 animate-pulse rounded-2xl bg-slate-100" />
+              <div className="h-40 animate-pulse rounded-2xl bg-slate-100" />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <div className="h-24 animate-pulse rounded-2xl bg-slate-100" />
+              <div className="h-24 animate-pulse rounded-2xl bg-slate-100" />
+              <div className="h-24 animate-pulse rounded-2xl bg-slate-100" />
+              <div className="h-24 animate-pulse rounded-2xl bg-slate-100" />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="h-72 animate-pulse rounded-2xl bg-slate-100" />
+              <div className="h-72 animate-pulse rounded-2xl bg-slate-100" />
+            </div>
+            <div className="h-44 animate-pulse rounded-2xl bg-slate-100" />
           </div>
         ) : (
           <div
@@ -72,10 +104,23 @@ export function AdminDashboardPage() {
   return (
     <section className="space-y-6">
       <header className="space-y-2">
-        <p className="text-sm font-semibold uppercase tracking-[3px] text-redex-red">REDEX AI COURSE FOUNDRY</p>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Welcome back, {displayName}</h1>
-        <p className="text-sm text-slate-600">Your training operations at a glance</p>
+        <p className="text-sm font-semibold uppercase tracking-[3px] text-redex-red">ADMIN DASHBOARD</p>
+        <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-slate-900">
+          {greetingFor(new Date().getHours())}, {displayName}
+        </h1>
+        <p className="text-[15px] leading-[1.45] text-slate-600">Your training operations at a glance</p>
       </header>
+
+      {summary.metrics.pending_generation_jobs > 0 ? (
+        <div
+          className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-medium text-amber-800"
+          role="status"
+          aria-live="polite"
+        >
+          {summary.metrics.pending_generation_jobs} module generation
+          {summary.metrics.pending_generation_jobs > 1 ? 's' : ''} in progress…
+        </div>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <FoundryEntryCard onStart={() => navigate('/admin/foundry/start')} isDisabled={false} />
@@ -103,6 +148,8 @@ export function AdminDashboardPage() {
           title="Drafts"
           items={summary.drafts}
           getItemHref={getModuleVersionHistoryHref}
+          emptyMessage="No drafts in flight. Start a new module to see it here."
+          emptyIcon={<FileText className="h-8 w-8 text-slate-400" />}
           renderItemActions={(item) => (
             <button
               type="button"
@@ -118,12 +165,31 @@ export function AdminDashboardPage() {
       </div>
 
       <div className="space-y-3">
-        <CourseStatusList title="Published" items={summary.published} getItemHref={getModuleVersionHistoryHref} />
-        <div className="flex flex-wrap gap-x-4 gap-y-2">
-          <Link className="inline-flex text-sm font-semibold text-redex-red hover:underline" to="/admin/source-impact">
+        <CourseStatusList
+          title="Published"
+          items={summary.published}
+          getItemHref={getModuleVersionHistoryHref}
+          emptyMessage="No published modules yet. Approved courses will appear here."
+          emptyIcon={<CheckCircle2 className="h-8 w-8 text-slate-400" />}
+        />
+        <p className="mt-2 text-xs text-slate-500">{summary.metrics.archived} archived</p>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            to="/admin/source-impact"
+            className="inline-flex items-center gap-1.5 rounded-md border border-redex-red/30 px-3 py-1.5 text-xs font-semibold text-redex-red hover:bg-redex-red/5"
+          >
             Source Impact Review →
           </Link>
-          <Link className="inline-flex text-sm font-semibold text-redex-red hover:underline" to="/admin/audit">
+          <Link
+            to="/admin/foundry/library"
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Source library →
+          </Link>
+          <Link
+            to="/admin/audit"
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
             Audit log →
           </Link>
         </div>
@@ -135,9 +201,7 @@ export function AdminDashboardPage() {
         </h2>
         <dl className="mt-4 grid gap-4 sm:grid-cols-3">
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-redex-red/[0.08] p-2 text-redex-red" aria-hidden="true">
-              <Users className="h-4 w-4" />
-            </div>
+            <Users className="h-4 w-4 text-slate-400" aria-hidden="true" />
             <div>
               <dt className="text-xs font-medium text-slate-500">Active</dt>
               <dd className="text-lg font-semibold tabular-nums text-slate-900">
@@ -146,26 +210,32 @@ export function AdminDashboardPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-amber-50 p-2 text-amber-700" aria-hidden="true">
-              <AlertCircle className="h-4 w-4" />
-            </div>
+            <AlertCircle className="h-4 w-4 text-amber-700" aria-hidden="true" />
             <div>
               <dt className="text-xs font-medium text-slate-500">Overdue</dt>
               <dd className="text-lg font-semibold tabular-nums text-slate-900">{summary.assignment_summary.overdue}</dd>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-emerald-50 p-2 text-emerald-700" aria-hidden="true">
-              <CheckCircle2 className="h-4 w-4" />
-            </div>
+            <CheckCircle2 className="h-4 w-4 text-slate-400" aria-hidden="true" />
             <div>
               <dt className="text-xs font-medium text-slate-500">Completion rate</dt>
               <dd className="text-lg font-semibold tabular-nums text-slate-900">
-                {summary.assignment_summary.completion_rate_percent}%
+                {summary.assignment_summary.completion_rate_percent === null
+                  ? '—'
+                  : `${summary.assignment_summary.completion_rate_percent}%`}
               </dd>
             </div>
           </div>
         </dl>
+        <div className="mt-4 border-t border-slate-100 pt-3">
+          <Link
+            to="/admin/assignments"
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Manage assignments →
+          </Link>
+        </div>
       </section>
     </section>
   )

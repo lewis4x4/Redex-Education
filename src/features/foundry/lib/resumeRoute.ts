@@ -8,6 +8,7 @@ import type {
   SourceMaterial,
 } from '@/lib/education'
 import type { ModuleBasicsDraft } from '@/features/foundry/types'
+import type { FoundryDraftMetadata } from '@/types/training'
 
 export type FoundryResumeRoute =
   | '/admin/foundry/start'
@@ -32,9 +33,29 @@ export interface FoundryResumeState {
   lessonReviews: LessonReviewItem[]
   publishStatus: string
   getPublishBlockers?: () => PublishBlocker[]
+  draft_metadata?: FoundryDraftMetadata
+}
+
+const STAGE_TO_ROUTE: Record<string, FoundryResumeRoute> = {
+  basics: '/admin/foundry/start',
+  source: '/admin/foundry/source',
+  questions: '/admin/foundry/questions',
+  outline: '/admin/foundry/outline',
+  preview: '/admin/foundry/preview',
+  critique: '/admin/foundry/critique',
+  sidebyside: '/admin/foundry/sidebyside',
+  blockers: '/admin/foundry/blockers',
+  published: '/admin/foundry/published',
 }
 
 export function inferResumeRoute(draftState: FoundryResumeState): FoundryResumeRoute {
+  const stageRoute = draftState.draft_metadata?.current_stage
+    ? STAGE_TO_ROUTE[draftState.draft_metadata.current_stage]
+    : undefined
+
+  if (stageRoute) {
+    return stageRoute
+  }
   if (draftState.currentDraft === null) {
     return '/admin/foundry/start'
   }

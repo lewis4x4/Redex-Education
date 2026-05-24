@@ -706,6 +706,26 @@ export interface ModuleSourceBinding {
 /**
  * Publish-state lifecycle for a module version (Slice 7.2 — module versioning).
  */
+export type FoundryDraftStage =
+  | 'basics'
+  | 'source'
+  | 'questions'
+  | 'outline'
+  | 'preview'
+  | 'critique'
+  | 'sidebyside'
+  | 'blockers'
+  | 'published';
+
+export interface FoundryDraftMetadata {
+  current_stage?: FoundryDraftStage;
+  last_actor?: {
+    user_id?: UUID;
+    display_name?: string;
+  };
+  [key: string]: unknown;
+}
+
 export interface ModuleVersion {
   id: UUID;
   module_id: UUID;
@@ -727,6 +747,8 @@ export interface ModuleVersion {
   stale_since?: ISODateTime;
   /** Cached/mock count used by admin history views; live helpers can recompute it. */
   completed_count?: number;
+  /** Foundry-only draft persistence payload used for cross-session resume. */
+  draft_metadata?: FoundryDraftMetadata;
   created_at: ISODateTime;
 }
 
@@ -880,6 +902,8 @@ export interface AdminModuleListItem {
   status: 'Draft' | 'Needs review' | 'Published' | 'Archived';
   /** Human-readable timestamp or review context detail. */
   meta: string;
+  /** Optional Foundry resume payload for draft rows. */
+  draft_metadata?: FoundryDraftMetadata;
 }
 
 export interface AdminDashboardMetrics {
@@ -889,8 +913,12 @@ export interface AdminDashboardMetrics {
   needs_review: number;
   /** Number of modules currently published. */
   published: number;
+  /** Number of archived module versions. */
+  archived: number;
   /** Number of learners actively progressing through assigned training. */
   learners_in_progress: number;
+  /** Number of module generation jobs currently queued or running. */
+  pending_generation_jobs: number;
 }
 
 export interface AdminDashboardSummary {
@@ -906,7 +934,7 @@ export interface AdminDashboardSummary {
   assignment_summary: {
     active_assignments: number;
     overdue: number;
-    completion_rate_percent: number;
+    completion_rate_percent: number | null;
   };
 }
 

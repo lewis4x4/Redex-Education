@@ -6,6 +6,7 @@ const insertMock = vi.hoisted(() => vi.fn())
 const updateMock = vi.hoisted(() => vi.fn())
 const selectMock = vi.hoisted(() => vi.fn())
 const singleMock = vi.hoisted(() => vi.fn())
+const maybeSingleMock = vi.hoisted(() => vi.fn())
 const eqMock = vi.hoisted(() => vi.fn())
 const orderMock = vi.hoisted(() => vi.fn())
 const limitMock = vi.hoisted(() => vi.fn())
@@ -31,6 +32,7 @@ function wireBuilder() {
     update: updateMock,
     select: selectMock,
     single: singleMock,
+    maybeSingle: maybeSingleMock,
     eq: eqMock,
     order: orderMock,
     limit: limitMock,
@@ -42,6 +44,7 @@ function wireBuilder() {
   selectMock.mockReturnValue(builder)
   eqMock.mockReturnValue(builder)
   orderMock.mockReturnValue(builder)
+  limitMock.mockReturnValue(builder)
 }
 
 const draft = {
@@ -159,6 +162,55 @@ describe('foundry mutations', () => {
     const { publishModuleVersion } = await import('./foundry')
 
     await expect(publishModuleVersion({ course_id: 'course-1', module_id: 'module-1', approved_by: 'user-admin' })).rejects.toThrow('Failed to publish module version: publish failed')
+  })
+
+  it('upsertModuleDraft inserts a draft row when no existing draft exists', async () => {
+    maybeSingleMock.mockResolvedValueOnce({ data: null, error: null })
+    singleMock.mockResolvedValueOnce({ data: { id: 'row' }, error: null })
+    const { upsertModuleDraft } = await import('./foundry')
+
+    await expect(upsertModuleDraft({ module_title: 'Safety Basics', current_stage: 'basics' })).resolves.toEqual({ id: 'version-row' })
+    expect(fromMock).toHaveBeenCalledWith('module_versions')
+    expect(insertMock).toHaveBeenCalledWith(expect.objectContaining({
+      module_title: 'Safety Basics',
+      version_number: 1,
+      status: 'draft',
+      draft_metadata: expect.objectContaining({ current_stage: 'basics' }),
+    }))
+  })
+
+  it('upsertModuleDraft updates an existing draft row', async () => {
+    maybeSingleMock.mockResolvedValueOnce({ data: { id: 'draft-row-1' }, error: null })
+    singleMock.mockResolvedValueOnce({ data: { id: 'updated-row' }, error: null })
+    const { upsertModuleDraft } = await import('./foundry')
+
+    await expect(upsertModuleDraft({ module_id: 'module-1', module_title: 'Updated title', current_stage: 'questions', actor: { user_id: 'user-1', display_name: 'Alex' } })).resolves.toEqual({ id: 'version-updated-row' })
+    expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({
+      module_title: 'Updated title',
+      draft_metadata: expect.objectContaining({
+        current_stage: 'questions',
+        last_actor: { user_id: 'user-1', display_name: 'Alex' },
+      }),
+    }))
+    expect(eqMock).toHaveBeenCalledWith('id', 'draft-row-1')
+  })
+
+  it('upsertModuleDraft omits last_actor when actor is not provided', async () => {
+    maybeSingleMock.mockResolvedValueOnce({ data: { id: 'draft-row-1' }, error: null })
+    singleMock.mockResolvedValueOnce({ data: { id: 'updated-row' }, error: null })
+    const { upsertModuleDraft } = await import('./foundry')
+
+    await upsertModuleDraft({ module_id: 'module-1', module_title: 'Updated title', current_stage: 'preview' })
+    expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({
+      draft_metadata: { current_stage: 'preview' },
+    }))
+  })
+
+  it('upsertModuleDraft throws descriptive errors', async () => {
+    maybeSingleMock.mockResolvedValueOnce({ data: null, error: new Error('draft failed') })
+    const { upsertModuleDraft } = await import('./foundry')
+
+    await expect(upsertModuleDraft({ module_title: 'Safety Basics', current_stage: 'basics' })).rejects.toThrow('Failed to load module draft: draft failed')
   })
 
   it('archiveModuleVersion marks a module version archived and returns the mapped row', async () => {

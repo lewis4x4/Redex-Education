@@ -23,9 +23,21 @@ describe('AdminMetricCard', () => {
     expect(screen.getByText('-4% vs last week')).toHaveClass('text-red-600')
   })
 
-  it('applies red accent styling when variant is accent', () => {
+  it('applies red accent styling when variant is accent and value is non-zero', () => {
     render(<AdminMetricCard label="Needs review" value={1} variant="accent" />)
 
     expect(screen.getByText('1')).toHaveClass('text-redex-red')
+  })
+
+  it('does not apply red accent styling when variant is accent and value is zero number', () => {
+    render(<AdminMetricCard label="Needs review" value={0} variant="accent" />)
+
+    expect(screen.getByText('0')).toHaveClass('text-slate-900')
+  })
+
+  it('does not apply red accent styling when variant is accent and value is zero string', () => {
+    render(<AdminMetricCard label="Needs review" value="0" variant="accent" />)
+
+    expect(screen.getByText('0')).toHaveClass('text-slate-900')
   })
 })

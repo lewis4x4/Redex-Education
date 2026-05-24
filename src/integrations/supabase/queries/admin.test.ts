@@ -1,14 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-// ============================================================
-// admin.ts query module — unit tests
-//
-// Mirrors the pattern in queries/courses.test.ts and
-// queries/assignments.test.ts but mocks per-table builders so the
-// three parallel queries inside fetchAdminSummary can be exercised
-// independently.
-// ============================================================
-
 const fromMock = vi.hoisted(() => vi.fn())
 
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { from: fromMock } }))
@@ -24,11 +15,16 @@ interface EnrollmentsBuilder {
 interface AssignmentsBuilder {
   select: ReturnType<typeof vi.fn>
 }
+interface GenerationJobsBuilder {
+  select: ReturnType<typeof vi.fn>
+  in: ReturnType<typeof vi.fn>
+}
 
 function wireBuilders(): {
   moduleVersions: ModuleVersionsBuilder
   enrollments: EnrollmentsBuilder
   assignments: AssignmentsBuilder
+  generationJobs: GenerationJobsBuilder
 } {
   const moduleVersions: ModuleVersionsBuilder = {
     select: vi.fn().mockReturnThis(),
@@ -41,18 +37,22 @@ function wireBuilders(): {
   const assignments: AssignmentsBuilder = {
     select: vi.fn(),
   }
+  const generationJobs: GenerationJobsBuilder = {
+    select: vi.fn().mockReturnThis(),
+    in: vi.fn(),
+  }
 
   fromMock.mockImplementation((table: string) => {
     if (table === 'module_versions') return moduleVersions
     if (table === 'user_training_enrollments') return enrollments
     if (table === 'assignments') return assignments
+    if (table === 'generation_jobs') return generationJobs
     throw new Error(`Unexpected table in test: ${table}`)
   })
 
-  return { moduleVersions, enrollments, assignments }
+  return { moduleVersions, enrollments, assignments, generationJobs }
 }
 
-// Stable "now" for deterministic relative-time output.
 const NOW = new Date('2026-05-24T16:00:00.000Z').getTime()
 
 beforeEach(() => {
@@ -67,11 +67,10 @@ afterEach(() => {
 
 describe('fetchAdminSummary', () => {
   it('aggregates module_versions into Draft / Needs review / Published buckets', async () => {
-    const { moduleVersions, enrollments, assignments } = wireBuilders()
+    const { moduleVersions, enrollments, assignments, generationJobs } = wireBuilders()
 
     moduleVersions.order.mockResolvedValueOnce({
       data: [
-        // 2 hours ago — Draft
         {
           id: 'mv-draft-1',
           module_id: 'mod-a',
@@ -83,7 +82,6 @@ describe('fetchAdminSummary', () => {
           version_number: 1,
           source_stale: false,
         },
-        // 3 days ago — in_review → Needs review
         {
           id: 'mv-review-1',
           module_id: 'mod-b',
@@ -95,7 +93,6 @@ describe('fetchAdminSummary', () => {
           version_number: 1,
           source_stale: false,
         },
-        // approved → also Needs review
         {
           id: 'mv-review-2',
           module_id: 'mod-c',
@@ -107,7 +104,6 @@ describe('fetchAdminSummary', () => {
           version_number: 1,
           source_stale: false,
         },
-        // 1 week ago — Published
         {
           id: 'mv-pub-1',
           module_id: 'mod-d',
@@ -119,7 +115,6 @@ describe('fetchAdminSummary', () => {
           version_number: 1,
           source_stale: false,
         },
-        // archived → excluded
         {
           id: 'mv-archived-1',
           module_id: 'mod-e',
@@ -136,6 +131,7 @@ describe('fetchAdminSummary', () => {
     })
     enrollments.eq.mockResolvedValueOnce({ count: 14, error: null })
     assignments.select.mockResolvedValueOnce({ data: [], error: null })
+    generationJobs.in.mockResolvedValueOnce({ count: 2, error: null })
 
     const { fetchAdminSummary } = await import('./admin')
     const summary = await fetchAdminSummary()
@@ -143,17 +139,22 @@ describe('fetchAdminSummary', () => {
     expect(fromMock).toHaveBeenCalledWith('module_versions')
     expect(fromMock).toHaveBeenCalledWith('user_training_enrollments')
     expect(fromMock).toHaveBeenCalledWith('assignments')
+    expect(fromMock).toHaveBeenCalledWith('generation_jobs')
 
     expect(moduleVersions.order).toHaveBeenCalledWith('updated_at', { ascending: false })
     expect(enrollments.eq).toHaveBeenCalledWith('status', 'active')
     expect(enrollments.select).toHaveBeenCalledWith('*', { count: 'exact', head: true })
     expect(assignments.select).toHaveBeenCalledWith('status, due_at')
+    expect(generationJobs.select).toHaveBeenCalledWith('*', { count: 'exact', head: true })
+    expect(generationJobs.in).toHaveBeenCalledWith('status', ['queued', 'running'])
 
     expect(summary.metrics).toEqual({
       drafts: 1,
       needs_review: 2,
       published: 1,
+      archived: 1,
       learners_in_progress: 14,
+      pending_generation_jobs: 2,
     })
 
     expect(summary.drafts).toEqual([
@@ -194,26 +195,22 @@ describe('fetchAdminSummary', () => {
   })
 
   it('computes assignment_summary with overdue derived from status OR due_at < now', async () => {
-    const { moduleVersions, enrollments, assignments } = wireBuilders()
+    const { moduleVersions, enrollments, assignments, generationJobs } = wireBuilders()
 
     moduleVersions.order.mockResolvedValueOnce({ data: [], error: null })
     enrollments.eq.mockResolvedValueOnce({ count: 0, error: null })
+    generationJobs.in.mockResolvedValueOnce({ count: 0, error: null })
 
     const past = new Date(NOW - 24 * 60 * 60 * 1000).toISOString()
     const future = new Date(NOW + 24 * 60 * 60 * 1000).toISOString()
 
     assignments.select.mockResolvedValueOnce({
       data: [
-        // 2 completed
         { status: 'completed', due_at: null },
         { status: 'completed', due_at: past },
-        // 1 explicitly overdue
         { status: 'overdue', due_at: past },
-        // 1 in_progress with past due_at → derived overdue
         { status: 'in_progress', due_at: past },
-        // 1 in_progress not yet due
         { status: 'in_progress', due_at: future },
-        // 1 pending with no due date → active, not overdue
         { status: 'pending', due_at: null },
       ],
       error: null,
@@ -225,16 +222,17 @@ describe('fetchAdminSummary', () => {
     expect(summary.assignment_summary).toEqual({
       active_assignments: 4,
       overdue: 2,
-      completion_rate_percent: 33, // 2 / 6 → 33% (rounded)
+      completion_rate_percent: 33,
     })
   })
 
-  it('returns 0% completion when there are no assignments', async () => {
-    const { moduleVersions, enrollments, assignments } = wireBuilders()
+  it('returns null completion rate when there are no assignments', async () => {
+    const { moduleVersions, enrollments, assignments, generationJobs } = wireBuilders()
 
     moduleVersions.order.mockResolvedValueOnce({ data: [], error: null })
     enrollments.eq.mockResolvedValueOnce({ count: 0, error: null })
     assignments.select.mockResolvedValueOnce({ data: [], error: null })
+    generationJobs.in.mockResolvedValueOnce({ count: 0, error: null })
 
     const { fetchAdminSummary } = await import('./admin')
     const summary = await fetchAdminSummary()
@@ -242,16 +240,17 @@ describe('fetchAdminSummary', () => {
     expect(summary.assignment_summary).toEqual({
       active_assignments: 0,
       overdue: 0,
-      completion_rate_percent: 0,
+      completion_rate_percent: null,
     })
   })
 
   it('returns 0 learners_in_progress when the count is null', async () => {
-    const { moduleVersions, enrollments, assignments } = wireBuilders()
+    const { moduleVersions, enrollments, assignments, generationJobs } = wireBuilders()
 
     moduleVersions.order.mockResolvedValueOnce({ data: [], error: null })
     enrollments.eq.mockResolvedValueOnce({ count: null, error: null })
     assignments.select.mockResolvedValueOnce({ data: [], error: null })
+    generationJobs.in.mockResolvedValueOnce({ count: 0, error: null })
 
     const { fetchAdminSummary } = await import('./admin')
     const summary = await fetchAdminSummary()
@@ -260,40 +259,43 @@ describe('fetchAdminSummary', () => {
   })
 
   it('throws when module_versions query errors', async () => {
-    const { moduleVersions, enrollments, assignments } = wireBuilders()
+    const { moduleVersions, enrollments, assignments, generationJobs } = wireBuilders()
 
     moduleVersions.order.mockResolvedValueOnce({ data: null, error: new Error('mv failed') })
     enrollments.eq.mockResolvedValueOnce({ count: 0, error: null })
     assignments.select.mockResolvedValueOnce({ data: [], error: null })
+    generationJobs.in.mockResolvedValueOnce({ count: 0, error: null })
 
     const { fetchAdminSummary } = await import('./admin')
     await expect(fetchAdminSummary()).rejects.toThrow('mv failed')
   })
 
   it('throws when user_training_enrollments query errors', async () => {
-    const { moduleVersions, enrollments, assignments } = wireBuilders()
+    const { moduleVersions, enrollments, assignments, generationJobs } = wireBuilders()
 
     moduleVersions.order.mockResolvedValueOnce({ data: [], error: null })
     enrollments.eq.mockResolvedValueOnce({ count: null, error: new Error('enrollments failed') })
     assignments.select.mockResolvedValueOnce({ data: [], error: null })
+    generationJobs.in.mockResolvedValueOnce({ count: 0, error: null })
 
     const { fetchAdminSummary } = await import('./admin')
     await expect(fetchAdminSummary()).rejects.toThrow('enrollments failed')
   })
 
   it('throws when assignments query errors', async () => {
-    const { moduleVersions, enrollments, assignments } = wireBuilders()
+    const { moduleVersions, enrollments, assignments, generationJobs } = wireBuilders()
 
     moduleVersions.order.mockResolvedValueOnce({ data: [], error: null })
     enrollments.eq.mockResolvedValueOnce({ count: 0, error: null })
     assignments.select.mockResolvedValueOnce({ data: null, error: new Error('assignments failed') })
+    generationJobs.in.mockResolvedValueOnce({ count: 0, error: null })
 
     const { fetchAdminSummary } = await import('./admin')
     await expect(fetchAdminSummary()).rejects.toThrow('assignments failed')
   })
 
   it('handles a published module_version with no published_at by omitting the timestamp', async () => {
-    const { moduleVersions, enrollments, assignments } = wireBuilders()
+    const { moduleVersions, enrollments, assignments, generationJobs } = wireBuilders()
 
     moduleVersions.order.mockResolvedValueOnce({
       data: [
@@ -313,6 +315,7 @@ describe('fetchAdminSummary', () => {
     })
     enrollments.eq.mockResolvedValueOnce({ count: 0, error: null })
     assignments.select.mockResolvedValueOnce({ data: [], error: null })
+    generationJobs.in.mockResolvedValueOnce({ count: 0, error: null })
 
     const { fetchAdminSummary } = await import('./admin')
     const summary = await fetchAdminSummary()

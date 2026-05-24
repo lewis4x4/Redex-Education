@@ -13,3 +13,15 @@ export async function fetchModuleVersionHistory(moduleId: string): Promise<Modul
   if (error) throw error
   return (data ?? []).map(mapModuleVersionRow)
 }
+
+export async function fetchDraftByModuleVersionId(moduleVersionId: string): Promise<ModuleVersion | null> {
+  const { data, error } = await supabase
+    .from('module_versions')
+    .select('*')
+    .eq('id', moduleVersionId)
+    .eq('status', 'draft')
+    .maybeSingle()
+
+  if (error) throw error
+  return data ? mapModuleVersionRow(data) : null
+}

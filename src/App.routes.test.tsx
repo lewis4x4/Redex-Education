@@ -308,12 +308,18 @@ describe('Redex Education routes', () => {
     expect(screen.getByRole('heading', { name: /Page not found/i })).toBeInTheDocument()
   })
 
+  it('routes unknown /admin/* paths to NotFoundPage', () => {
+    renderAt('/admin/does-not-exist')
+
+    expect(screen.getByRole('heading', { name: /Page not found/i })).toBeInTheDocument()
+  })
+
   it('renders /admin through AuthGate wiring with enabled start CTA when mock auth is enabled', async () => {
     vi.stubEnv('VITE_MOCK_AUTH', 'true')
 
     renderAt('/admin')
 
-    expect(await screen.findByRole('heading', { name: /welcome back, admin/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /Good (morning|afternoon|evening), Marcus/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /start new module/i })).toBeEnabled()
   })
 

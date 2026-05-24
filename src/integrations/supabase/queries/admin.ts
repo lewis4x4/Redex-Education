@@ -6,30 +6,8 @@ import type {
   AdminModuleListItem,
 } from '@/types/training'
 
-// ============================================================
-// Admin Dashboard Aggregator (Slice "Real Admin Dashboard")
-//
-// Replaces MOCK_ADMIN_SUMMARY consumption. Aggregates four redex
-// tables into the canonical AdminDashboardSummary domain shape:
-//
-//   - redex.module_versions          → drafts / needs_review / published lists + counts
-//   - redex.user_training_enrollments → learners_in_progress count
-//   - redex.assignments               → active / overdue / completion_rate_percent
-//
-// Row→domain mapping stays at this integration boundary; the UI
-// (AdminDashboardPage) consumes only AdminDashboardSummary.
-// ============================================================
-
-/** Module-version statuses surfaced as the "Drafts" bucket. */
 const DRAFT_STATUSES: readonly string[] = ['draft']
-/**
- * Statuses surfaced as the "Needs review" bucket. `approved` is included
- * because an approved-but-unpublished version still requires an admin
- * action (publish) before learners see it — semantically closer to a
- * review queue than to "Published".
- */
 const NEEDS_REVIEW_STATUSES: readonly string[] = ['in_review', 'approved']
-/** Module-version statuses surfaced as the "Published" bucket. */
 const PUBLISHED_STATUSES: readonly string[] = ['published']
 
 type AssignmentStatsRow = {
@@ -37,26 +15,25 @@ type AssignmentStatsRow = {
   due_at: string | null
 }
 
-/**
- * Fetch the canonical admin dashboard summary by aggregating across
- * module_versions / user_training_enrollments / assignments.
- *
- * All three sub-queries run in parallel via `Promise.all`. Any
- * individual Supabase error rejects the whole call so the caller can
- * surface a single "failed to load" state.
- */
 export async function fetchAdminSummary(): Promise<AdminDashboardSummary> {
-  const [moduleVersions, learnersInProgress, assignmentSummary] = await Promise.all([
+  const [moduleVersions, learnersInProgress, assignmentSummary, pendingGenerationJobs] = await Promise.all([
     fetchModuleVersionRowsForAdmin(),
     fetchLearnersInProgressCount(),
     fetchAssignmentSummary(),
+    fetchPendingGenerationJobCount(),
   ])
 
   const drafts: AdminModuleListItem[] = []
   const needs_review: AdminModuleListItem[] = []
   const published: AdminModuleListItem[] = []
+  let archived = 0
 
   for (const row of moduleVersions) {
+    if (row.status === 'archived') {
+      archived += 1
+      continue
+    }
+
     const item = toAdminModuleListItem(row)
     if (item === null) continue
 
@@ -73,7 +50,9 @@ export async function fetchAdminSummary(): Promise<AdminDashboardSummary> {
     drafts: drafts.length,
     needs_review: needs_review.length,
     published: published.length,
+    archived,
     learners_in_progress: learnersInProgress,
+    pending_generation_jobs: pendingGenerationJobs,
   }
 
   return {
@@ -100,6 +79,16 @@ async function fetchLearnersInProgressCount(): Promise<number> {
     .from('user_training_enrollments')
     .select('*', { count: 'exact', head: true })
     .eq('status', 'active')
+
+  if (error) throw error
+  return count ?? 0
+}
+
+async function fetchPendingGenerationJobCount(): Promise<number> {
+  const { count, error } = await supabase
+    .from('generation_jobs')
+    .select('*', { count: 'exact', head: true })
+    .in('status', ['queued', 'running'])
 
   if (error) throw error
   return count ?? 0
@@ -138,7 +127,7 @@ async function fetchAssignmentSummary(): Promise<AdminDashboardSummary['assignme
   }
 
   const total = rows.length
-  const completion_rate_percent = total === 0 ? 0 : Math.round((completed / total) * 100)
+  const completion_rate_percent = total === 0 ? null : Math.round((completed / total) * 100)
 
   return {
     active_assignments: active,
@@ -157,6 +146,7 @@ function toAdminModuleListItem(row: ModuleVersionRow): AdminModuleListItem | nul
       title: row.module_title,
       status: 'Draft',
       meta: `Updated ${formatRelativePast(row.updated_at)}`,
+      draft_metadata: row.draft_metadata as AdminModuleListItem['draft_metadata'] | undefined,
     }
   }
 
@@ -188,19 +178,9 @@ function toAdminModuleListItem(row: ModuleVersionRow): AdminModuleListItem | nul
     }
   }
 
-  // archived (or any unknown status) → not surfaced on the dashboard.
   return null
 }
 
-/**
- * Render an ISO timestamp as a past-tense relative string using
- * `Intl.RelativeTimeFormat`. Mirrors the pattern in
- * `features/audit/components/AuditEventRow` and extends it with
- * week / month / year units so dashboard meta strings match the mock
- * shape ("Published 1 week ago", "Published 2 months ago").
- *
- * Always renders past-tense regardless of clock-skew edge cases.
- */
 function formatRelativePast(value: string): string {
   const valueMs = new Date(value).getTime()
   if (Number.isNaN(valueMs)) return 'recently'
@@ -218,7 +198,6 @@ function formatRelativePast(value: string): string {
   if (absMs < minute) return 'just now'
 
   const formatter = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
-  // Force past-tense by using a non-positive number.
   const past = diffMs > 0 ? -diffMs : diffMs
 
   if (absMs < hour) return formatter.format(Math.round(past / minute), 'minute')

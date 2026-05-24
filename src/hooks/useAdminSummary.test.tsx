@@ -13,7 +13,14 @@ vi.mock('@/lib/education/supabaseDataProvider', () => ({
 }))
 
 const SUPABASE_SUMMARY: AdminDashboardSummary = {
-  metrics: { drafts: 1, needs_review: 2, published: 3, learners_in_progress: 4 },
+  metrics: {
+    drafts: 1,
+    needs_review: 2,
+    published: 3,
+    archived: 0,
+    learners_in_progress: 4,
+    pending_generation_jobs: 0,
+  },
   drafts: [],
   needs_review: [],
   published: [],

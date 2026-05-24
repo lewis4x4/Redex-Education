@@ -4,6 +4,7 @@ const fromMock = vi.hoisted(() => vi.fn())
 const selectMock = vi.hoisted(() => vi.fn())
 const eqMock = vi.hoisted(() => vi.fn())
 const orderMock = vi.hoisted(() => vi.fn())
+const maybeSingleMock = vi.hoisted(() => vi.fn())
 const mapModuleVersionRowMock = vi.hoisted(() => vi.fn((row: unknown) => ({
   id: `version-${(row as { id: string }).id}`,
   status: (row as { status?: string }).status,
@@ -15,7 +16,7 @@ vi.mock('@/integrations/supabase/db-rows', () => ({
 }))
 
 function wireBuilder() {
-  const builder = { select: selectMock, eq: eqMock, order: orderMock }
+  const builder = { select: selectMock, eq: eqMock, order: orderMock, maybeSingle: maybeSingleMock }
   fromMock.mockReturnValue(builder)
   selectMock.mockReturnValue(builder)
   eqMock.mockReturnValue(builder)
@@ -76,6 +77,29 @@ describe('module version history queries', () => {
 
     await expect(fetchModuleVersionHistory('module-empty')).resolves.toEqual([])
     expect(mapModuleVersionRowMock).not.toHaveBeenCalled()
+  })
+
+  it('fetchDraftByModuleVersionId returns mapped draft rows', async () => {
+    maybeSingleMock.mockResolvedValueOnce({ data: { id: 'draft-1', status: 'draft' }, error: null })
+    const { fetchDraftByModuleVersionId } = await import('./moduleVersions')
+
+    await expect(fetchDraftByModuleVersionId('draft-1')).resolves.toEqual({ id: 'version-draft-1', status: 'draft' })
+    expect(eqMock).toHaveBeenNthCalledWith(1, 'id', 'draft-1')
+    expect(eqMock).toHaveBeenNthCalledWith(2, 'status', 'draft')
+  })
+
+  it('fetchDraftByModuleVersionId returns null when no draft row exists', async () => {
+    maybeSingleMock.mockResolvedValueOnce({ data: null, error: null })
+    const { fetchDraftByModuleVersionId } = await import('./moduleVersions')
+
+    await expect(fetchDraftByModuleVersionId('missing')).resolves.toBeNull()
+  })
+
+  it('fetchDraftByModuleVersionId throws Supabase errors', async () => {
+    maybeSingleMock.mockResolvedValueOnce({ data: null, error: new Error('draft fetch failed') })
+    const { fetchDraftByModuleVersionId } = await import('./moduleVersions')
+
+    await expect(fetchDraftByModuleVersionId('draft-1')).rejects.toThrow('draft fetch failed')
   })
 
   it('fetchModuleVersionHistory throws Supabase errors', async () => {

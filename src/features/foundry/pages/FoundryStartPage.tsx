@@ -39,7 +39,7 @@ export function FoundryStartPage() {
         />
         <p className="inline-flex items-center gap-1.5 text-xs text-slate-500">
           <Save className="h-3.5 w-3.5" aria-hidden="true" />
-          Your draft is saved automatically
+          Saved as you go
         </p>
       </div>
     </section>
