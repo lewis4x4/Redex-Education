@@ -29,6 +29,8 @@ export function AuthCallbackPage() {
     const searchParams = new URLSearchParams(window.location.search)
     const redirectTo = getSafeRedirectPath(searchParams.get('redirect_to'))
     const code = getAuthCode(window.location.search)
+    const hash = window.location.hash ?? ''
+    const hasImplicitTokens = hash.includes('access_token=') || hash.includes('refresh_token=')
     let settled = false
     let timeoutId: number | undefined
 
@@ -56,11 +58,10 @@ export function AuthCallbackPage() {
       setErrorMessage(message)
     }
 
-    if (!code) {
-      finishError('The sign-in link is missing an auth code. Please request a new magic link.')
-      return undefined
-    }
-
+    // Listen for session-established events from EITHER:
+    //  - PKCE exchangeCodeForSession (below)
+    //  - Supabase client's automatic hash-fragment detection (implicit flow)
+    //  - An existing session already in localStorage (user navigated here mid-session)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -69,26 +70,40 @@ export function AuthCallbackPage() {
       }
     })
 
-    void supabase.auth
-      .exchangeCodeForSession(code)
-      .then(({ data, error }) => {
-        if (error) {
-          finishError(error.message)
-          return
-        }
+    // Also check for an existing session synchronously — covers the case where the
+    // user navigated to /auth/callback while already signed in (no event will fire).
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        finishSuccess()
+      }
+    })
 
-        if (data.session) {
-          finishSuccess()
-          return
-        }
+    if (code) {
+      // PKCE flow — exchange the code for a session.
+      void supabase.auth
+        .exchangeCodeForSession(code)
+        .then(({ data, error }) => {
+          if (error) {
+            finishError(error.message)
+            return
+          }
 
-        timeoutId = window.setTimeout(() => {
-          finishError('We could not finish signing you in. Please request a new magic link.')
-        }, 1500)
-      })
-      .catch((error: unknown) => {
-        finishError(error instanceof Error ? error.message : 'We could not finish signing you in.')
-      })
+          if (data.session) {
+            finishSuccess()
+          }
+        })
+        .catch((error: unknown) => {
+          finishError(error instanceof Error ? error.message : 'We could not finish signing you in.')
+        })
+    } else if (!hasImplicitTokens) {
+      // No PKCE code and no implicit-flow hash tokens. Give the existing-session
+      // check + the auth listener a brief window to fire before declaring failure.
+      timeoutId = window.setTimeout(() => {
+        finishError('The sign-in link is missing or expired. Please request a new magic link.')
+      }, 1500)
+    }
+    // If hasImplicitTokens is true, the Supabase client auto-detects the hash and
+    // emits a SIGNED_IN event — onAuthStateChange will call finishSuccess.
 
     return () => {
       settled = true

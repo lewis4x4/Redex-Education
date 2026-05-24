@@ -35,6 +35,7 @@ vi.mock('@/integrations/supabase/client', () => ({
     auth: {
       exchangeCodeForSession: supabaseAuthMocks.exchangeCodeForSession,
       onAuthStateChange: supabaseAuthMocks.onAuthStateChange,
+      getSession: vi.fn(() => Promise.resolve({ data: { session: null }, error: null })),
       signInWithOtp: vi.fn(),
     },
   },

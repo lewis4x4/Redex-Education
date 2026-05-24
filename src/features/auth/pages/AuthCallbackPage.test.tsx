@@ -6,6 +6,7 @@ import { AuthCallbackPage } from './AuthCallbackPage'
 const supabaseAuthMocks = vi.hoisted(() => ({
   exchangeCodeForSession: vi.fn(),
   onAuthStateChange: vi.fn(),
+  getSession: vi.fn(),
   unsubscribe: vi.fn(),
 }))
 
@@ -14,6 +15,7 @@ vi.mock('@/integrations/supabase/client', () => ({
     auth: {
       exchangeCodeForSession: supabaseAuthMocks.exchangeCodeForSession,
       onAuthStateChange: supabaseAuthMocks.onAuthStateChange,
+      getSession: supabaseAuthMocks.getSession,
     },
   },
 }))
@@ -37,10 +39,13 @@ describe('AuthCallbackPage', () => {
   beforeEach(() => {
     supabaseAuthMocks.exchangeCodeForSession.mockReset()
     supabaseAuthMocks.onAuthStateChange.mockReset()
+    supabaseAuthMocks.getSession.mockReset()
     supabaseAuthMocks.unsubscribe.mockReset()
     supabaseAuthMocks.onAuthStateChange.mockReturnValue({
       data: { subscription: { unsubscribe: supabaseAuthMocks.unsubscribe } },
     })
+    // Default: no existing session. Tests override per-case.
+    supabaseAuthMocks.getSession.mockResolvedValue({ data: { session: null }, error: null })
   })
 
   afterEach(() => {
@@ -85,5 +90,26 @@ describe('AuthCallbackPage', () => {
     expect(await screen.findByRole('heading', { name: /Sign-in link failed/i })).toBeInTheDocument()
     expect(screen.getByText('Invalid or expired link')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Back to sign in/i })).toHaveAttribute('href', '/sign-in')
+  })
+
+  it('redirects to /learn when an existing session is already present (no code in URL)', async () => {
+    supabaseAuthMocks.getSession.mockResolvedValue({
+      data: { session: { access_token: 'existing-token' } },
+      error: null,
+    })
+
+    renderCallback('/auth/callback')
+
+    expect(await screen.findByText('learn route')).toBeInTheDocument()
+    expect(supabaseAuthMocks.exchangeCodeForSession).not.toHaveBeenCalled()
+  })
+
+  it('shows missing-link error when arriving with no code, no session, and no hash tokens', async () => {
+    renderCallback('/auth/callback')
+
+    expect(
+      await screen.findByRole('heading', { name: /Sign-in link failed/i }, { timeout: 3000 }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/missing or expired/i)).toBeInTheDocument()
   })
 })
