@@ -9,6 +9,7 @@ import { getCourseFoundryAiClient } from '@/features/foundry/ai'
 import { DEFAULT_AI_MODULE_PREVIEW, DEFAULT_AI_SOURCE_MATERIAL } from '@/features/foundry/ai/pageInputDefaults'
 import { useMockGenerationDelay } from '@/features/foundry/lib/useMockGenerationDelay'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
+import { useActorInfo } from '@/hooks/useActorInfo'
 
 export function SelfCritiqueReviewPage() {
   const navigate = useNavigate()
@@ -18,6 +19,7 @@ export function SelfCritiqueReviewPage() {
   const setCritique = useFoundryDraftStore((state) => state.setCritique)
   const ignoreIssue = useFoundryDraftStore((state) => state.ignoreIssue)
   const unignoreIssue = useFoundryDraftStore((state) => state.unignoreIssue)
+  const actor = useActorInfo()
 
   const critiqueModule = () =>
     getCourseFoundryAiClient().critiqueModule({
@@ -29,7 +31,7 @@ export function SelfCritiqueReviewPage() {
     shouldGenerate: critique === null,
     delayMs: 700,
     populate: () => {
-      void critiqueModule().then(setCritique)
+      void critiqueModule().then((report) => setCritique(report, actor))
     },
   })
 
@@ -112,11 +114,11 @@ export function SelfCritiqueReviewPage() {
               selectedFixes,
               sources: sourceMaterial ?? DEFAULT_AI_SOURCE_MATERIAL,
             })
-            useFoundryDraftStore.getState().setGeneratedModule(regeneratedModule)
+            useFoundryDraftStore.getState().setGeneratedModule(regeneratedModule, actor)
             setCritique({
               ...(await critiqueModule()),
               generated_at: new Date().toISOString(),
-            })
+            }, actor)
             toast.success('Regenerated module with fixes')
           }}
         />

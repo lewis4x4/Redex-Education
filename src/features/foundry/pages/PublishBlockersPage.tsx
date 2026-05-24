@@ -6,9 +6,11 @@ import { PublishBlockerList } from '@/features/foundry/components/PublishBlocker
 import { MOCK_PUBLISH_BLOCKERS } from '@/features/foundry/data/mockMissingSource'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
 import { inferModuleState } from '@/features/publishing/lib/moduleStates'
+import { useActorInfo } from '@/hooks/useActorInfo'
 
 export function PublishBlockersPage() {
   const navigate = useNavigate()
+  const actor = useActorInfo()
 
   const currentDraft = useFoundryDraftStore((state) => state.currentDraft)
   const sourceMaterial = useFoundryDraftStore((state) => state.sourceMaterial)
@@ -51,7 +53,7 @@ export function PublishBlockersPage() {
       return
     }
 
-    if (setPublished()) {
+    if (setPublished(actor)) {
       navigate('/admin/foundry/published')
     }
   }

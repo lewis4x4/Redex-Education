@@ -51,7 +51,7 @@ describe('SourceImpactReviewPage', () => {
       expect.arrayContaining([
         expect.objectContaining({
           event_type: 'stale_lesson_regenerated',
-          actor_name: 'Jordan Patel',
+          actor_name: 'Redex system',
           entity_label: 'HR Basics at Redex v1',
         }),
       ]),

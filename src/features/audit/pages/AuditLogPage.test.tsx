@@ -1,7 +1,7 @@
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useAuditLogStore } from '../store/auditLogStore'
 import { AuditLogPage } from './AuditLogPage'
@@ -16,6 +16,8 @@ function renderPage() {
 
 describe('AuditLogPage', () => {
   beforeEach(() => {
+    vi.stubEnv('VITE_MOCK_AUTH', 'true')
+
     act(() => {
       useAuditLogStore.getState().resetEvents()
     })

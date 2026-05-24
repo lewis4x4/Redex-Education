@@ -21,6 +21,8 @@ const config: import('vite').UserConfig & { test: import('vitest').InlineConfig 
           if (id.match(/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/)) return 'react-vendor'
           if (id.includes('react-markdown') || id.includes('rehype-') || id.includes('remark-') || id.includes('unified') || id.includes('unist-') || id.includes('mdast-') || id.includes('hast-') || id.includes('micromark')) return 'markdown-vendor'
           if (id.includes('@supabase')) return 'supabase-vendor'
+          if (id.includes('lucide-react')) return 'icons-vendor'
+          if (id.includes('@radix-ui')) return 'radix-vendor'
           return 'vendor'
         },
       },

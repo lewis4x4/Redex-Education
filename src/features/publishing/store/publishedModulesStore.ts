@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
-import { MOCK_ADMIN_USER } from '@/lib/education'
 import type { ISODateTime, UUID } from '@/lib/education'
 
 export interface PublishedModuleRecord {
@@ -32,7 +31,7 @@ export const HR_BASICS_PUBLISHED_MODULE: PublishedModuleRecord = {
   module_version_id: 'module-version-hr-basics-v1',
   title: 'HR Basics at Redex',
   published_at: '2026-05-23T00:00:00.000Z',
-  published_by: MOCK_ADMIN_USER.id,
+  published_by: 'system',
 }
 
 function cloneSeedPublishedModules(): PublishedModuleRecord[] {

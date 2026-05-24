@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useAuth } from '@/hooks/useAuth'
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { AuthContext } from '@/hooks/auth-context'
 import {
   MOCK_ADMIN_USER,
   MOCK_LEARNER_MARCUS,
@@ -26,8 +26,9 @@ function getMockProfile(role: User['role'] | null): User {
 }
 
 export function useProfile(): { profile: User | null; loading: boolean; refetch: () => void } {
-  const { user, role } = useAuth()
-  const userId = user?.id ?? null
+  const authContext = useContext(AuthContext)
+  const userId = authContext?.user?.id ?? null
+  const role = authContext?.role ?? null
   const mockAuthEnabled = import.meta.env.VITE_MOCK_AUTH === 'true'
   const [profile, setProfile] = useState<User | null>(null)
   const [loading, setLoading] = useState(false)

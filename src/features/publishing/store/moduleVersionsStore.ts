@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
 import { usePublishedModulesStore } from '@/features/publishing/store/publishedModulesStore'
-import { MOCK_ADMIN_USER } from '@/lib/education'
 import type { ISODateTime, ModuleVersion, UUID } from '@/lib/education'
 
 export const HR_BASICS_MODULE_VERSION_V1: ModuleVersion = {
@@ -12,8 +11,8 @@ export const HR_BASICS_MODULE_VERSION_V1: ModuleVersion = {
   version_number: 1,
   status: 'published',
   published_at: '2026-05-23T00:00:00.000Z',
-  published_by: MOCK_ADMIN_USER.id,
-  approved_by: MOCK_ADMIN_USER.id,
+  published_by: 'system',
+  approved_by: 'system',
   source_binder_version: 'sbv-1',
   assessment_version: 'av-1',
   completed_count: 1,

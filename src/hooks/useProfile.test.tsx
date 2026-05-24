@@ -1,24 +1,29 @@
 import { renderHook, waitFor } from '@testing-library/react'
+import type { ContextType, ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useProfile } from './useProfile'
-import { useAuth } from './useAuth'
+import { AuthContext } from './auth-context'
 import { fetchProfileByUserId } from '@/integrations/supabase/queries/profiles'
 import { MOCK_LEARNER_MARCUS } from '@/lib/education'
-
-vi.mock('./useAuth', () => ({
-  useAuth: vi.fn(),
-}))
 
 vi.mock('@/integrations/supabase/queries/profiles', () => ({
   fetchProfileByUserId: vi.fn(),
 }))
 
-const useAuthMock = vi.mocked(useAuth)
 const fetchProfileByUserIdMock = vi.mocked(fetchProfileByUserId)
+const refreshSession = vi.fn()
+const signOut = vi.fn()
+
+function createAuthWrapper(value: ContextType<typeof AuthContext>) {
+  return function AuthWrapper({ children }: { children: ReactNode }) {
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  }
+}
 
 describe('useProfile', () => {
   beforeEach(() => {
-    useAuthMock.mockReset()
+    refreshSession.mockReset()
+    signOut.mockReset()
     fetchProfileByUserIdMock.mockReset()
   })
 
@@ -29,9 +34,10 @@ describe('useProfile', () => {
 
   it('returns the Marcus persona in learner mock mode', () => {
     vi.stubEnv('VITE_MOCK_AUTH', 'true')
-    useAuthMock.mockReturnValue({ user: null, session: null, loading: false, role: 'learner', refreshSession: vi.fn(), signOut: vi.fn() })
 
-    const { result } = renderHook(() => useProfile())
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createAuthWrapper({ user: null, session: null, loading: false, role: 'learner', refreshSession, signOut }),
+    })
 
     expect(result.current.loading).toBe(false)
     expect(result.current.profile).toEqual(MOCK_LEARNER_MARCUS)
@@ -50,17 +56,18 @@ describe('useProfile', () => {
       updated_at: '2026-05-24T00:00:00.000Z',
     }
 
-    useAuthMock.mockReturnValue({
-      user: { id: 'user-real', email: 'real@redex.example' },
-      session: { access_token: 'token' },
-      loading: false,
-      role: 'learner',
-      refreshSession: vi.fn(),
-      signOut: vi.fn(),
-    } as never)
     fetchProfileByUserIdMock.mockResolvedValue(profile)
 
-    const { result } = renderHook(() => useProfile())
+    const { result } = renderHook(() => useProfile(), {
+      wrapper: createAuthWrapper({
+        user: { id: 'user-real', email: 'real@redex.example' } as never,
+        session: { access_token: 'token' } as never,
+        loading: false,
+        role: 'learner',
+        refreshSession,
+        signOut,
+      }),
+    })
 
     await waitFor(() => expect(result.current.profile).toEqual(profile))
     expect(fetchProfileByUserIdMock).toHaveBeenCalledWith('user-real')

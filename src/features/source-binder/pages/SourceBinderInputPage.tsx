@@ -8,6 +8,7 @@ import { SourcePastePanel, type SourceType } from '@/features/source-binder/comp
 import { SourcePreviewPanel } from '@/features/source-binder/components/SourcePreviewPanel'
 import { SourceUploadDropzone } from '@/features/source-binder/components/SourceUploadDropzone'
 import { parseMarkdownSections } from '@/features/source-binder/utils/markdownSections'
+import { useActorInfo } from '@/hooks/useActorInfo'
 
 export function SourceBinderInputPage() {
   const navigate = useNavigate()
@@ -15,6 +16,7 @@ export function SourceBinderInputPage() {
   const sourceMaterial = useFoundryDraftStore((state) => state.sourceMaterial)
   const setSourceMaterial = useFoundryDraftStore((state) => state.setSourceMaterial)
   const clearSourceMaterial = useFoundryDraftStore((state) => state.clearSourceMaterial)
+  const actor = useActorInfo()
 
   const [sourceId] = useState(() => sourceMaterial?.id ?? `source-${Date.now()}`)
   const [title, setTitle] = useState(sourceMaterial?.title ?? '')
@@ -33,7 +35,7 @@ export function SourceBinderInputPage() {
       raw_text_preview: nextRawText.slice(0, 200),
       processing_status: 'processed',
       sections: parseMarkdownSections(nextRawText),
-    })
+    }, actor)
   }
 
   const handleTitleChange = (nextTitle: string) => {

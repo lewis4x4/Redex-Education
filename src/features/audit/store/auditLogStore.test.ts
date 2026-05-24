@@ -34,6 +34,7 @@ describe('useAuditLogStore', () => {
 
   beforeEach(async () => {
     vi.resetModules()
+    vi.stubEnv('VITE_MOCK_AUTH', 'true')
 
     Object.defineProperty(globalThis, 'localStorage', {
       configurable: true,

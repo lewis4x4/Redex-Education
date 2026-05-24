@@ -4181,3 +4181,17 @@ Slice C turns the Slice B real AI stub into a durable server-side generation job
 
 ---
 
+
+## 2026-05-24 — Deferred P2 Follow-ups from P0/P1 Audit Slice
+
+**Status**: Documented for future phases; intentionally not implemented in the P0/P1 hardening slice.
+
+- `db-rows.ts` `mapLessonContentJson` still uses a lenient cast; add per-variant Zod validation in Phase 10.
+- Three `Object.fromEntries` sites still cast to a full `Record`; tighten to `Partial<Record<...>>` where keys are not guaranteed exhaustive.
+- `foundryDraftStore.ts` remains large and should be split into focused Zustand slices.
+- `teamProgress.ts` still has a role lookup map hardcoded from mock users.
+- `AssignedUsersTable` still uses a hardcoded assignable user list.
+- ADR 015 needs a documentation update for `module_versions.module_id` type drift.
+- `submit-generation-job` already has role authorization; this slice only needed the CORS hard-fail there.
+
+---

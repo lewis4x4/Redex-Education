@@ -14,7 +14,7 @@ import { MOCK_DRIVE_SYNC_DELAY_MS, simulateDriveSync } from '@/features/source-b
 import { computeAffectedModules } from '@/features/source-binder/lib/sourceImpact'
 import { useSourceChangeEventsStore } from '@/features/source-binder/store/sourceChangeEventsStore'
 import { useModuleVersionsStore } from '@/features/publishing/store/moduleVersionsStore'
-import { MOCK_ADMIN_USER } from '@/lib/education'
+import { useActorInfo } from '@/hooks/useActorInfo'
 import type { SourceChangeEvent } from '@/lib/education'
 
 function delay(ms: number): Promise<void> {
@@ -37,6 +37,7 @@ export function SourceImpactReviewPage() {
   const markEventResolved = useSourceChangeEventsStore((state) => state.markEventResolved)
   const versions = useModuleVersionsStore((state) => state.versions)
   const markVersionStale = useModuleVersionsStore((state) => state.markVersionStale)
+  const actor = useActorInfo() ?? { userId: 'system', displayName: 'Redex system' }
 
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
@@ -87,8 +88,8 @@ export function SourceImpactReviewPage() {
     markEventResolved(selectedEvent.id)
     useAuditLogStore.getState().recordEvent({
       event_type: 'stale_lesson_regenerated',
-      actor_user_id: MOCK_ADMIN_USER.id,
-      actor_name: MOCK_ADMIN_USER.display_name,
+      actor_user_id: actor.userId,
+      actor_name: actor.displayName,
       entity_type: 'module_version',
       entity_id: selectedEventImpact.version.id,
       entity_label: `${selectedEventImpact.version.module_title} v${selectedEventImpact.version.version_number}`,

@@ -4,14 +4,16 @@ import { useNavigate } from 'react-router-dom'
 import { DEMO_ORIENTATION_COURSE } from '@/lib/education'
 import { ModuleBasicsForm } from '@/features/foundry/components/ModuleBasicsForm'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
+import { useActorInfo } from '@/hooks/useActorInfo'
 import type { ModuleBasicsFormValues } from '@/features/foundry/types'
 
 export function FoundryStartPage() {
   const navigate = useNavigate()
   const currentDraft = useFoundryDraftStore((state) => state.currentDraft)
+  const actor = useActorInfo()
 
   const handleSubmit = (values: ModuleBasicsFormValues) => {
-    useFoundryDraftStore.getState().setBasics(values)
+    useFoundryDraftStore.getState().setBasics(values, actor)
     navigate('/admin/foundry/source')
   }
 

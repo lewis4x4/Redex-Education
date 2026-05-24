@@ -6,7 +6,8 @@ import { z } from 'zod'
 
 import { Button } from '@/components/ui/button'
 import { usePublishedModulesStore } from '@/features/publishing/store/publishedModulesStore'
-import { MOCK_ADMIN_USER, MOCK_LEARNER_ANA, MOCK_LEARNER_DEVON, MOCK_LEARNER_MARCUS } from '@/lib/education'
+import { MOCK_LEARNER_ANA, MOCK_LEARNER_DEVON, MOCK_LEARNER_MARCUS } from '@/lib/education'
+import { useActorInfo } from '@/hooks/useActorInfo'
 import type { Assignment, User } from '@/types/training'
 import { COHORTS } from '../lib/cohorts'
 import { useAssignmentStore } from '../store/assignmentStore'
@@ -82,6 +83,7 @@ function getAssigneeLabel(values: AssignmentFormValues): string {
 export function AssignmentForm({ onAssigned }: AssignmentFormProps) {
   const createAssignment = useAssignmentStore((state) => state.createAssignment)
   const publishedModules = usePublishedModulesStore((state) => state.publishedModules)
+  const actor = useActorInfo()
   const moduleOptions = publishedModules.map((module) => ({
     value: module.module_version_id,
     label: module.title,
@@ -105,7 +107,7 @@ export function AssignmentForm({ onAssigned }: AssignmentFormProps) {
     const cohort = COHORTS.find((candidate) => candidate.id === values.cohortId)
     const assignment = createAssignment({
       module_version_id: values.moduleVersionId,
-      assigned_by: MOCK_ADMIN_USER.id,
+      assigned_by: actor?.userId ?? 'system',
       due_at: toDueAtIso(values.dueAt),
       ...(values.assigneeMode === 'user' ? { assignee_user_id: values.assigneeUserId } : {}),
       ...(values.assigneeMode === 'cohort' && cohort ? { assignee_role: cohort.role } : {}),

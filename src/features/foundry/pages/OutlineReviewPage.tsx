@@ -14,6 +14,7 @@ import {
 } from '@/features/foundry/ai/pageInputDefaults'
 import { useMockGenerationDelay } from '@/features/foundry/lib/useMockGenerationDelay'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
+import { useActorInfo } from '@/hooks/useActorInfo'
 
 const OUTLINE_STATUS_LABELS = {
   draft: 'Draft',
@@ -32,6 +33,7 @@ export function OutlineReviewPage() {
   const approveOutline = useFoundryDraftStore((state) => state.approveOutline)
   const regenerateOutlineStart = useFoundryDraftStore((state) => state.regenerateOutlineStart)
   const lessonSourceBindings = getCourseFoundryLessonSourceBindings()
+  const actor = useActorInfo()
 
   const generateOutline = () =>
     getCourseFoundryAiClient().generateOutline({
@@ -44,19 +46,19 @@ export function OutlineReviewPage() {
     shouldGenerate: outline === null,
     delayMs: 600,
     populate: () => {
-      void generateOutline().then(setOutline)
+      void generateOutline().then((nextOutline) => setOutline(nextOutline, actor))
     },
   })
 
   const handleRegenerate = async () => {
     regenerateOutlineStart()
     await new Promise((resolve) => window.setTimeout(resolve, 800))
-    setOutline(await generateOutline())
+    setOutline(await generateOutline(), actor)
     toast.success('Regenerated outline')
   }
 
   const handleApprove = () => {
-    approveOutline()
+    approveOutline(actor)
     toast.success('Outline approved')
   }
 

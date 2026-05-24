@@ -256,8 +256,12 @@ function createSeedEvents(): AuditLog[] {
   ])
 }
 
+function shouldSeedMockAuditEvents(): boolean {
+  return import.meta.env.VITE_MOCK_AUTH === 'true'
+}
+
 function cloneSeedEvents(): AuditLog[] {
-  return createSeedEvents().map(cloneEvent)
+  return shouldSeedMockAuditEvents() ? createSeedEvents().map(cloneEvent) : []
 }
 
 export const useAuditLogStore = create<AuditLogState>()(

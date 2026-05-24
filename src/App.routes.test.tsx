@@ -134,36 +134,36 @@ describe('Redex Education routes', () => {
     vi.unstubAllEnvs()
   })
 
-  it('redirects / to /learn', () => {
+  it('redirects / to /learn', async () => {
     renderAt('/')
 
-    expect(screen.getByText(/Continue where you left off/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Continue where you left off/i)).toBeInTheDocument()
   })
 
-  it('redirects unknown module routes to /learn', () => {
+  it('redirects unknown module routes to /learn', async () => {
     renderAt('/learn/player/unknown-module-id')
 
-    expect(screen.getByText(/Continue where you left off/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Continue where you left off/i)).toBeInTheDocument()
   })
 
-  it('renders the player route for the Orientation module direct URL', () => {
+  it('renders the player route for the Orientation module direct URL', async () => {
     renderAt('/learn/player/mod-001')
 
-    expect(screen.getByText('Orientation Module')).toBeInTheDocument()
+    expect(await screen.findByText('Orientation Module')).toBeInTheDocument()
     expect(screen.getByText(/No lessons in this module yet/i)).toBeInTheDocument()
   })
 
-  it('renders the player route for the HR Basics primary learner module', () => {
+  it('renders the player route for the HR Basics primary learner module', async () => {
     renderAt('/learn/player/hr-basics-mod-001')
 
-    expect(screen.getByText('HR Basics at Redex')).toBeInTheDocument()
+    expect(await screen.findByText('HR Basics at Redex')).toBeInTheDocument()
     expect(screen.getByText(/No lessons in this module yet/i)).toBeInTheDocument()
   })
 
-  it('defaults /learn/player to the HR Basics primary learner module', () => {
+  it('defaults /learn/player to the HR Basics primary learner module', async () => {
     renderAt('/learn/player')
 
-    expect(screen.getByText('HR Basics at Redex')).toBeInTheDocument()
+    expect(await screen.findByText('HR Basics at Redex')).toBeInTheDocument()
     expect(screen.getByText(/No lessons in this module yet/i)).toBeInTheDocument()
   })
 
@@ -219,7 +219,7 @@ describe('Redex Education routes', () => {
 
     renderAt('/learn/player/hr-basics-mod-001')
 
-    await user.click(screen.getByRole('radio', { name: 'Correct answer' }))
+    await user.click(await screen.findByRole('radio', { name: 'Correct answer' }))
     await user.click(screen.getByRole('button', { name: 'Submit Quiz' }))
 
     await waitFor(() => {
@@ -282,7 +282,7 @@ describe('Redex Education routes', () => {
 
     renderAt('/learn/player/hr-basics-mod-001')
 
-    await user.click(screen.getByRole('button', { name: /complete module/i }))
+    await user.click(await screen.findByRole('button', { name: /complete module/i }))
     expect(recordLessonProgress).toHaveBeenCalledWith('hr-basics-lesson-route-test', 'completed')
     expect(
       useAssignmentStore
@@ -378,7 +378,7 @@ describe('Redex Education routes', () => {
     renderAt('/manager')
 
     expect(await screen.findByRole('heading', { name: 'Team training progress' })).toBeInTheDocument()
-    expect(screen.getByRole('row', { name: /Marcus Chen/i })).toBeInTheDocument()
+    expect(await screen.findByRole('row', { name: /Marcus Chen/i })).toBeInTheDocument()
   })
 
   it('renders the auth callback route without redirecting through /', async () => {

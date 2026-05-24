@@ -4,17 +4,24 @@ import type { User as SupabaseUser } from '@supabase/supabase-js'
 import AuthGate from '@/components/auth/AuthGate'
 import { AppShell } from '@/components/layout/AppShell'
 import { NotFoundPage } from '@/components/layout/NotFoundPage'
+import { RouteErrorBoundary } from '@/components/layout/RouteErrorBoundary'
 import { RouteLoadingFallback } from '@/components/layout/RouteLoadingFallback'
-import { LearnerDashboardPage } from '@/features/learner/pages/LearnerDashboardPage'
 import { LearnerWelcomePage } from '@/features/learner/pages/LearnerWelcomePage'
 import { useAssignmentStore } from '@/features/assignments/store/assignmentStore'
-import { ModulePlayer } from '@/features/learner/components/ModulePlayer'
 import { useAssessmentAttemptStore } from '@/features/progress/store/assessmentAttemptStore'
 import { useAuth } from '@/hooks/useAuth'
 import { useEducation } from '@/hooks/useEducation'
 import { useProfile } from '@/hooks/useProfile'
 import { getModuleVersionId } from '@/lib/education/moduleVersions'
 import type { LearnerProfile, ProgressStatus, User as DomainUser } from '@/lib/education'
+
+const LearnerDashboardPage = lazy(() =>
+  import('@/features/learner/pages/LearnerDashboardPage').then((m) => ({ default: m.LearnerDashboardPage })),
+)
+
+const ModulePlayer = lazy(() =>
+  import('@/features/learner/components/ModulePlayer').then((m) => ({ default: m.ModulePlayer })),
+)
 
 const AdminDashboardPage = lazy(() =>
   import('@/features/admin/pages/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })),
@@ -123,11 +130,13 @@ function LearnerDashboardRoute() {
   return (
     <AppShell breadcrumb="Learning › My Learning Dashboard">
       <AuthGate>
-        <LearnerDashboardPage
-          learner={learner}
-          onContinue={() => navigate('/learn/player/hr-basics-mod-001')}
-          onStartJourney={() => navigate('/learn/player/hr-basics-mod-001')}
-        />
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <LearnerDashboardPage
+            learner={learner}
+            onContinue={() => navigate('/learn/player/hr-basics-mod-001')}
+            onStartJourney={() => navigate('/learn/player/hr-basics-mod-001')}
+          />
+        </Suspense>
       </AuthGate>
     </AppShell>
   )
@@ -191,43 +200,45 @@ function LearnerModuleRoute() {
 
   return (
     <AppShell breadcrumb="Learning › Module Player" playerMode>
-      <ModulePlayer
-        key={routeModule.id}
-        module={routeModule}
-        lessons={moduleLessons}
-        completedLessonIds={completedLessonIds}
-        onProgressUpdate={(lessonId: string, status: ProgressStatus) => {
-          education.recordLessonProgress(lessonId, status)
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <ModulePlayer
+          key={routeModule.id}
+          module={routeModule}
+          lessons={moduleLessons}
+          completedLessonIds={completedLessonIds}
+          onProgressUpdate={(lessonId: string, status: ProgressStatus) => {
+            education.recordLessonProgress(lessonId, status)
 
-          const isCompletingModule =
-            status === 'completed' &&
-            moduleLessons.length > 0 &&
-            moduleLessons.every((lesson) => completedLessonIdSet.has(lesson.id) || lesson.id === lessonId)
+            const isCompletingModule =
+              status === 'completed' &&
+              moduleLessons.length > 0 &&
+              moduleLessons.every((lesson) => completedLessonIdSet.has(lesson.id) || lesson.id === lessonId)
 
-          if (isCompletingModule) {
+            if (isCompletingModule) {
+              completeActiveAssignment()
+            }
+          }}
+          onQuizAttempt={(lessonId, attempt) => {
+            if (!moduleEnrollment) {
+              return
+            }
+
+            recordAttempt({
+              enrollment_id: moduleEnrollment.id,
+              lesson_id: lessonId,
+              score_percent: attempt.score,
+              passed: attempt.passed,
+              answers: attempt.answers,
+              actor_user_id: moduleEnrollment.user_id,
+            })
+          }}
+          onCompleteModule={() => {
             completeActiveAssignment()
-          }
-        }}
-        onQuizAttempt={(lessonId, attempt) => {
-          if (!moduleEnrollment) {
-            return
-          }
-
-          recordAttempt({
-            enrollment_id: moduleEnrollment.id,
-            lesson_id: lessonId,
-            score_percent: attempt.score,
-            passed: attempt.passed,
-            answers: attempt.answers,
-            actor_user_id: moduleEnrollment.user_id,
-          })
-        }}
-        onCompleteModule={() => {
-          completeActiveAssignment()
-          navigate('/learn')
-        }}
-        onExit={() => navigate('/learn')}
-      />
+            navigate('/learn')
+          }}
+          onExit={() => navigate('/learn')}
+        />
+      </Suspense>
     </AppShell>
   )
 }
@@ -454,7 +465,8 @@ function NotFoundRoute() {
 
 export default function App() {
   return (
-    <Routes>
+    <RouteErrorBoundary>
+      <Routes>
       <Route path="/" element={<Navigate to="/learn" replace />} />
       <Route path="/learn" element={<LearnerDashboardRoute />} />
       <Route path="/learn/welcome" element={<LearnerWelcomeRoute />} />
@@ -479,7 +491,8 @@ export default function App() {
       <Route path="/admin/foundry/published" element={<PublishConfirmationRoute />} />
       <Route path="/admin/foundry/library" element={<SourceLibraryRoute />} />
       <Route path="/admin/*" element={<AdminRoute />} />
-      <Route path="*" element={<NotFoundRoute />} />
-    </Routes>
+        <Route path="*" element={<NotFoundRoute />} />
+      </Routes>
+    </RouteErrorBoundary>
   )
 }

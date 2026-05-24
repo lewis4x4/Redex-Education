@@ -79,7 +79,7 @@ describe('ModuleVersionHistoryPage', () => {
     expect(within(versionRegion).getByRole('heading', { name: 'v1' })).toBeInTheDocument()
     expect(screen.getAllByText('sbv-1')).toHaveLength(2)
     expect(screen.getAllByText('av-1')).toHaveLength(2)
-    expect(screen.getByText('Jordan Patel')).toBeInTheDocument()
+    expect(screen.getByText('system')).toBeInTheDocument()
   })
 
   it('shows completed count and expands learner names', async () => {

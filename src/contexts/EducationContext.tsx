@@ -68,10 +68,19 @@ function restoreLessonProgress(): Record<string, LessonProgress> {
       return {};
     }
 
-    const stored = JSON.parse(raw) as Partial<StoredProgress>;
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') {
+      return {};
+    }
+
+    const stored = parsed as Partial<StoredProgress>;
+    if (!stored.lessonProgress || typeof stored.lessonProgress !== 'object') {
+      return {};
+    }
+
     const restored: Record<string, LessonProgress> = {};
 
-    Object.entries(stored.lessonProgress ?? {}).forEach(([lessonId, progress]) => {
+    Object.entries(stored.lessonProgress).forEach(([lessonId, progress]) => {
       restored[lessonId] = {
         id: `lp-${lessonId}`,
         enrollment_id: getEnrollmentIdForLesson(lessonId),

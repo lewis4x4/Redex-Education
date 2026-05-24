@@ -1,9 +1,41 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? "*")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+let ALLOWED_ORIGINS: string[] = [];
+
+function configureAllowedOrigins(functionName: string): Response | null {
+  const rawAllowedOrigins = Deno.env.get("ALLOWED_ORIGINS");
+
+  if (!rawAllowedOrigins) {
+    console.error(`[${functionName}] ALLOWED_ORIGINS must be set`);
+    return new Response(
+      JSON.stringify({
+        status: "error",
+        code: "server_misconfigured",
+        message: "Server configuration error",
+      }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  ALLOWED_ORIGINS = rawAllowedOrigins
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (ALLOWED_ORIGINS.length === 0) {
+    console.error(`[${functionName}] ALLOWED_ORIGINS must include at least one origin`);
+    return new Response(
+      JSON.stringify({
+        status: "error",
+        code: "server_misconfigured",
+        message: "Server configuration error",
+      }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  return null;
+}
 
 function resolveCorsHeaders(request: Request): Record<string, string> {
   const requestOrigin = request.headers.get("origin") ?? "";
@@ -188,6 +220,10 @@ function bearerToken(request: Request): string {
 }
 
 Deno.serve(async (request) => {
+  const corsConfigError = configureAllowedOrigins("submit-generation-job");
+  if (corsConfigError) {
+    return corsConfigError;
+  }
   if (request.method === "OPTIONS") {
     return new Response(null, {
       status: 204,

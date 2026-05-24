@@ -594,7 +594,7 @@ describe('useFoundryDraftStore', () => {
         expect.objectContaining({
           module_version_id: 'module-version-hr-basics-v1',
           title: 'HR Basics at Redex',
-          published_by: 'user-jordan-admin',
+          published_by: 'system',
         }),
       ]),
     )
@@ -605,7 +605,7 @@ describe('useFoundryDraftStore', () => {
         module_title: 'HR Basics at Redex',
         version_number: 1,
         status: 'published',
-        approved_by: 'user-jordan-admin',
+        approved_by: 'system',
       }),
     )
   })

@@ -15,10 +15,42 @@ const DRIVE_API_BASE_URL = "https://www.googleapis.com/drive/v3";
 // in production by setting ALLOWED_ORIGINS (comma-separated). Authentication
 // still relies on the Supabase JWT in the Authorization header; CORS is
 // defense-in-depth.
-const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? "*")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+let ALLOWED_ORIGINS: string[] = [];
+
+function configureAllowedOrigins(functionName: string): Response | null {
+  const rawAllowedOrigins = Deno.env.get("ALLOWED_ORIGINS");
+
+  if (!rawAllowedOrigins) {
+    console.error(`[${functionName}] ALLOWED_ORIGINS must be set`);
+    return new Response(
+      JSON.stringify({
+        status: "error",
+        code: "server_misconfigured",
+        message: "Server configuration error",
+      }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  ALLOWED_ORIGINS = rawAllowedOrigins
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (ALLOWED_ORIGINS.length === 0) {
+    console.error(`[${functionName}] ALLOWED_ORIGINS must include at least one origin`);
+    return new Response(
+      JSON.stringify({
+        status: "error",
+        code: "server_misconfigured",
+        message: "Server configuration error",
+      }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  return null;
+}
 
 function resolveCorsHeaders(request: Request): Record<string, string> {
   const requestOrigin = request.headers.get("origin") ?? "";
@@ -41,6 +73,10 @@ function resolveCorsHeaders(request: Request): Record<string, string> {
 interface ParseSourceFileRequest {
   source_file_id?: string;
   drive_file_id?: string;
+}
+
+interface ProfileRoleRow {
+  role: string;
 }
 
 interface DriveFileMetadata {
@@ -145,6 +181,37 @@ function getRequiredEnv(name: string): string {
   }
 
   return value;
+}
+
+async function requireFoundryAuthor(
+  request: Request,
+  supabaseUrl: string,
+  supabaseServiceRoleKey: string,
+): Promise<ReturnType<typeof createClient>> {
+  const jwt = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+
+  if (!jwt) {
+    throw new EdgeFunctionError("auth_required", "Authorization header required.", 401);
+  }
+
+  const callerClient = createClient(supabaseUrl, supabaseServiceRoleKey, { db: { schema: "redex" } });
+  const { data: { user }, error: authError } = await callerClient.auth.getUser(jwt);
+
+  if (authError || !user) {
+    throw new EdgeFunctionError("auth_failed", "Invalid or expired token.", 401);
+  }
+
+  const { data: profile } = await callerClient
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single<ProfileRoleRow>();
+
+  if (!profile || !["admin", "foundry_author"].includes(profile.role)) {
+    throw new EdgeFunctionError("forbidden", "Foundry author role required.", 403);
+  }
+
+  return callerClient;
 }
 
 function escapeDriveQueryLiteral(value: string): string {
@@ -322,6 +389,10 @@ function authorityUpdateFrom(
 }
 
 Deno.serve(async (request) => {
+  const corsConfigError = configureAllowedOrigins("parse-source-file");
+  if (corsConfigError) {
+    return corsConfigError;
+  }
   if (request.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
@@ -345,10 +416,10 @@ Deno.serve(async (request) => {
 
   try {
     requestBody = await parseRequestBody(request);
-    const accessToken = await getDriveAccessToken();
     const supabaseUrl = getRequiredEnv("SUPABASE_URL");
     const supabaseServiceRoleKey = getRequiredEnv("SUPABASE_SERVICE_ROLE_KEY");
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, { db: { schema: "redex" } });
+    const supabase = await requireFoundryAuthor(request, supabaseUrl, supabaseServiceRoleKey);
+    const accessToken = await getDriveAccessToken();
 
     const { data: sourceFile, error: sourceFileError } = await supabase
       .from("source_files")

@@ -69,7 +69,7 @@ describe('AssignmentForm', () => {
       expect.objectContaining({
         module_version_id: 'module-version-hr-basics-v1',
         assignee_user_id: 'user-marcus',
-        assigned_by: 'user-jordan-admin',
+        assigned_by: 'system',
         status: 'pending',
       }),
     )

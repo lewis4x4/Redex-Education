@@ -10,6 +10,7 @@ import { GenerationStatusBadge } from '@/features/foundry/components/GenerationS
 import { getCourseFoundryAiClient } from '@/features/foundry/ai'
 import { DEFAULT_AI_OUTLINE, DEFAULT_AI_SOURCE_MATERIAL } from '@/features/foundry/ai/pageInputDefaults'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
+import { useActorInfo } from '@/hooks/useActorInfo'
 import type { LessonGenerationStatus } from '@/lib/education'
 
 const STATUS_ORDER: LessonGenerationStatus[] = [
@@ -27,6 +28,7 @@ export function ModuleGenerationPreviewPage() {
   const sourceMaterial = useFoundryDraftStore((state) => state.sourceMaterial)
   const updateLessonStatus = useFoundryDraftStore((state) => state.updateLessonStatus)
   const [selectedLessonIndex, setSelectedLessonIndex] = useState(0)
+  const actor = useActorInfo()
 
   const handleGenerateModule = async () => {
     setSelectedLessonIndex(0)
@@ -34,7 +36,7 @@ export function ModuleGenerationPreviewPage() {
       outline: outline ?? DEFAULT_AI_OUTLINE,
       sources: sourceMaterial ?? DEFAULT_AI_SOURCE_MATERIAL,
     })
-    useFoundryDraftStore.getState().setGeneratedModule(generatedPreview)
+    useFoundryDraftStore.getState().setGeneratedModule(generatedPreview, actor)
     toast.success(`Generated ${generatedPreview.lessons.length} lessons`)
   }
 

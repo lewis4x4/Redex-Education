@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
 import { useModuleVersionsStore } from '@/features/publishing/store/moduleVersionsStore'
+import { useActorInfo } from '@/hooks/useActorInfo'
 
 function formatPublishedAt(value: string | null) {
   if (value === null) {
@@ -29,6 +30,7 @@ export function PublishConfirmationPage() {
   const versions = useModuleVersionsStore((state) => state.versions)
   const forkNewDraftVersion = useModuleVersionsStore((state) => state.forkNewDraftVersion)
   const getLatestPublishedVersion = useModuleVersionsStore((state) => state.getLatestPublishedVersion)
+  const actor = useActorInfo()
 
   const moduleTitle = currentDraft?.title || generatedModule?.module_title || 'HR Basics at Redex'
   const moduleId =
@@ -45,7 +47,7 @@ export function PublishConfirmationPage() {
 
     const forkedVersion = forkNewDraftVersion(latestPublishedVersion.id)
     resetFoundryDraft()
-    seedDraftFromModuleVersion(forkedVersion)
+    seedDraftFromModuleVersion(forkedVersion, actor)
     navigate('/admin/foundry/start')
   }
 

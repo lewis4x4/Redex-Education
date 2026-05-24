@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { MOCK_ADMIN_USER } from '@/lib/education';
 import type {
   CourseOutlineDraft,
   GeneratedModulePreview,
@@ -21,7 +20,7 @@ import { useModuleVersionsStore } from '@/features/publishing/store/moduleVersio
 import { usePublishedModulesStore } from '@/features/publishing/store/publishedModulesStore';
 import type { SetupAnswersInput } from '../schemas/foundrySchemas';
 import type { ModuleBasicsDraft, ModuleBasicsFormValues } from '../types';
-import type { AuditLog, ModuleVersion } from '@/lib/education';
+import type { AuditLog, ModuleVersion, UUID } from '@/lib/education';
 
 const DEFAULT_MODULE_VERSION_ID = 'module-version-hr-basics-v1';
 
@@ -155,10 +154,31 @@ function shouldPersistToSupabase(): boolean {
   return getDataSource() === 'supabase';
 }
 
-function recordAuditEvent(input: Omit<AuditLog, 'id' | 'occurred_at' | 'actor_user_id' | 'actor_name'>) {
+export interface ActorInfo {
+  userId: UUID;
+  displayName: string;
+}
+
+const SYSTEM_ACTOR: ActorInfo = {
+  userId: 'system',
+  displayName: 'Redex system',
+};
+
+function toAuditActor(actor?: ActorInfo) {
+  const resolved = actor ?? SYSTEM_ACTOR;
+
+  return {
+    actor_user_id: resolved.userId,
+    actor_name: resolved.displayName,
+  };
+}
+
+function recordAuditEvent(
+  input: Omit<AuditLog, 'id' | 'occurred_at' | 'actor_user_id' | 'actor_name'>,
+  actor?: ActorInfo,
+) {
   useAuditLogStore.getState().recordEvent({
-    actor_user_id: MOCK_ADMIN_USER.id,
-    actor_name: MOCK_ADMIN_USER.display_name,
+    ...toAuditActor(actor),
     ...input,
   });
 }
@@ -177,7 +197,7 @@ interface FoundryDraftState {
   lastWriteError: WriteError | null;
   clearLastWriteError: () => void;
   /** Save form values as the draft (sets updated_at) */
-  setBasics: (values: ModuleBasicsFormValues) => void;
+  setBasics: (values: ModuleBasicsFormValues, actor?: ActorInfo) => void;
   /** Clear the working draft (e.g. on successful publish, or "Start over") */
   clearDraft: () => void;
   /** The current source material draft for Slice 2.3 source binder */
@@ -193,19 +213,19 @@ interface FoundryDraftState {
   /** Self-critique report for generated module */
   critique: SelfCritiqueReport | null;
   /** Set self-critique report */
-  setCritique: (report: SelfCritiqueReport) => void;
+  setCritique: (report: SelfCritiqueReport, actor?: ActorInfo) => void;
   /** Publish lifecycle for the current Foundry draft */
   publishStatus: FoundryPublishStatus;
   /** ISO timestamp when the module was published, if published */
   publishedAt: string | null;
   /** Mark module published when no publish blockers remain; returns true when published. */
-  setPublished: () => boolean;
+  setPublished: (actor?: ActorInfo) => boolean;
   /** Reset publish lifecycle back to draft */
   resetPublishStatus: () => void;
   /** Reset the full Foundry draft flow back to an empty draft */
   resetFoundryDraft: () => void;
   /** Seed a new working draft from a forked module version. */
-  seedDraftFromModuleVersion: (version: ModuleVersion) => void;
+  seedDraftFromModuleVersion: (version: ModuleVersion, actor?: ActorInfo) => void;
   /** Side-by-side review state for generated lessons */
   lessonReviews: LessonReviewItem[];
   /** Overwrite lesson review state */
@@ -213,7 +233,7 @@ interface FoundryDraftState {
   /** Clear lesson review state */
   clearLessonReviews: () => void;
   /** Mark one lesson review item approved by lesson/module indices */
-  approveLessonReview: (lessonIdx: number, moduleIdx: number) => void;
+  approveLessonReview: (lessonIdx: number, moduleIdx: number, actor?: ActorInfo) => void;
   /** Mark one lesson review item as needing regeneration by lesson/module indices */
   rejectLessonReview: (lessonIdx: number, moduleIdx: number) => void;
   /** Computes true when any lesson has unsupported_claim AND is not approved. */
@@ -227,7 +247,7 @@ interface FoundryDraftState {
   /** Remove ignore state for one critique issue */
   unignoreIssue: (issueId: string) => void;
   /** Save parsed source material */
-  setSourceMaterial: (material: SourceMaterial) => void;
+  setSourceMaterial: (material: SourceMaterial, actor?: ActorInfo) => void;
   /** Clear source material draft */
   clearSourceMaterial: () => void;
   /** Save setup-question answers as the draft (sets updated_at) */
@@ -235,15 +255,15 @@ interface FoundryDraftState {
   /** Clear setup-question answers draft */
   clearSetupAnswers: () => void;
   /** Set generated outline and reset status to draft */
-  setOutline: (draft: CourseOutlineDraft) => void;
+  setOutline: (draft: CourseOutlineDraft, actor?: ActorInfo) => void;
   /** Mark current outline approved (no-op when no outline exists) */
-  approveOutline: () => void;
+  approveOutline: (actor?: ActorInfo) => void;
   /** Clear current outline and reset status */
   clearOutline: () => void;
   /** Set regenerating status for simulated loading */
   regenerateOutlineStart: () => void;
   /** Set generated module preview */
-  setGeneratedModule: (preview: GeneratedModulePreview) => void;
+  setGeneratedModule: (preview: GeneratedModulePreview, actor?: ActorInfo) => void;
   /** Clear generated module preview */
   clearGeneratedModule: () => void;
   /** Update one generated lesson status by lesson/module indices (no-op if preview missing) */
@@ -276,7 +296,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
       publishedAt: null,
       lessonReviews: [],
       selectedLibraryFileIds: [],
-      setBasics: (values) => {
+      setBasics: (values, actor) => {
         const wasNewDraft = get().currentDraft === null;
         const moduleId = resolveDraftModuleId(values.title);
 
@@ -310,7 +330,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
             entity_type: 'module',
             entity_id: moduleId,
             entity_label: values.title,
-          });
+          }, actor);
         }
       },
       clearDraft: () => set({ currentDraft: null, lastWriteError: null, ...resetPublishState }),
@@ -329,7 +349,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
           selectedLibraryFileIds: [],
           ...resetPublishState,
         }),
-      seedDraftFromModuleVersion: (version) => {
+      seedDraftFromModuleVersion: (version, actor) => {
         set({
           lastWriteError: null,
           currentDraft: {
@@ -367,10 +387,10 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
             entity_id: version.id,
             entity_label: `${version.module_title} v${version.version_number}`,
             metadata: { module_id: version.module_id, version_number: version.version_number },
-          });
+          }, actor);
         }
       },
-      setPublished: () => {
+      setPublished: (actor) => {
         const state = get();
         const blockers = state.getPublishBlockers();
 
@@ -404,8 +424,8 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
           module_title: title,
           version_number: versionNumber,
           status: 'published',
-          approved_by: MOCK_ADMIN_USER.id,
-          published_by: MOCK_ADMIN_USER.id,
+          approved_by: (actor ?? SYSTEM_ACTOR).userId,
+          published_by: (actor ?? SYSTEM_ACTOR).userId,
           source_binder_version: state.currentDraft?.source_binder_version ?? 'sbv-1',
           assessment_version: state.currentDraft?.assessment_version ?? 'av-1',
         });
@@ -413,7 +433,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
         usePublishedModulesStore.getState().registerPublishedModule({
           module_version_id: moduleVersion.id,
           title,
-          published_by: MOCK_ADMIN_USER.id,
+          published_by: (actor ?? SYSTEM_ACTOR).userId,
         });
 
         set({ publishStatus: 'published', publishedAt: moduleVersion.published_at ?? new Date().toISOString() });
@@ -424,7 +444,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
               publishModuleVersion({
                 course_id: resolveCourseIdForWrite(state.currentDraft, title),
                 module_id: moduleId,
-                approved_by: MOCK_ADMIN_USER.id,
+                approved_by: (actor ?? SYSTEM_ACTOR).userId,
               }),
             )
             .then(() => set({ lastWriteError: null }))
@@ -438,12 +458,12 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
             entity_id: moduleVersion.id,
             entity_label: `${title} v${versionNumber}`,
             metadata: { module_id: moduleId, version_number: versionNumber },
-          });
+          }, actor);
         }
 
         return true;
       },
-      setCritique: (report) => {
+      setCritique: (report, actor) => {
         const wasMissingCritique = get().critique === null;
         set({ critique: report, ...resetPublishState });
 
@@ -454,12 +474,12 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
             entity_id: resolveDraftModuleId(report.module_title, get().currentDraft),
             entity_label: report.module_title,
             metadata: { issue_count: report.issues.length, blocks_publish: report.blocks_publish },
-          });
+          }, actor);
         }
       },
       setLessonReviews: (items) => set({ lessonReviews: items, ...resetPublishState }),
       clearLessonReviews: () => set({ lessonReviews: [], ...resetPublishState }),
-      approveLessonReview: (lessonIdx, moduleIdx) => {
+      approveLessonReview: (lessonIdx, moduleIdx, actor) => {
         const priorReview = get().lessonReviews.find(
           (item) => item.lesson_index === lessonIdx && item.module_index === moduleIdx,
         );
@@ -480,7 +500,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
             entity_id: `${priorReview.module_index}-${priorReview.lesson_index}`,
             entity_label: priorReview.lesson_title,
             metadata: { module_index: priorReview.module_index, lesson_index: priorReview.lesson_index },
-          });
+          }, actor);
         }
       },
       rejectLessonReview: (lessonIdx, moduleIdx) =>
@@ -606,7 +626,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
             ...resetPublishState,
           };
         }),
-      setSourceMaterial: (material) => {
+      setSourceMaterial: (material, actor) => {
         const state = get();
         const wasMissingSource = state.sourceMaterial === null;
         set({ sourceMaterial: material, ...resetPublishState });
@@ -630,7 +650,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
             entity_id: material.id,
             entity_label: material.title,
             metadata: { source_type: material.type },
-          });
+          }, actor);
         }
       },
       clearSourceMaterial: () => set({ sourceMaterial: null, ...resetPublishState }),
@@ -658,7 +678,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
         }
       },
       clearSetupAnswers: () => set({ setupAnswers: null, ...resetPublishState }),
-      setOutline: (draft) => {
+      setOutline: (draft, actor) => {
         const state = get();
         const wasMissingOutline = state.outline === null;
         const courseId = resolveCourseIdForWrite(state.currentDraft, draft.course_title);
@@ -703,10 +723,10 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
             entity_id: resolveDraftModuleId(draft.course_title, get().currentDraft),
             entity_label: draft.course_title,
             metadata: { modules: draft.modules.length, lessons: lessonCount },
-          });
+          }, actor);
         }
       },
-      approveOutline: () => {
+      approveOutline: (actor) => {
         const state = get();
         const shouldRecord = state.outline !== null && state.outline_status !== 'approved';
 
@@ -724,7 +744,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
             entity_type: 'module',
             entity_id: resolveDraftModuleId(state.outline.course_title, state.currentDraft),
             entity_label: state.outline.course_title,
-          });
+          }, actor);
         }
       },
       clearOutline: () =>
@@ -734,7 +754,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
           ...resetPublishState,
         }),
       regenerateOutlineStart: () => set({ outline_status: 'regenerating', ...resetPublishState }),
-      setGeneratedModule: (preview) => {
+      setGeneratedModule: (preview, actor) => {
         const state = get();
         const wasMissingModule = state.generatedModule === null;
         set({ generatedModule: preview, ...resetPublishState });
@@ -756,7 +776,7 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
             entity_id: resolveDraftModuleId(preview.module_title, get().currentDraft),
             entity_label: preview.module_title,
             metadata: { lessons: preview.lessons.length },
-          });
+          }, actor);
         }
       },
       clearGeneratedModule: () => set({ generatedModule: null, ...resetPublishState }),
