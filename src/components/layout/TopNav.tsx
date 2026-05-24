@@ -87,7 +87,7 @@ export function TopNav() {
               )}
             >
               <span className="sm:hidden">Learner</span>
-              <span className="hidden sm:inline">Learner experience</span>
+              <span className="hidden sm:inline">Academy</span>
             </button>
 
             {canSeeManager ? (
@@ -103,7 +103,7 @@ export function TopNav() {
                 )}
               >
                 <span className="sm:hidden">Manager</span>
-                <span className="hidden sm:inline">Manager experience</span>
+                <span className="hidden sm:inline">Team</span>
               </button>
             ) : null}
 
@@ -120,7 +120,7 @@ export function TopNav() {
                 )}
               >
                 <span className="sm:hidden">Admin</span>
-                <span className="hidden sm:inline">Admin experience</span>
+                <span className="hidden sm:inline">Foundry</span>
               </button>
             ) : null}
           </div>

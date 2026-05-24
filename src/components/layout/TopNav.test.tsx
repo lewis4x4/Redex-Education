@@ -52,8 +52,8 @@ describe('TopNav', () => {
     renderNav('/manager')
 
     expect(screen.getByRole('button', { name: 'Open user menu' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Manager experience/i })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Admin experience/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Team/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Foundry/i })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Open user menu' }))
 
@@ -79,7 +79,7 @@ describe('TopNav', () => {
     renderNav('/sign-in')
 
     expect(screen.queryByRole('button', { name: 'Open user menu' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Admin experience/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Manager experience/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Foundry/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Team/i })).not.toBeInTheDocument()
   })
 })
