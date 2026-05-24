@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/integrations/supabase/client'
@@ -36,11 +36,8 @@ function decodeJwtPayload(accessToken: string | undefined): Record<string, unkno
 }
 
 function getRoleFromSession(session: Session | null): Role | null {
-  const appMetadataRole = normalizeRole(session?.user?.app_metadata?.redex_role)
-  if (appMetadataRole) {
-    return appMetadataRole
-  }
-
+  // The Supabase custom-access-token hook injects redex_role as a top-level JWT
+  // claim, not into user.app_metadata, so role checks must read the access token.
   const tokenClaims = decodeJwtPayload(session?.access_token)
   return normalizeRole(tokenClaims?.redex_role)
 }
@@ -108,11 +105,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [mockAuthEnabled])
 
+  const refreshSession = useCallback(async () => {
+    if (mockAuthEnabled) {
+      return
+    }
+
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.refreshSession()
+
+    if (error) {
+      console.warn('[auth] Unable to refresh Supabase session.', error)
+      throw error
+    }
+
+    setSession(session)
+    setUser(session?.user ?? null)
+  }, [mockAuthEnabled])
+
   const role = mockAuthEnabled ? getMockRole() : getRoleFromSession(session)
 
   const value = useMemo(
-    () => ({ user, session, loading, role }),
-    [user, session, loading, role],
+    () => ({ user, session, loading, role, refreshSession }),
+    [user, session, loading, role, refreshSession],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

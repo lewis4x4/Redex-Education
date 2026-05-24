@@ -328,7 +328,7 @@ function providerFromEnv(): AiProvider {
 }
 
 function modelFor(provider: AiProvider): string {
-  return Deno.env.get("AI_MODEL") ?? (provider === "openai" ? "gpt-4.1-mini" : "claude-3-5-sonnet-20241022");
+  return Deno.env.get("AI_MODEL") ?? (provider === "openai" ? "gpt-5" : "claude-sonnet-4-5");
 }
 
 function apiKeyFor(provider: AiProvider): string {
@@ -364,8 +364,8 @@ function tokenEstimate(value: string): number {
 }
 
 function costFromUsage(provider: AiProvider, inputTokens: number, outputTokens: number): number {
-  const defaultInputCentsPerMillion = provider === "openai" ? 15 : 300;
-  const defaultOutputCentsPerMillion = provider === "openai" ? 60 : 1500;
+  const defaultInputCentsPerMillion = provider === "openai" ? 125 : 300;
+  const defaultOutputCentsPerMillion = provider === "openai" ? 1000 : 1500;
   const inputRate = Number(Deno.env.get("AI_INPUT_COST_CENTS_PER_MILLION_TOKENS") ?? defaultInputCentsPerMillion);
   const outputRate = Number(Deno.env.get("AI_OUTPUT_COST_CENTS_PER_MILLION_TOKENS") ?? defaultOutputCentsPerMillion);
   const cost = (inputTokens / 1_000_000) * inputRate + (outputTokens / 1_000_000) * outputRate;

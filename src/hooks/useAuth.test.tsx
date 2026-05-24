@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider } from './use-auth'
 import { useAuth } from './useAuth'
@@ -7,6 +7,7 @@ import { useAuth } from './useAuth'
 const supabaseAuthMocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   onAuthStateChange: vi.fn(),
+  refreshSession: vi.fn(),
   unsubscribe: vi.fn(),
 }))
 
@@ -15,6 +16,7 @@ vi.mock('@/integrations/supabase/client', () => ({
     auth: {
       getSession: supabaseAuthMocks.getSession,
       onAuthStateChange: supabaseAuthMocks.onAuthStateChange,
+      refreshSession: supabaseAuthMocks.refreshSession,
     },
   },
 }))
@@ -32,6 +34,7 @@ describe('useAuth role claims', () => {
   beforeEach(() => {
     supabaseAuthMocks.getSession.mockReset()
     supabaseAuthMocks.onAuthStateChange.mockReset()
+    supabaseAuthMocks.refreshSession.mockReset()
     supabaseAuthMocks.unsubscribe.mockReset()
     supabaseAuthMocks.onAuthStateChange.mockReturnValue({
       data: { subscription: { unsubscribe: supabaseAuthMocks.unsubscribe } },
@@ -43,7 +46,7 @@ describe('useAuth role claims', () => {
     vi.clearAllMocks()
   })
 
-  it('exposes redex_role from Supabase user app metadata', async () => {
+  it('reads redex_role from access token claims instead of stale app metadata', async () => {
     vi.stubEnv('VITE_MOCK_AUTH', 'false')
     supabaseAuthMocks.getSession.mockResolvedValue({
       data: {
@@ -58,7 +61,7 @@ describe('useAuth role claims', () => {
     const { result } = renderHook(() => useAuth(), { wrapper })
 
     await waitFor(() => expect(result.current.loading).toBe(false))
-    expect(result.current.role).toBe('manager')
+    expect(result.current.role).toBe('learner')
   })
 
   it('falls back to decoding redex_role from the access token claims', async () => {
@@ -95,6 +98,40 @@ describe('useAuth role claims', () => {
 
     const { result } = renderHook(() => useAuth(), { wrapper })
 
+    expect(result.current.role).toBe('admin')
+  })
+
+  it('refreshes the Supabase session and updates role claims', async () => {
+    vi.stubEnv('VITE_MOCK_AUTH', 'false')
+    supabaseAuthMocks.getSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: jwtWithClaims({ redex_role: 'learner' }),
+          user: { app_metadata: {} },
+        },
+      },
+      error: null,
+    })
+    supabaseAuthMocks.refreshSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: jwtWithClaims({ redex_role: 'admin' }),
+          user: { app_metadata: {} },
+        },
+      },
+      error: null,
+    })
+
+    const { result } = renderHook(() => useAuth(), { wrapper })
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.role).toBe('learner')
+
+    await act(async () => {
+      await result.current.refreshSession()
+    })
+
+    expect(supabaseAuthMocks.refreshSession).toHaveBeenCalledTimes(1)
     expect(result.current.role).toBe('admin')
   })
 })

@@ -29,7 +29,134 @@ npm run dev
 
 **Node requirement:** `^20.19.0 || >=22.12.0`
 
-## 3) Scripts
+## 3) First-time operator setup
+
+Use this checklist when preparing the real Redex Supabase project from a fresh clone.
+
+### Supabase project link
+
+```bash
+supabase link --project-ref toghxeuhgkcrbrdxewdw
+```
+
+### Database migrations
+
+```bash
+supabase db push --linked
+```
+
+### Edge functions deploy
+
+Deploy all five Edge Functions. `generation-worker` is invoked by cron/service role, and `custom-access-token-hook` is called by Supabase Auth, so both are deployed without JWT verification.
+
+```bash
+supabase functions deploy drive-sync
+supabase functions deploy parse-source-file
+supabase functions deploy submit-generation-job
+supabase functions deploy generation-worker --no-verify-jwt
+supabase functions deploy custom-access-token-hook --no-verify-jwt
+```
+
+### Required secrets
+
+Set Edge Function secrets with `supabase secrets set ...`. These values live in Supabase, not in browser `.env` files.
+
+| Name | Purpose | Example value |
+|---|---|---|
+| `GOOGLE_DRIVE_LIBRARY_FOLDER_ID` | Google Drive `_library/` folder to sync | `1AbCdEfGhIjKlMn...` |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Full service-account key JSON; grant the service account Viewer on the Drive folder | `"$(cat ~/keys/redex-drive-service-account.json)"` |
+| `AI_PROVIDER_API_KEY` | Anthropic or OpenAI provider key used only by Edge Functions | `sk-ant-...` or `sk-proj-...` |
+| `AI_PROVIDER` | AI provider selector; defaults to Anthropic when unset | `anthropic` or `openai` |
+| `AI_MODEL` | Provider model override | `claude-sonnet-4-5` default, or `gpt-5` for OpenAI |
+| `CUSTOM_ACCESS_TOKEN_HOOK_SECRET` | Supabase Dashboard-generated HTTP hook secret | `v1,whsec_...` |
+| `ALLOWED_ORIGINS` | CSV of allowed browser origins for Edge Function CORS; defaults to `*` when unset | `http://localhost:5173,https://education.goredex.com` |
+
+Optional/server-provided Edge Function env vars used by the codebase:
+
+| Name | Purpose | Example value |
+|---|---|---|
+| `AI_INPUT_COST_CENTS_PER_MILLION_TOKENS` | Override input-token cost accounting; defaults are 300 for Anthropic Sonnet 4.5 and 125 for OpenAI `gpt-5`, in cents per million | `300` |
+| `AI_OUTPUT_COST_CENTS_PER_MILLION_TOKENS` | Override output-token cost accounting; defaults are 1500 for Anthropic Sonnet 4.5 and 1000 for OpenAI `gpt-5`, in cents per million | `1500` |
+| `AI_MAX_TOKENS` | Override non-entailment generation max tokens | `4096` |
+| `SUPABASE_URL` | Supabase-provided project URL inside Edge Functions | `https://toghxeuhgkcrbrdxewdw.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase-provided service-role key inside Edge Functions; never expose in browser code | `<service-role-jwt>` |
+
+Example secret command:
+
+```bash
+supabase secrets set \
+  GOOGLE_DRIVE_LIBRARY_FOLDER_ID="<drive-folder-id>" \
+  GOOGLE_SERVICE_ACCOUNT_JSON="$(cat ~/path/to/service-account.json)" \
+  AI_PROVIDER="anthropic" \
+  AI_MODEL="claude-sonnet-4-5" \
+  AI_PROVIDER_API_KEY="<sk-ant-or-sk-proj-key>" \
+  CUSTOM_ACCESS_TOKEN_HOOK_SECRET="v1,whsec_<dashboard-generated-secret>" \
+  ALLOWED_ORIGINS="http://localhost:5173,https://<your-production-domain>"
+```
+
+### Supabase Dashboard manual steps
+
+1. **Authentication → URL Configuration → Redirect URLs**: add `http://localhost:5173/**` and the production URL, for example `https://<your-production-domain>/**`.
+2. **Authentication → Hooks → Custom Access Token**: enable the HTTP hook pointing at `https://toghxeuhgkcrbrdxewdw.supabase.co/functions/v1/custom-access-token-hook`; use the Dashboard-generated secret that starts with `v1,whsec_`.
+3. **Authentication → Emails → SMTP Settings**: configure Resend or the chosen SMTP provider so magic-link email delivery is reliable.
+
+### pg_cron schedule
+
+Run once in the Supabase SQL editor after deploying `generation-worker`. Replace placeholders with the real project ref and service-role key. Do not commit service-role secrets.
+
+```sql
+create extension if not exists pg_cron with schema extensions;
+create extension if not exists pg_net with schema extensions;
+
+select cron.schedule(
+  'redex-generation-worker',
+  '* * * * *',
+  $$
+    select net.http_post(
+      url := 'https://<project-ref>.supabase.co/functions/v1/generation-worker',
+      headers := jsonb_build_object(
+        'Authorization', 'Bearer <SUPABASE_SERVICE_ROLE_KEY>',
+        'Content-Type', 'application/json'
+      ),
+      body := '{}'::jsonb
+    );
+  $$
+);
+```
+
+### Owner-email allowlist
+
+Migration `20260524000000_owner_email_allowlist.sql` creates `redex.allowed_owner_emails`, seeds Brian's owner emails, auto-elevates matching new sign-ins to `admin`, and backfills missing profiles for existing `auth.users`.
+
+To add more owners later:
+
+```sql
+insert into redex.allowed_owner_emails (email)
+values (lower('new.owner@goredex.com'))
+on conflict do nothing;
+
+update redex.profiles
+set role = 'admin'
+where lower(email) = lower('new.owner@goredex.com');
+```
+
+### `.env` setup
+
+Frontend `.env` values are public Vite configuration only. Copy the template, fill in the Supabase public URL and anon key, and switch to real backends for production-like usage.
+
+```bash
+cp .env.example .env
+```
+
+```dotenv
+VITE_SUPABASE_URL=https://toghxeuhgkcrbrdxewdw.supabase.co
+VITE_SUPABASE_ANON_KEY=<public-anon-key>
+VITE_MOCK_AUTH=false
+VITE_DATA_SOURCE=supabase
+VITE_AI_MODE=real
+```
+
+## 4) Scripts
 
 | Command | Purpose |
 |---|---|
@@ -38,11 +165,11 @@ npm run dev
 | `npm run preview` | Preview the production build |
 | `npm run typecheck` | TypeScript check only (no emit) |
 | `npm run lint` | ESLint check (currently 0 errors / 0 warnings) |
-| `npm test` | Run Vitest once (613 passing, 1 skipped) |
+| `npm test` | Run Vitest once (619+ passing mock-mode baseline) |
 | `npm run test:watch` | Vitest watch mode |
 | `npm run test:coverage` | V8 coverage report |
 
-## 4) Environment variables
+## 5) Environment variables
 
 | Variable | Required | Description |
 |---|---|---|
@@ -73,7 +200,7 @@ supabase secrets set GOOGLE_DRIVE_LIBRARY_FOLDER_ID=<your-folder-id>
 
 These secrets are read by edge functions only — they NEVER reach the browser. The frontend `.env` does NOT need them. See [SLICE_2_4_DEPLOY.md](./prompt-exports/SLICE_2_4_DEPLOY.md) for the full deploy runbook.
 
-## 5) Project structure
+## 6) Project structure
 
 ```text
 Redex-Education/
@@ -98,7 +225,7 @@ Redex-Education/
 └── vite.config.ts        # Vite + Vitest config
 ```
 
-## 6) Routing overview
+## 7) Routing overview
 
 | Path | Renders | Notes |
 |---|---|---|
@@ -113,7 +240,7 @@ Redex-Education/
 
 This table is partial. See [Architecture §3](./docs/architecture.md#3-route-table) for the full route table (20+ routes across learner / admin / foundry / publishing / manager / audit / source-impact surfaces).
 
-## 7) Where to go next
+## 8) Where to go next
 
 - New to the codebase? → [Architecture brief](./docs/architecture.md)
 - Want to contribute? → [Contributing guide](./CONTRIBUTING.md)

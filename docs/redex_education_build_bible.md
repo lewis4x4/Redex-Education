@@ -4082,3 +4082,58 @@ Slice C turns the Slice B real AI stub into a durable server-side generation job
 
 ---
 
+## 2026-05-24 — Operator Readiness Slice: Permanent Landmine Fixes
+
+**Status**: ✅ Completed. Five critical operator-readiness fixes plus documentation/runbook updates shipped without changing the npm toolchain.
+
+**Audit findings**:
+- Consolidated findings shipped: **7**.
+- Severity breakdown: **5 critical operator landmines** (AI default, owner auto-elevation, full profile backfill, stale role refresh utility, dead app_metadata role check) + **2 documentation/operator-runbook gaps** (first-time setup and Build Bible record).
+
+**Files touched**:
+- `supabase/functions/_shared/courseFoundryAiClientServer.ts` — default Anthropic model now `claude-sonnet-4-5`; OpenAI fallback remains `gpt-5`; cost defaults align to current provider pricing defaults (`claude-sonnet-4-5`: 300/1500 cents per million input/output, `gpt-5`: 125/1000).
+- `supabase/migrations/20260524000000_owner_email_allowlist.sql` — creates `redex.allowed_owner_emails`, seeds Brian's three owner emails, replaces `redex.handle_new_user()`, recreates the auth trigger, backfills missing profiles, and promotes allowlisted existing profiles to `admin` idempotently.
+- `src/hooks/auth-context.ts` — exposes `refreshSession()` on `AuthContextType`.
+- `src/hooks/use-auth.tsx` — removes dead `user.app_metadata.redex_role` fallback, reads `redex_role` from the top-level JWT payload, and implements `refreshSession()` via `supabase.auth.refreshSession()`.
+- `src/hooks/useAuth.test.tsx` — covers JWT-over-app-metadata role resolution and session refresh role updates.
+- `README.md` — adds the top-level **First-time operator setup** runbook with Supabase link/push/deploy commands, required secrets, Dashboard manual steps, pg_cron SQL, owner allowlist instructions, and `.env` setup.
+- `docs/redex_education_build_bible.md` — records this operator-readiness slice.
+
+**Migration applied**:
+- ✅ `supabase db push --linked` applied `20260524000000_owner_email_allowlist.sql` to Redex_App (`toghxeuhgkcrbrdxewdw`).
+- ✅ Direct re-run via `supabase db query --linked -f supabase/migrations/20260524000000_owner_email_allowlist.sql -o table` completed successfully, verifying the migration is safe to re-run.
+
+**Functions redeployed**:
+- ✅ `supabase functions deploy generation-worker --no-verify-jwt` redeployed `generation-worker` to Redex_App (`toghxeuhgkcrbrdxewdw`) with script size 97.89kB.
+
+**Remote verification**:
+- ✅ Owner profile roles:
+  - `blewis@goredex.com` → `admin`
+  - `blewis@lewisinsurance.com` → `admin`
+  - `brian.lewis@goredex.com` → `admin`
+- ✅ Profile backfill count: `redex.profiles = 23`, `auth.users where email is not null = 23`.
+- ✅ `redex.allowed_owner_emails` lists the three seeded owner emails.
+
+**Local verification**:
+- ✅ `npm run typecheck` — green.
+- ✅ `npm run lint` — 0 errors / 0 warnings.
+- ✅ `npm test -- --run` — **620 passed, 110 test files**.
+- ✅ `npm run build` — green.
+- ✅ Oracle review pass completed; follow-ups applied for case-idempotent allowlist inserts and OpenAI `gpt-5` cost defaults.
+
+**Pricing verification**:
+- Anthropic official pricing lists Claude Sonnet 4.5 at **$3 / MTok input** and **$15 / MTok output**, matching the 300/1500 cent defaults.
+- OpenAI official GPT-5 model docs list **$1.25 / MTok input** and **$10 / MTok output**, matching the 125/1000 cent defaults.
+
+**Manual operator steps still required**:
+1. Supabase Dashboard → Authentication → URL Configuration: add local and production redirect URLs.
+2. Supabase Dashboard → Authentication → Hooks → Custom Access Token: enable the HTTP hook and paste the `v1,whsec_...` secret into Supabase secrets.
+3. Supabase Dashboard → Authentication → Emails → SMTP Settings: configure Resend or the chosen SMTP provider.
+4. Supabase SQL editor: schedule `redex-generation-worker` with pg_cron using the real service-role key.
+
+**Known scope / remaining risks**:
+- Dashboard Auth configuration and SMTP/cron secrets remain intentionally manual because they require project-owner credentials and service-role material.
+- Existing sessions still need a token refresh to pick up future role updates; `refreshSession()` now provides the client-side utility for future admin UI or operator-directed refresh flows.
+
+---
+
