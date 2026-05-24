@@ -395,8 +395,12 @@ function apiKeyFor(provider: AiProvider): string {
   return key;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function buildUserPrompt(prompt: PromptDefinition, input: unknown): string {
-  const payload = isRecord(input) ? input : {};
+  const payload: Record<string, unknown> = isRecord(input) ? input : {};
 
   return prompt.user
     .replace("{{learning_outcomes}}", JSON.stringify(payload.learning_outcomes ?? [], null, 2))
