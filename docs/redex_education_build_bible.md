@@ -4195,3 +4195,58 @@ Slice C turns the Slice B real AI stub into a durable server-side generation job
 - `submit-generation-job` already has role authorization; this slice only needed the CORS hard-fail there.
 
 ---
+
+## 2026-05-24 — Production JWT Role Fix: Expose `redex` schema in Supabase Data API (PGRST106)
+
+**Status**: ✅ Resolved.
+
+**Reported symptom**: `blewis@goredex.com` could sign in via magic link on `https://redex.education`, the Supabase session/JWT existed, but the UI showed a **LEARNER** badge and `/admin` was inaccessible. Browser console showed HTTP 406 responses from `redex.*` REST queries.
+
+**Verified working in advance of the fix**:
+- Hook function `custom-access-token-hook` was deployed, version 5 ACTIVE
+- Configured URL in Supabase Dashboard included the `-hook` suffix
+- `CUSTOM_ACCESS_TOKEN_HOOK_SECRET` env var was set and matched the Dashboard signing secret
+- `redex.profiles` had `role='admin'` for the user
+- Owner allowlist entry present
+- Function was reachable (HTTP 401 on unsigned curl test, correct rejection behavior)
+
+**Actual root cause**: The Supabase **Data API (PostgREST) was not exposing the `redex` schema**. The hook's service-role client used:
+
+```ts
+createClient(supabaseUrl, serviceRoleKey, { db: { schema: 'redex' } })
+```
+
+…then queried `redex.profiles`. PostgREST returned **PGRST106**:
+
+```
+The schema must be one of the following: public, graphql_public
+```
+
+The function caught the error, logged the warning, and silently fell back to `"redex_role": "learner"` — the intentional safe default. So the JWT carried the wrong role for every admin user.
+
+This affected **every Supabase client query against the `redex` schema**, not just the hook — the browser client and edge functions would have hit the same PGRST106 had they made user-facing queries.
+
+**Fix**:
+
+Supabase Dashboard → Integrations → Data API → Settings → **Exposed schemas** → add `redex` while preserving the existing entries.
+
+Resulting `Exposed schemas`: `public, graphql_public, redex`
+
+**Verification**: fresh sign-in showed the ADMIN badge in the header; `/admin` opened cleanly; the PGRST106 warning stopped appearing in function logs.
+
+**Why this wasn't caught earlier**:
+- Local tests use mock mode, never hitting PostgREST.
+- The CI eval harness uses mock AI client, also bypasses PostgREST.
+- Slice 8.5 verified the schema migration applied (tables exist) but didn't verify the Data API surfaces them.
+- ADR 017 (schema isolation) documented the DB-level isolation but not the matching Data API config step.
+
+**Key lesson**: Postgres schema creation and Supabase Data API exposure are TWO separate configurations. Creating `redex` schema in a migration makes it queryable via service-role Postgres (which is why `supabase db query` worked), but PostgREST — which every Supabase JS client and Edge Function uses by default — only honors schemas explicitly listed in the Data API config.
+
+**Documentation updates landed alongside this fix**:
+- ADR 017 (Redex schema isolation) — added a "Required Data API exposure" subsection
+- README "First-time operator setup" — added the exposed-schemas step explicitly with screenshot location
+- This Build Bible entry as the canonical record of the diagnosis
+
+**Next operator who sets up a new Supabase project for this app**: add `redex` to Exposed Schemas BEFORE running migrations. If you forget, you'll hit PGRST106 the first time any client tries to query a redex table.
+
+---

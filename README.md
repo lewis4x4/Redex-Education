@@ -96,9 +96,10 @@ supabase secrets set \
 
 ### Supabase Dashboard manual steps
 
-1. **Authentication → URL Configuration → Redirect URLs**: add `http://localhost:5173/**` and the production URL, for example `https://<your-production-domain>/**`.
-2. **Authentication → Hooks → Custom Access Token**: enable the HTTP hook pointing at `https://toghxeuhgkcrbrdxewdw.supabase.co/functions/v1/custom-access-token-hook`; use the Dashboard-generated secret that starts with `v1,whsec_`.
-3. **Authentication → Emails → SMTP Settings**: configure Resend or the chosen SMTP provider so magic-link email delivery is reliable.
+1. **Integrations → Data API → Settings → Exposed schemas**: add `redex` to the list. Final value should be `public, graphql_public, redex`. **This is non-negotiable** — without it, every Supabase client query against `redex.*` (the browser app, Edge Functions, the custom-access-token hook) silently fails with `PGRST106 The schema must be one of the following: public, graphql_public`. The custom-access-token hook in particular falls back to `redex_role: 'learner'` when this step is missed, blocking every admin user from `/admin` despite a correctly-populated `redex.profiles` row. See ADR 017 for the full rationale.
+2. **Authentication → URL Configuration → Redirect URLs**: add `http://localhost:5173/**` and the production URL, for example `https://<your-production-domain>/**`.
+3. **Authentication → Hooks → Custom Access Token**: enable the HTTP hook pointing at `https://toghxeuhgkcrbrdxewdw.supabase.co/functions/v1/custom-access-token-hook`; use the Dashboard-generated secret that starts with `v1,whsec_`.
+4. **Authentication → Emails → SMTP Settings**: configure Resend or the chosen SMTP provider so magic-link email delivery is reliable.
 
 ### pg_cron schedule
 

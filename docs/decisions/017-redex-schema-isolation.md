@@ -41,6 +41,35 @@ Concretely:
 - One Postgres feature is unavailable cross-schema without explicit `redex.foo` references: `search_path`. The Supabase client's `db.schema: 'redex'` option handles this for the PostgREST API. Direct `psql` sessions should `SET search_path = redex, public;` if they need redex's objects without prefixing.
 - The legacy installer table `auth.users` and the `auth.uid()` function continue to be referenced unprefixed — they live in the `auth` schema, not `public`, and apply to every schema.
 
+## Required Data API exposure (gotcha — learned the hard way)
+
+**Postgres schema creation alone is not enough.** Supabase's Data API (PostgREST) must be explicitly configured to expose the schema, otherwise every PostgREST query (every Supabase JS `from()` call, every Edge Function service-role query) returns:
+
+```
+PGRST106: The schema must be one of the following: public, graphql_public
+```
+
+This applies even when the client correctly passes `db: { schema: 'redex' }` — that option tells PostgREST which schema to route into, but PostgREST only honors schemas on its allowlist.
+
+**Required operator step**:
+
+Supabase Dashboard → Integrations → Data API → Settings → **Exposed schemas** → add `redex`. The full list should be:
+
+```
+public, graphql_public, redex
+```
+
+**What fails without this step** (silently, until users notice):
+- The custom-access-token-hook can't read `redex.profiles.role` → defaults every user to `learner`
+- Browser supabase client `.from('training_courses')` etc. return 406 → silent error or empty arrays in UI
+- Edge functions (drive-sync, parse-source-file, submit-generation-job, generation-worker) can't read or write any `redex` table → fail with PGRST106
+
+**Why this isn't caught by tests**: Local Vitest tests use mock mode and never hit PostgREST. CI runs the same. The gotcha only surfaces on real production traffic.
+
+**Diagnosis signal**: if you see `PGRST106` in any function log, on any client query, the Exposed Schemas list is missing `redex`. The fix is the Dashboard step above; no code change required.
+
+History: this bit production on 2026-05-24 — `blewis@goredex.com` signed in but JWT defaulted to `learner` because the hook couldn't read the profiles row. Fixed by adding `redex` to Exposed Schemas. See Build Bible "Production JWT Role Fix" entry for the full diagnosis.
+
 ## References
 
 - v2 Roadmap Slice 8.5: [`../Redex_Education_Phase10-13_Roadmap_v2_20260523.md`](../Redex_Education_Phase10-13_Roadmap_v2_20260523.md)
