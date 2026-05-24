@@ -3,10 +3,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 let ALLOWED_ORIGINS: string[] = [];
 
 function configureAllowedOrigins(functionName: string): Response | null {
-  const rawAllowedOrigins = Deno.env.get("ALLOWED_ORIGINS");
+  const rawAllowedOrigins = Deno.env.get("REDEX_ALLOWED_ORIGINS");
 
   if (!rawAllowedOrigins) {
-    console.error(`[${functionName}] ALLOWED_ORIGINS must be set`);
+    console.error(`[${functionName}] REDEX_ALLOWED_ORIGINS must be set`);
     return new Response(
       JSON.stringify({
         status: "error",
@@ -23,7 +23,7 @@ function configureAllowedOrigins(functionName: string): Response | null {
     .filter(Boolean);
 
   if (ALLOWED_ORIGINS.length === 0) {
-    console.error(`[${functionName}] ALLOWED_ORIGINS must include at least one origin`);
+    console.error(`[${functionName}] REDEX_ALLOWED_ORIGINS must include at least one origin`);
     return new Response(
       JSON.stringify({
         status: "error",

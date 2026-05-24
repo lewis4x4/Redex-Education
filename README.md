@@ -69,7 +69,7 @@ Set Edge Function secrets with `supabase secrets set ...`. These values live in 
 | `AI_PROVIDER` | AI provider selector; defaults to Anthropic when unset | `anthropic` or `openai` |
 | `AI_MODEL` | Provider model override | `claude-sonnet-4-5` default, or `gpt-5` for OpenAI |
 | `CUSTOM_ACCESS_TOKEN_HOOK_SECRET` | Supabase Dashboard-generated HTTP hook secret | `v1,whsec_...` |
-| `ALLOWED_ORIGINS` | CSV of allowed browser origins for Edge Function CORS; required for deployed functions | `http://localhost:5173,https://education.goredex.com` |
+| `REDEX_ALLOWED_ORIGINS` | CSV of allowed browser origins for Redex Education Edge Function CORS; required for deployed functions. Namespaced (`REDEX_`-prefixed) so it does NOT collide with any `ALLOWED_ORIGINS` secret used by other apps sharing this Supabase project (e.g., the Victra/installer system). | `http://localhost:5173,https://redex.education` |
 
 Optional/server-provided Edge Function env vars used by the codebase:
 
@@ -91,7 +91,7 @@ supabase secrets set \
   AI_MODEL="claude-sonnet-4-5" \
   AI_PROVIDER_API_KEY="<sk-ant-or-sk-proj-key>" \
   CUSTOM_ACCESS_TOKEN_HOOK_SECRET="v1,whsec_<dashboard-generated-secret>" \
-  ALLOWED_ORIGINS="http://localhost:5173,https://education.goredex.com,https://education.redexops.com"
+  REDEX_ALLOWED_ORIGINS="http://localhost:5173,https://redex.education"
 ```
 
 ### Supabase Dashboard manual steps

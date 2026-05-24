@@ -5,16 +5,16 @@ const DRIVE_API_BASE_URL = "https://www.googleapis.com/drive/v3";
 const FOLDER_MIME_TYPE = "application/vnd.google-apps.folder";
 
 // CORS: by default echoes the requesting origin and only allows POST/OPTIONS.
-// Tighten further by setting ALLOWED_ORIGINS env to a comma-separated list of
+// Tighten further by setting REDEX_ALLOWED_ORIGINS env to a comma-separated list of
 // trusted frontend URLs. Authentication still depends on the Supabase JWT in
 // the Authorization header — CORS is in-depth-only.
 let ALLOWED_ORIGINS: string[] = [];
 
 function configureAllowedOrigins(functionName: string): Response | null {
-  const rawAllowedOrigins = Deno.env.get("ALLOWED_ORIGINS");
+  const rawAllowedOrigins = Deno.env.get("REDEX_ALLOWED_ORIGINS");
 
   if (!rawAllowedOrigins) {
-    console.error(`[${functionName}] ALLOWED_ORIGINS must be set`);
+    console.error(`[${functionName}] REDEX_ALLOWED_ORIGINS must be set`);
     return new Response(
       JSON.stringify({
         status: "error",
@@ -31,7 +31,7 @@ function configureAllowedOrigins(functionName: string): Response | null {
     .filter(Boolean);
 
   if (ALLOWED_ORIGINS.length === 0) {
-    console.error(`[${functionName}] ALLOWED_ORIGINS must include at least one origin`);
+    console.error(`[${functionName}] REDEX_ALLOWED_ORIGINS must include at least one origin`);
     return new Response(
       JSON.stringify({
         status: "error",

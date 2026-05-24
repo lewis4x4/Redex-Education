@@ -12,16 +12,16 @@ import {
 const DRIVE_API_BASE_URL = "https://www.googleapis.com/drive/v3";
 
 // CORS: defaults to `*` (parity with previous behavior) but can be locked down
-// in production by setting ALLOWED_ORIGINS (comma-separated). Authentication
+// in production by setting REDEX_ALLOWED_ORIGINS (comma-separated). Authentication
 // still relies on the Supabase JWT in the Authorization header; CORS is
 // defense-in-depth.
 let ALLOWED_ORIGINS: string[] = [];
 
 function configureAllowedOrigins(functionName: string): Response | null {
-  const rawAllowedOrigins = Deno.env.get("ALLOWED_ORIGINS");
+  const rawAllowedOrigins = Deno.env.get("REDEX_ALLOWED_ORIGINS");
 
   if (!rawAllowedOrigins) {
-    console.error(`[${functionName}] ALLOWED_ORIGINS must be set`);
+    console.error(`[${functionName}] REDEX_ALLOWED_ORIGINS must be set`);
     return new Response(
       JSON.stringify({
         status: "error",
@@ -38,7 +38,7 @@ function configureAllowedOrigins(functionName: string): Response | null {
     .filter(Boolean);
 
   if (ALLOWED_ORIGINS.length === 0) {
-    console.error(`[${functionName}] ALLOWED_ORIGINS must include at least one origin`);
+    console.error(`[${functionName}] REDEX_ALLOWED_ORIGINS must include at least one origin`);
     return new Response(
       JSON.stringify({
         status: "error",
