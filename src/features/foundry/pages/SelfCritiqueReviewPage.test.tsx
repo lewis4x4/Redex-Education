@@ -32,6 +32,7 @@ function createStorageMock(): Storage {
 describe('SelfCritiqueReviewPage', () => {
   let SelfCritiqueReviewPage: (typeof import('./SelfCritiqueReviewPage'))['SelfCritiqueReviewPage']
   let useFoundryDraftStore: (typeof import('@/features/foundry/store/foundryDraftStore'))['useFoundryDraftStore']
+  let aiModule: typeof import('@/features/foundry/ai')
 
   beforeEach(async () => {
     vi.resetModules()
@@ -43,6 +44,7 @@ describe('SelfCritiqueReviewPage', () => {
     })
 
     ;({ useFoundryDraftStore } = await import('@/features/foundry/store/foundryDraftStore'))
+    aiModule = await import('@/features/foundry/ai')
     ;({ SelfCritiqueReviewPage } = await import('./SelfCritiqueReviewPage'))
 
     act(() => {
@@ -98,6 +100,18 @@ describe('SelfCritiqueReviewPage', () => {
     renderPage()
 
     expect(await screen.findByText('Publish blocked')).toBeInTheDocument()
+  })
+
+  it('shows error alert with retry when critique generation fails', async () => {
+    vi.spyOn(aiModule, 'getCourseFoundryAiClient').mockReturnValue({
+      ...aiModule.mockAiClient,
+      critiqueModule: vi.fn().mockRejectedValue(new Error('worker stage failed')),
+    })
+
+    renderPage()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("We couldn't run self-critique.")
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
   })
 
   it('enables Continue button and navigates to side-by-side review on click', async () => {

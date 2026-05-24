@@ -54,6 +54,23 @@ describe('FoundryQuestionsPage', () => {
 
     act(() => {
       useFoundryDraftStore.getState().clearSetupAnswers()
+      useFoundryDraftStore.getState().setBasics({
+        title: 'Draft ready',
+        parent_course_id: 'standalone',
+        audience: 'Ops',
+        criticality: 'required',
+        training_type: 'operational',
+        estimated_minutes: 30,
+      })
+      useFoundryDraftStore.getState().setSourceMaterial({
+        id: 'source-1',
+        title: 'Source',
+        type: 'markdown',
+        raw_text: '# Source',
+        raw_text_preview: '# Source',
+        processing_status: 'processed',
+        sections: [],
+      })
     })
   })
 
@@ -72,9 +89,10 @@ describe('FoundryQuestionsPage', () => {
   it('renders eyebrow, heading, subhead, and wizard', () => {
     renderWithRoutes()
 
-    expect(screen.getByText('REDEX AI COURSE FOUNDRY · STEP 3')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Setup questions' })).toBeInTheDocument()
-    expect(screen.getByText(/These answers drive how the Foundry generates this module\./i)).toBeInTheDocument()
+    expect(screen.getByText('REDEX AI COURSE FOUNDRY')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Generation guidance' })).toBeInTheDocument()
+    expect(screen.getByText(/These answers refine how the Foundry generates this module\./i)).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Foundry progress' })).toBeInTheDocument()
     expect(screen.getByRole('form', { name: /setup questions wizard/i })).toBeInTheDocument()
   })
 
@@ -109,7 +127,7 @@ describe('FoundryQuestionsPage', () => {
       }),
     )
     expect(useFoundryDraftStore.getState().setupAnswers?.updated_at).toEqual(expect.any(String))
-    expect(toastSuccessMock).toHaveBeenCalledWith('Setup answers saved')
+    expect(toastSuccessMock).toHaveBeenCalledWith('Saved to your draft')
 
     expect(await screen.findByText('Outline route reached')).toBeInTheDocument()
   })

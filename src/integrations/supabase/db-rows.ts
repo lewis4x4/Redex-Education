@@ -257,6 +257,9 @@ export function mapProfileRow(row: ProfileRow): User {
     email: requiredString(row.email, context, 'email'),
     display_name: requiredString(row.display_name, context, 'display_name'),
     role: requiredEnum(row.role, ROLES, context, 'role') as Role,
+    department: optionalString(row.department),
+    manager_id: optionalString(row.manager_id),
+    start_date: optionalString(row.start_date),
     created_at: requiredString(row.created_at, context, 'created_at'),
     updated_at: requiredString(row.updated_at, context, 'updated_at'),
   }

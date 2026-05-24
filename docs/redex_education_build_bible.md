@@ -4450,3 +4450,199 @@ Both read-only audit reports are committed under `docs/reviews/` as the durable 
 - `preferred_name` Supabase column — `fetchProfilesByIds` uses `select('*')` + safe extraction because the generated TS types don't yet include `preferred_name`. Re-generate types after the next migration that adds the column for full type safety.
 
 **Next**: The live AI-generation smoke test against Brian's Drive `_library/` HR content. With per-stage draft persistence in place, the smoke test now also validates the new Drafts-bucket populate behavior on the dashboard end-to-end.
+
+---
+
+## 2026-05-24 — Slice: Onboarding Workflow
+
+**Status**: ✅ Completed locally (pending orchestrator deploy).
+
+**Summary**:
+- Added onboarding profile schema support in `redex.profiles` (`start_date`, `department`, `manager_id`) with comments and safe idempotent migration behavior.
+- Added `invite-user` Supabase Edge Function (`supabase/functions/invite-user`) that:
+  - requires admin caller auth,
+  - invites via `supabase.auth.admin.inviteUserByEmail(email)`,
+  - upserts `redex.profiles` with role/department/start date/manager,
+  - returns `{ ok: true, user_id, profile_id }`.
+- Added onboarding client mutation `onboardNewPerson(input)`:
+  - invokes the edge function,
+  - inserts assignment rows for selected module versions,
+  - writes local audit event `user_onboarded`.
+- Added onboarding queries:
+  - `fetchAuditableModulesForOnboarding(audience)` currently returns all published module versions (plus best-effort module criticality join) for UI-side filtering.
+  - `fetchOnboardingCandidates()` returns learner profiles with computed onboarding completion percentage and last activity from assignments.
+- Added onboarding UI/routes:
+  - `/admin/onboard` form with full name, email, role, department, start date, manager, and module checklist.
+  - `/admin/people` table listing Name, Email, Role, Department, Start date, Completion %, Last activity.
+  - `/admin/people/:id` selected-person status card for post-invite navigation.
+- Added Admin Dashboard third CTA card: **Onboarding** → `/admin/onboard`.
+- Updated Supabase/domain row mapping/types to include profile onboarding fields.
+
+**Tests added**:
+- `src/features/onboarding/pages/OnboardNewPersonPage.test.tsx`
+- `src/features/onboarding/pages/PeopleListPage.test.tsx`
+- `src/integrations/supabase/mutations/onboarding.test.ts`
+- `src/integrations/supabase/queries/onboarding.test.ts`
+- `supabase/functions/invite-user/index.test.ts`
+- Route coverage additions in `src/App.routes.test.tsx`
+- Dashboard CTA coverage additions in `src/features/admin/pages/AdminDashboardPage.test.tsx`
+
+**Known gap (explicitly tracked)**:
+- Audience-to-module tagging join is not yet implemented; onboarding module fetch currently returns all published module versions and the UI filters locally.
+
+---
+
+## 2026-05-24 — Mega-slice: Foundry End-to-End + Learning Outcomes Moonshot + Onboarding
+
+**Status**: ✅ Completed.
+
+**Context**: After the admin dashboard end-to-end overhaul, Brian pointed at the FoundryStartPage basics form and asked the right product question: *"Is this exactly how the questions should be asked? Are these the questions that should be asked?"* The orchestrator commissioned two read-only audits (design + functional) on the entire Foundry author chain, then dispatched three parallel waves of builders (cleanup, onboarding, basics-v2, AI-prompts, design-polish) to fix the entire workflow end-to-end plus introduce learning outcomes as a first-class field that flows through every AI prompt and every learner-facing display.
+
+### Two audit reports (durable artifacts)
+
+- `docs/reviews/foundry-workflow-design-audit-2026-05-24.md` — 1,052-line design audit; 10 cross-cutting findings + per-page chrome issues across 13 files in scope.
+- `docs/reviews/foundry-workflow-functional-audit-2026-05-24.md` — 690-line functional audit; 5 P0 smoke-test-killer blockers + extensive per-page gap list + complete learning-outcomes integration map + smoke-test preflight checklist.
+
+### Sub-slice 1 — Onboarding Workflow (`/admin/onboard` + `/admin/people`)
+
+Closes the "how does Brian onboard a new hire?" gap.
+
+**Migration**: `supabase/migrations/20260524180000_onboarding_profile_columns.sql` adds `redex.profiles.start_date date`, `redex.profiles.department text`.
+
+**New edge function**: `supabase/functions/invite-user/index.ts` + `handler.ts` + tests. Calls `supabase.auth.admin.inviteUserByEmail` and upserts the `redex.profiles` row.
+
+**New mutation**: `src/integrations/supabase/mutations/onboarding.ts` — `onboardNewPerson(input)` POSTs to invite-user edge function, then inserts assignment rows for every chosen module, then writes a `user_onboarded` audit event.
+
+**New queries**: `src/integrations/supabase/queries/onboarding.ts` — `fetchAuditableModulesForOnboarding(audience)` (returns all published versions for v1 — audience-tag join deferred), `fetchOnboardingCandidates()`.
+
+**New pages**: `src/features/onboarding/pages/OnboardNewPersonPage.tsx` (form: name, email, role, department, start date, manager, auto-checked module list), `src/features/onboarding/pages/PeopleListPage.tsx` (table of all profiles + completion stats).
+
+**Dashboard CTA card**: third entry card added to `AdminDashboardPage` ("Onboarding — welcome a new hire and auto-assign required training") alongside Foundry + Assignments.
+
+### Sub-slice 2 — Assignments page wire-to-Supabase + CTA button alignment
+
+Removes the last visible mock-data leaks from the admin surface.
+
+**Files modified**:
+- `src/features/assignments/components/AssignmentForm.tsx` — removed hardcoded `ASSIGNABLE_USERS = [MARCUS, ANA, DEVON]`; now sources from a new `useAssignmentAdmin()` hook.
+- `src/features/assignments/components/AssignedUsersTable.tsx` — removed hardcoded `PEOPLE` array; consumes enriched assignment rows (`assignee_display_name`, `assigned_by_display_name`).
+- `src/features/assignments/pages/AssignmentAdminPage.tsx` — removed mock-language copy ("Marcus/Ana/Devon", "local mock assignment state").
+- `src/features/assignments/hooks/useAssignmentAdmin.ts` (new) — dispatcher with mock fast-path + supabase async path; exposes `assignableUsers`, `publishedModules`, `assignments`, `loading`, `error`, `refetch`, `createAssignment`.
+- `src/integrations/supabase/queries/profiles.ts` — added `fetchAssignableUsers()`.
+- `src/integrations/supabase/queries/assignments.ts` — added `fetchPublishedModuleAssignments()`, `fetchAllAssignmentsWithNames()`, `AssignmentWithNames` type.
+- `src/integrations/supabase/mutations/assignments.ts` — added `createAssignment(input)` (kept `insertAssignment` alias for back-compat).
+
+**CTA button alignment**: `FoundryEntryCard` and `AssignmentsEntryCard` now use `flex h-full flex-col` + `mt-auto pt-6` wrapper on the button so both buttons pin to the bottom of equal-height grid cells regardless of body length.
+
+### Sub-slice 3 — Basics form v2 + Learning Outcomes (the moonshot)
+
+The user-facing form rewrite + store hardening + the new field that propagates through every AI prompt and every learner-facing display.
+
+**Types** (`src/types/training.ts`):
+- New `LearningOutcome = { id, text }` interface.
+- `CANONICAL_AUDIENCES` const + `CANONICAL_AUDIENCE_LABELS` (10 archetypes: new_hire, all_employees, field_team, managers, customer_support, sales, operations, compliance_officers, foundry_authors, leadership).
+- `ModuleBasicsDraft` extended with `learning_outcomes` (1-3), `audience_archetype`, `audience_refinement`, `completion_required` (`required | recommended | optional`; default **recommended**, was `'required'`).
+- `FoundryDraftMetadata.basics` shape extended to persist all of the above.
+
+**Schema** (`src/features/foundry/schemas/foundrySchemas.ts`):
+- `learning_outcomes` array, min 1, max 3, each text 8–180 chars.
+- `audience_archetype` enum (10 options).
+- `audience_refinement` optional, max 80 chars.
+- `completion_required` enum.
+
+**Form** (`src/features/foundry/components/ModuleBasicsForm.tsx`):
+- Rebuilt with `useFieldArray` for the 3-outcome rows (add/remove, min 1 max 3).
+- Audience dropdown + refinement input.
+- Completion-required radios (default Recommended).
+- Estimated duration as preset buttons (15/30/60/90) + custom override.
+- "Why we ask" toggle on every field with helper copy.
+- Submit button now uses `variant="brand"` (closes the design-audit C-3 finding for this page).
+
+**Helper**: `src/features/foundry/lib/audienceFormat.ts` exports `formatAudienceForAi(basics)` — produces `"New hires"` or `"New hires (with 6+ months experience)"` strings consumed by every AI prompt.
+
+**Cold-load redirect guard hook**: `src/features/foundry/hooks/useDraftRedirect.ts` — `useDraftRedirect(stage)` redirects to the prerequisite page when required store state is missing. Builders II and III sprinkle it on their pages.
+
+**Foundry draft store hardening** (`src/features/foundry/store/foundryDraftStore.ts`):
+- `hydrateFromDraftMetadata`, `resumeDraftFromAdminItem`, and `seedDraftFromModuleVersion` no longer hardcode `audience='New hires'` / `training_type='general_informational'` / `estimated_minutes=20` — they now read the real values from `draft_metadata.basics`. `resumeDraftFromAdminItem` logs a `console.warn` if metadata is missing instead of silently substituting fixtures.
+- New `setBasics` invalidation: when material basics fields change (title/audience/criticality/training_type/learning_outcomes), invalidate `outline`, `generatedModule`, `critique`, `lessonReviews`, `publishStatus`. Preserves `sourceMaterial` + `selectedLibraryFileIds`.
+- `persistDraftStage` now writes `learning_outcomes`, `audience_archetype`, `audience_refinement`, `completion_required` into `draft_metadata.basics` so server-side draft rows carry the full intent.
+
+### Sub-slice 4 — AI prompts deep integration (5 P0 fixes + learning outcomes everywhere)
+
+The audit found five AI-pipeline blockers that would have killed Brian's smoke test. All fixed.
+
+**C1 — SideBySideReviewPage stuck forever in supabase mode**: `realAiClient.generateLessons` now derives a default `lesson_reviews` array from the generated module's lessons before returning, so the SideBy page hydrates immediately in real mode (no more "Loading review data…" infinite spinner).
+
+**C2 — Drive library selections never reached the AI**: when `sourceMaterial` is empty and `selectedLibraryFileIds.length > 0`, both the client (`realAiClient.ts`) and the edge function (`generation-worker/index.ts`) now fetch the corresponding `source_files` + `source_sections` from `redex` and concatenate their parsed markdown as the AI source.
+
+**C3 — All lesson types used the `lesson_generation.text` prompt**: introduced `PROMPT_KEY_BY_LESSON_TYPE` map; each of the 9 lesson types (text, quiz, checklist, acknowledgment, scenario, video, coach, assignment, reflection_prompt) now dispatches to its dedicated prompt. Server-side `courseFoundryAiClientServer.ts` mirrors the dispatch.
+
+**C4 — self_critique missing context**: the critique input shape now threads `promptIds`, `courseOutline`, `generatedAssessments`, and `learning_outcomes` end-to-end; prompt templates resolve the variables.
+
+**Generation error handling**: `OutlineReviewPage`, `ModuleGenerationPreviewPage`, `SelfCritiqueReviewPage`, `SideBySideReviewPage` all wrap their AI calls in try/catch and surface failures via `role="alert"` cards with Retry buttons (mirroring the dashboard error pattern). No more silent fire-and-forget.
+
+**Learning outcomes wired everywhere**:
+- `prompts.ts` adds `{{learningOutcomes}}` variable and system-prompt rule to every prompt template ("Every generated lesson and assessment must directly serve these outcomes").
+- `courseFoundryAiClientServer.ts` (the edge-function-side mirror) carries the same wiring.
+- `mockAiClient.ts` honors outcomes for parity (generated lesson titles reference outcome verbs).
+- `pageInputDefaults.ts` supplies a default 3-outcome HR-onboarding set so mock-mode tests have realistic content.
+
+**Audience archetype wired everywhere**: `formatAudienceForAi(basics)` is now the single source for the `{{targetAudience}}` template variable in every prompt.
+
+### Sub-slice 5 — Foundry stepper, design polish, mock-leak elimination, learner outcome surfaces
+
+**Foundry stepper** (`src/features/foundry/components/FoundryStepper.tsx`, new) — shared 8-stage stepper (Basics → Source → Questions → Outline → Preview → Critique → Side-by-side → Publish) rendered on every Foundry page. Pulls current stage from store state. Accessible (`aria-current="step"`, `role="navigation"`).
+
+**Save-state copy unified**: every Foundry page now says "Saved to your draft" or "Auto-saves as you continue" — no more inconsistent phrasing.
+
+**Engineer-language leaks removed**: zero remaining `Slice N.N` strings, `TODO`/`FIXME` in JSX, or "mock" references in author-facing copy.
+
+**Mock-data fallbacks eliminated** (design-audit cross-cutting C-7):
+- `PublishConfirmationPage.tsx`: hardcoded `'HR Basics at Redex'` fallback replaced with an empty-state card "No published module to celebrate. [Back to dashboard]".
+- `PublishBlockersPage.tsx`: `MOCK_PUBLISH_BLOCKERS` no longer rendered in production paths; shows an empty state with a "Back to outline" CTA.
+
+**Variant=brand bypass sweep**: 5 additional `<Button>` instances across Foundry pages migrated from raw `bg-redex-red` classNames to `variant="brand"` so they all share the shadow/hover/active treatment with the rest of the app.
+
+**Cold-load redirect guards applied**: `useDraftRedirect` (Builder I's hook) is now active on every Foundry page that requires upstream state. Direct navigation to `/admin/foundry/outline` with no draft now redirects safely instead of silently using `DEFAULT_AI_MODULE_BASICS`.
+
+**Learner-side outcome surfaces (the moonshot extension)**:
+- `LearnerDashboardPage.tsx`: every module card shows a "What you'll learn" preview pulling outcomes from `draft_metadata.basics.learning_outcomes`.
+- `ModulePlayer.tsx` start screen: prominently displays the module's 3 learning outcomes above the lesson list.
+- `ModulePlayer.tsx` completion screen: replaces the 🎉 emoji + 3xl headline confetti (design-bar §11 violation) with a clean **"What you can now do"** panel listing the outcomes the learner just completed.
+- `ModuleVersionHistoryPage.tsx`: outcomes appear as a sub-section under each version's title.
+
+### Verification (entire mega-slice)
+
+- ✅ `npm run typecheck` — 0 errors.
+- ✅ `npm run lint` — 0 errors / 0 warnings.
+- ✅ `npm test -- --run` — **753 passed / 127 test files** (+41 over the 712 baseline before this push: 718 after cleanup → 729 after onboarding → 745 after Builder II → 753 after final route-test patches).
+- ✅ `npm run build` — green, 531 ms.
+
+### Acceptance criteria
+
+- ✅ Five P0 smoke-test blockers from the functional audit are all fixed (SideBy hydration, library-source assembly, lesson-type prompt dispatch, self_critique full context, generation error handling).
+- ✅ Learning outcomes are a first-class field on the basics form (1-3 bullets) and propagate to every AI prompt, every learner-facing surface, every admin module summary.
+- ✅ Audience is now a structured archetype + refinement, not free text — the AI receives a curated string.
+- ✅ Basics "Criticality" renamed to `completion_required` (Required/Recommended/Optional, default Recommended) — no more enum collision with setup-questions criticality.
+- ✅ Foundry workflow has a consistent stepper, consistent save-state language, no mock-fixture fallbacks in production paths, no engineer-language leaks.
+- ✅ `/admin/onboard` workflow creates a profile + invite + auto-assigns modules + writes audit log.
+- ✅ `/admin/people` lists all profiles with completion stats.
+- ✅ AssignmentAdminPage reads/writes live Supabase data; zero hardcoded mock personas.
+- ✅ CTA buttons on the dashboard align at the bottom of equal-height cards.
+
+### Known scope deferred
+
+- Audience-to-module-version tagging schema + filter join: `fetchAuditableModulesForOnboarding(audience)` currently returns all published versions for v1 and the UI filters locally. The full join requires either a `module_versions.audience_archetypes text[]` column or a `module_version_audiences` link table — separate slice.
+- `preferred_name` column on `redex.profiles` — `display_name` is still used everywhere; the audit-recommended `preferred_name` column is a separate one-line migration + type regen.
+- Audit-log persistence to `redex.audit_logs` — audit events are still Zustand-local; persisting them server-side is a separate slice with its own migration + RLS.
+
+### Deployment requirements
+
+The following must be applied to the linked Supabase project for the new features to work in production:
+
+1. **Migration** `supabase/migrations/20260524180000_onboarding_profile_columns.sql` — adds `start_date` + `department` columns to `redex.profiles`. Apply via `supabase db push`.
+2. **Edge function** `supabase/functions/invite-user/` — new function for the onboarding workflow. Deploy via `supabase functions deploy invite-user`.
+3. **Edge function** `supabase/functions/generation-worker/` — modified to assemble Drive-library source when `sourceMaterial` is empty and `selectedLibraryFileIds` is set. Redeploy via `supabase functions deploy generation-worker`.
+
+**Next**: The live AI-generation smoke test against Brian's Drive `_library/` HR content is now genuinely unblocked. Every audit-identified blocker is fixed, every mock leak is eliminated, and the workflow now asks the right questions (learning outcomes, structured audience, sane criticality scale) and uses them everywhere they need to be used.
+

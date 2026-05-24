@@ -1,4 +1,4 @@
-import type { FoundryDraftStage, ModuleVersion, UUID } from '@/types/training'
+import type { FoundryDraftMetadata, FoundryDraftStage, ModuleVersion, UUID } from '@/types/training'
 import { getDataSource } from './dataSource'
 import * as supabaseDataProvider from './supabaseDataProvider'
 
@@ -39,6 +39,7 @@ export async function upsertModuleDraft(input: {
   module_title: string
   current_stage: FoundryDraftStage
   actor?: { user_id: UUID; display_name: string }
+  basics?: FoundryDraftMetadata['basics']
 }): Promise<ModuleVersion> {
   if (getDataSource() === 'supabase') {
     return supabaseDataProvider.upsertModuleDraft(input)

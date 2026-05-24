@@ -58,9 +58,11 @@ describe('PublishConfirmationPage', () => {
       useFoundryDraftStore.getState().setBasics({
         title: 'HR Basics at Redex',
         parent_course_id: 'standalone',
-        audience: 'New hires',
-        criticality: 'required',
+        audience_archetype: 'new_hire',
+        audience_refinement: '',
+        completion_required: 'required',
         training_type: 'general_informational',
+        learning_outcomes: [{ id: 'outcome-1', text: 'Complete onboarding tasks independently.' }],
         estimated_minutes: 20,
       })
       useFoundryDraftStore.getState().setGeneratedModule(MOCK_GENERATED_MODULE)
@@ -105,6 +107,18 @@ describe('PublishConfirmationPage', () => {
     expect(screen.getByRole('button', { name: 'Return to admin dashboard' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Edit & create new version' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Start a new module' })).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Foundry progress' })).toBeInTheDocument()
+  })
+
+  it('shows empty celebration state when publish data is missing', async () => {
+    act(() => {
+      useFoundryDraftStore.getState().resetFoundryDraft()
+    })
+
+    renderPage()
+
+    expect(screen.getByText('No published module to celebrate.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back to dashboard' })).toBeInTheDocument()
   })
 
   it('returns to admin dashboard from the primary CTA', async () => {

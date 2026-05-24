@@ -1,22 +1,8 @@
-import { usePublishedModulesStore, type PublishedModuleRecord } from '@/features/publishing/store/publishedModulesStore'
+import { type PublishedModuleRecord } from '@/features/publishing/store/publishedModulesStore'
+import type { AssignmentWithNames } from '@/integrations/supabase/queries/assignments'
+import type { Assignment, Role } from '@/types/training'
+import { useAssignmentAdmin } from '../hooks/useAssignmentAdmin'
 import { COHORTS } from '../lib/cohorts'
-import { useAssignmentStore } from '../store/assignmentStore'
-import {
-  MOCK_ADMIN_USER,
-  MOCK_LEARNER_ANA,
-  MOCK_LEARNER_DEVON,
-  MOCK_LEARNER_MARCUS,
-  MOCK_MANAGER_USER,
-} from '@/lib/education'
-import type { Assignment, Role, User } from '@/types/training'
-
-const PEOPLE: User[] = [
-  MOCK_LEARNER_MARCUS,
-  MOCK_LEARNER_ANA,
-  MOCK_LEARNER_DEVON,
-  MOCK_ADMIN_USER,
-  MOCK_MANAGER_USER,
-]
 
 const STATUS_LABELS: Record<Assignment['status'], string> = {
   pending: 'Pending',
@@ -66,13 +52,9 @@ function getModuleLabel(
   return publishedModules.find((module) => module.module_version_id === moduleVersionId)?.title ?? moduleVersionId
 }
 
-function getUserName(userId?: string): string | undefined {
-  return PEOPLE.find((person) => person.id === userId)?.display_name
-}
-
-function getAssigneeLabel(assignment: Assignment): string {
+function getAssigneeLabel(assignment: AssignmentWithNames): string {
   if (assignment.assignee_user_id) {
-    return getUserName(assignment.assignee_user_id) ?? assignment.assignee_user_id
+    return assignment.assignee_display_name ?? assignment.assignee_user_id
   }
 
   if (assignment.assignee_role) {
@@ -84,8 +66,7 @@ function getAssigneeLabel(assignment: Assignment): string {
 }
 
 export function AssignedUsersTable() {
-  const assignments = useAssignmentStore((state) => state.assignments)
-  const publishedModules = usePublishedModulesStore((state) => state.publishedModules)
+  const { assignments, publishedModules } = useAssignmentAdmin()
   const sortedAssignments = [...assignments].sort(
     (left, right) => new Date(right.assigned_at).getTime() - new Date(left.assigned_at).getTime(),
   )
@@ -94,7 +75,7 @@ export function AssignedUsersTable() {
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 px-5 py-4">
         <h2 className="text-lg font-semibold tracking-tight text-slate-900">Current assignments</h2>
-        <p className="mt-1 text-sm text-slate-600">Local mock assignment state for learner and cohort training.</p>
+        <p className="mt-1 text-sm text-slate-600">All active and completed assignments.</p>
       </div>
 
       <div className="overflow-x-auto">
@@ -136,7 +117,7 @@ export function AssignedUsersTable() {
                     </div>
                   </td>
                   <td className="whitespace-nowrap px-5 py-4 text-slate-600">
-                    {getUserName(assignment.assigned_by) ?? assignment.assigned_by}
+                    {assignment.assigned_by_display_name ?? assignment.assigned_by}
                   </td>
                 </tr>
               )

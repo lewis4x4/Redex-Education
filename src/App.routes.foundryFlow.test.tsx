@@ -108,10 +108,26 @@ describe('Foundry admin end-to-end route flow', () => {
     )
 
     await user.type(await screen.findByLabelText(/module title/i), 'HR Basics at Redex')
-    await user.type(screen.getByLabelText(/audience/i), 'New hires')
+    // Audience archetype defaults to 'new_hire' ("New hires") in the new dropdown form;
+    // no input needed. Learning outcomes require at least one ≥8-char entry to pass schema validation.
+    await user.type(screen.getByPlaceholderText(/Describe a concrete post-training capability/i), 'Submit an expense report through the new ERP system within their first week.')
     await user.click(screen.getByRole('button', { name: 'Continue → Add source material' }))
 
     await waitFor(() => expect(screen.getByTestId('location-path')).toHaveTextContent('/admin/foundry/source'))
+
+    // Seed source material so the FoundryQuestionsPage prerequisite guard
+    // doesn't redirect back to /source. In production this is set when the
+    // admin pastes/uploads source on the source-binder page.
+    act(() => {
+      useFoundryDraftStore.getState().setSourceMaterial({
+        id: 'test-source-1',
+        title: 'HR onboarding handbook',
+        type: 'markdown',
+        raw_text: 'Sample HR onboarding source material for the foundry flow test.',
+        processing_status: 'processed',
+        sections: [],
+      })
+    })
 
     await user.click(await screen.findByRole('button', { name: 'Continue → Setup questions' }))
     await waitFor(() => expect(screen.getByTestId('location-path')).toHaveTextContent('/admin/foundry/questions'))
@@ -129,7 +145,7 @@ describe('Foundry admin end-to-end route flow', () => {
       })
     })
 
-    await user.click(await screen.findByRole('button', { name: /Continue → Outline preview/i }))
+    await user.click(await screen.findByRole('button', { name: /Continue → Outline review/i }))
     await waitFor(() => expect(screen.getByTestId('location-path')).toHaveTextContent('/admin/foundry/outline'))
 
     act(() => {

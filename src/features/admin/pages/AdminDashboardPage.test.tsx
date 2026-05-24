@@ -102,6 +102,7 @@ describe('AdminDashboardPage', () => {
     renderPage()
 
     expect(screen.getByRole('button', { name: /start new module/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /start onboarding/i })).toBeEnabled()
   })
 
   it('routes the assignments CTA to the assignment admin page', async () => {
@@ -127,6 +128,30 @@ describe('AdminDashboardPage', () => {
     await user.click(screen.getByRole('button', { name: /open assignments/i }))
 
     expect(screen.getByTestId('location-path')).toHaveTextContent('/admin/assignments')
+  })
+
+  it('routes the onboarding CTA to the onboard page', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <MemoryRouter initialEntries={['/admin']}>
+        <Routes>
+          <Route
+            path="/admin"
+            element={
+              <>
+                <AdminDashboardPage />
+                <LocationProbe />
+              </>
+            }
+          />
+          <Route path="/admin/onboard" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /start onboarding/i }))
+    expect(screen.getByTestId('location-path')).toHaveTextContent('/admin/onboard')
   })
 
   it('renders all metric labels', () => {

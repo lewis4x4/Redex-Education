@@ -26,18 +26,50 @@ export function ModuleGenerationPreviewPage() {
   const generatedModule = useFoundryDraftStore((state) => state.generatedModule)
   const outline = useFoundryDraftStore((state) => state.outline)
   const sourceMaterial = useFoundryDraftStore((state) => state.sourceMaterial)
+  const currentDraft = useFoundryDraftStore((state) => state.currentDraft)
   const updateLessonStatus = useFoundryDraftStore((state) => state.updateLessonStatus)
+  const setLessonReviews = useFoundryDraftStore((state) => state.setLessonReviews)
   const [selectedLessonIndex, setSelectedLessonIndex] = useState(0)
+  const [generationError, setGenerationError] = useState<string | null>(null)
+  const [isGenerating, setIsGenerating] = useState(false)
   const actor = useActorInfo()
 
   const handleGenerateModule = async () => {
-    setSelectedLessonIndex(0)
-    const generatedPreview = await getCourseFoundryAiClient().generateLessons({
-      outline: outline ?? DEFAULT_AI_OUTLINE,
-      sources: sourceMaterial ?? DEFAULT_AI_SOURCE_MATERIAL,
-    })
-    useFoundryDraftStore.getState().setGeneratedModule(generatedPreview, actor)
-    toast.success(`Generated ${generatedPreview.lessons.length} lessons`)
+    setIsGenerating(true)
+    setGenerationError(null)
+
+    try {
+      setSelectedLessonIndex(0)
+      const generatedPreview = await getCourseFoundryAiClient().generateLessons({
+        outline: outline ?? DEFAULT_AI_OUTLINE,
+        sources: sourceMaterial ?? DEFAULT_AI_SOURCE_MATERIAL,
+        learning_outcomes: currentDraft?.learning_outcomes,
+      })
+      useFoundryDraftStore.getState().setGeneratedModule(generatedPreview, actor)
+      setLessonReviews(
+        generatedPreview.lesson_reviews ??
+          generatedPreview.lessons.map((lesson) => ({
+            lesson_index: lesson.lesson_index,
+            module_index: lesson.module_index,
+            lesson_title: lesson.title,
+            confidence:
+              lesson.status === 'ready_for_approval'
+                ? 'high'
+                : lesson.status === 'unsupported_claim'
+                  ? 'unsupported'
+                  : 'medium',
+            has_unsupported_claim: lesson.status === 'unsupported_claim',
+            unsupported_note: lesson.status_note,
+            status: 'pending',
+            source_excerpts: [],
+          })),
+      )
+      toast.success(`Generated ${generatedPreview.lessons.length} lessons`)
+    } catch (error) {
+      setGenerationError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   const statusCounts = useMemo(() => {
@@ -88,17 +120,26 @@ export function ModuleGenerationPreviewPage() {
       </Card>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button
-          variant="brand"
-          onClick={() => {
-            void handleGenerateModule()
-          }}
-        >
-          ✨ Generate Full Module in One Click (Preview Mode)
+        <Button variant="brand" onClick={() => void handleGenerateModule()} disabled={isGenerating}>
+          {isGenerating ? 'Generating module…' : '✨ Generate Full Module in One Click (Preview Mode)'}
         </Button>
       </div>
 
-      {generatedModule === null ? (
+      {generationError ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-800 shadow-sm" role="alert">
+          <p className="font-semibold">We couldn't generate the module.</p>
+          <p className="mt-1 text-red-700">{generationError}</p>
+          <button
+            type="button"
+            onClick={() => {
+              void handleGenerateModule()
+            }}
+            className="mt-3 inline-flex rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+          >
+            Retry
+          </button>
+        </div>
+      ) : generatedModule === null ? (
         <Card className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
           <div className="space-y-2">
             <p className="text-2xl leading-none text-slate-400">↑</p>

@@ -102,6 +102,33 @@ export const GenerateLessonsOutputSchema = z.object({
   lessons: z.array(GeneratedLessonContentSchema),
   generated_at: z.string(),
   is_complete: z.boolean(),
+  lesson_reviews: z
+    .array(
+      z.object({
+        lesson_index: z.number().int().nonnegative(),
+        module_index: z.number().int().nonnegative(),
+        lesson_title: z.string(),
+        confidence: LessonConfidenceLevelSchema,
+        has_unsupported_claim: z.boolean(),
+        unsupported_note: z.string().optional(),
+        status: LessonReviewStatusSchema,
+        source_excerpts: z.array(
+          z.object({
+            drive_file_id: z.string(),
+            source_title: z.string(),
+            section_heading: z.string(),
+            section_body: z.string(),
+            highlighted_span: z
+              .object({
+                start: z.number().int().nonnegative(),
+                end: z.number().int().nonnegative(),
+              })
+              .optional(),
+          }),
+        ),
+      }),
+    )
+    .optional(),
 }) satisfies z.ZodType<GenerateLessonsOutput>;
 
 export const GenerateAssessmentOutputSchema = z.object({

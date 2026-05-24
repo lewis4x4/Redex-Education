@@ -49,6 +49,10 @@ export async function fetchAllProfiles(): Promise<User[]> {
   return (data ?? []).map(mapProfileRow)
 }
 
+export async function fetchAssignableUsers(): Promise<User[]> {
+  return fetchAllProfiles()
+}
+
 export async function fetchProfilesByManagerId(managerId: string): Promise<User[]> {
   const { data, error } = await supabase
     .from('profiles')

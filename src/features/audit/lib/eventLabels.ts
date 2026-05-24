@@ -17,6 +17,7 @@ const EVENT_LABELS: Record<AuditEventType, string> = {
   quiz_attempted: 'Quiz attempted',
   source_change_detected: 'Source change detected',
   stale_lesson_regenerated: 'Stale lesson regenerated',
+  user_onboarded: 'User onboarded',
 }
 
 const EVENT_ICONS: Record<AuditEventType, string> = {
@@ -34,6 +35,7 @@ const EVENT_ICONS: Record<AuditEventType, string> = {
   quiz_attempted: '?',
   source_change_detected: '!',
   stale_lesson_regenerated: '↻',
+  user_onboarded: '👤',
 }
 
 const EVENT_BADGE_VARIANTS: Record<AuditEventType, AuditEventBadgeVariant> = {
@@ -51,6 +53,7 @@ const EVENT_BADGE_VARIANTS: Record<AuditEventType, AuditEventBadgeVariant> = {
   quiz_attempted: 'progress',
   source_change_detected: 'warning',
   stale_lesson_regenerated: 'success',
+  user_onboarded: 'info',
 }
 
 export function getEventLabel(type: AuditEventType): string {

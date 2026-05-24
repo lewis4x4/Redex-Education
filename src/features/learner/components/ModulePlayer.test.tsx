@@ -94,7 +94,7 @@ describe('Redex Academy learner module player', () => {
     render(<ModulePlayer module={makeModule()} lessons={[quizLesson]} completedLessonIds={[]} />);
 
     expect(screen.getByRole('button', { name: /pass quiz to continue/i })).toBeDisabled();
-    expect(screen.getByText(/🔒 Pass the quiz above/i)).toBeInTheDocument();
+    expect(screen.getByText(/Pass the quiz above/i)).toBeInTheDocument();
   });
 
   it('does not lock a quiz lesson when it is already completed', () => {
@@ -117,7 +117,7 @@ describe('Redex Academy learner module player', () => {
     );
 
     expect(screen.getByRole('heading', { name: /you've completed redex academy test module/i })).toBeInTheDocument();
-    expect(screen.queryByText(/🔒 Pass the quiz above/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Pass the quiz above/i)).not.toBeInTheDocument();
   });
 
   it('uses content.type (not lesson_type) for quiz lock discriminant', () => {
@@ -132,7 +132,7 @@ describe('Redex Academy learner module player', () => {
     );
 
     expect(screen.getByRole('button', { name: /complete module/i })).toBeEnabled();
-    expect(screen.queryByText(/🔒 Pass the quiz above/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Pass the quiz above/i)).not.toBeInTheDocument();
   });
 
   it('locks later required sidebar lessons until prior required lessons are complete', () => {
@@ -260,6 +260,32 @@ describe('Redex Academy learner module player', () => {
     expect(screen.getByRole('heading', { name: /you've completed redex academy test module/i })).toBeInTheDocument();
     expect(screen.getByText('100%')).toBeInTheDocument();
     expect(screen.getByText('Passed')).toBeInTheDocument();
+  });
+
+  it('shows outcome panel on completion when module includes learning outcomes', async () => {
+    const user = userEvent.setup();
+    const quizLesson = makeLesson({
+      id: 'lesson-final-quiz',
+      title: 'Final Quiz',
+      content: {
+        type: 'quiz',
+        passing_threshold: 80,
+        allow_retakes: true,
+        questions: [],
+      },
+    });
+
+    render(
+      <ModulePlayer
+        module={{ ...makeModule('hr-basics-mod-001'), learning_outcomes: ['identify policy boundaries', 'complete required actions', 'escalate unresolved issues'] } as Module}
+        lessons={[quizLesson]}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /complete quiz pass/i }));
+
+    expect(screen.getByText('What you can now do')).toBeInTheDocument();
+    expect(screen.getAllByText('• identify policy boundaries').length).toBeGreaterThan(0);
   });
 
   it('fires onQuizAttempt for a failed quiz without marking the lesson complete', async () => {

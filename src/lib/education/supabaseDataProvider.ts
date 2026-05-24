@@ -105,6 +105,7 @@ export async function upsertModuleDraft(input: {
   module_title: string
   current_stage: import('@/types/training').FoundryDraftStage
   actor?: { user_id: string; display_name: string }
+  basics?: import('@/types/training').FoundryDraftMetadata['basics']
 }): Promise<ModuleVersion> {
   const { upsertModuleDraft: upsertSupabaseModuleDraft } = await import('@/integrations/supabase/mutations/foundry')
   return upsertSupabaseModuleDraft(input)

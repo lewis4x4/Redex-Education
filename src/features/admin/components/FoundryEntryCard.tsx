@@ -12,7 +12,7 @@ const FOUNDRY_DISABLED_TITLE = 'Coming soon — Course Foundry start flow'
 
 export function FoundryEntryCard({ onStart, isDisabled = false }: FoundryEntryCardProps) {
   return (
-    <Card className="rounded-2xl border border-redex-red/20 bg-redex-red/[0.04] p-6 shadow-sm md:p-8">
+    <Card className="flex h-full flex-col rounded-2xl border border-redex-red/20 bg-redex-red/[0.04] p-6 shadow-sm md:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[2px] text-redex-red">Course Foundry</p>
@@ -35,16 +35,18 @@ export function FoundryEntryCard({ onStart, isDisabled = false }: FoundryEntryCa
         <li>Review and approve AI-generated lessons</li>
       </ul>
 
-      <Button
-        type="button"
-        onClick={onStart}
-        disabled={isDisabled}
-        title={isDisabled ? FOUNDRY_DISABLED_TITLE : undefined}
-        variant="brand"
-        className="mt-6 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
-      >
-        Start new module →
-      </Button>
+      <div className="mt-auto pt-6">
+        <Button
+          type="button"
+          onClick={onStart}
+          disabled={isDisabled}
+          title={isDisabled ? FOUNDRY_DISABLED_TITLE : undefined}
+          variant="brand"
+          className="disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+        >
+          Start new module →
+        </Button>
+      </div>
     </Card>
   )
 }

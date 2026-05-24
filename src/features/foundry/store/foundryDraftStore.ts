@@ -22,7 +22,7 @@ import { useModuleVersionsStore } from '@/features/publishing/store/moduleVersio
 import { usePublishedModulesStore } from '@/features/publishing/store/publishedModulesStore';
 import type { SetupAnswersInput } from '../schemas/foundrySchemas';
 import type { ModuleBasicsDraft, ModuleBasicsFormValues } from '../types';
-import type { AuditLog, ModuleVersion, UUID } from '@/lib/education';
+import type { AuditLog, FoundryDraftMetadata, LearningOutcome, ModuleVersion, UUID } from '@/lib/education';
 
 const DEFAULT_MODULE_VERSION_ID = 'module-version-hr-basics-v1';
 
@@ -45,6 +45,7 @@ type DraftMetadataSnapshot = {
   module_version_id?: string;
   module_id?: string;
   module_title?: string;
+  basics?: FoundryDraftMetadata['basics'];
   sourceMaterial?: SourceMaterial | null;
   selectedLibraryFileIds?: string[];
   setupAnswers?: SetupAnswers | null;
@@ -187,6 +188,29 @@ const SYSTEM_ACTOR: ActorInfo = {
   displayName: 'Redex system',
 };
 
+function createLearningOutcome(overrides?: Partial<LearningOutcome>): LearningOutcome {
+  return {
+    id: overrides?.id ?? `outcome-${Math.random().toString(36).slice(2, 10)}`,
+    text: overrides?.text ?? '',
+  };
+}
+
+const DEFAULT_BASICS_VALUES = {
+  audience_archetype: 'new_hire' as const,
+  audience_refinement: '',
+  completion_required: 'recommended' as const,
+  training_type: 'general_informational' as const,
+  estimated_minutes: 30,
+};
+
+function normalizeLearningOutcomes(outcomes?: LearningOutcome[]): LearningOutcome[] {
+  if (!outcomes || outcomes.length === 0) {
+    return [createLearningOutcome()];
+  }
+
+  return outcomes.slice(0, 3).map((outcome) => createLearningOutcome(outcome));
+}
+
 function toAuditActor(actor?: ActorInfo) {
   const resolved = actor ?? SYSTEM_ACTOR;
 
@@ -207,6 +231,8 @@ function recordAuditEvent(
 }
 
 function hydrateFromDraftMetadata(snapshot: DraftMetadataSnapshot, item: FoundryResumeAdminItem) {
+  const basics = snapshot.basics;
+
   useFoundryDraftStore.setState((state) => ({
     currentDraft: {
       id: item.module_version_id,
@@ -214,10 +240,12 @@ function hydrateFromDraftMetadata(snapshot: DraftMetadataSnapshot, item: Foundry
       version_number: item.version_number,
       title: item.module_title,
       parent_course_id: 'standalone',
-      audience: 'New hires',
-      criticality: 'required',
-      training_type: 'general_informational',
-      estimated_minutes: 20,
+      audience_archetype: basics?.audience_archetype ?? DEFAULT_BASICS_VALUES.audience_archetype,
+      audience_refinement: basics?.audience_refinement ?? DEFAULT_BASICS_VALUES.audience_refinement,
+      completion_required: basics?.completion_required ?? DEFAULT_BASICS_VALUES.completion_required,
+      training_type: basics?.training_type ?? DEFAULT_BASICS_VALUES.training_type,
+      learning_outcomes: normalizeLearningOutcomes(basics?.learning_outcomes),
+      estimated_minutes: basics?.estimated_minutes ?? DEFAULT_BASICS_VALUES.estimated_minutes,
       updated_at: new Date().toISOString(),
     },
     sourceMaterial: snapshot.sourceMaterial ?? state.sourceMaterial,
@@ -354,6 +382,16 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
             module_title: moduleTitle,
             current_stage: stage,
             actor: actor ? { user_id: actor.userId, display_name: actor.displayName } : undefined,
+            basics: state.currentDraft
+              ? {
+                audience_archetype: state.currentDraft.audience_archetype,
+                audience_refinement: state.currentDraft.audience_refinement,
+                completion_required: state.currentDraft.completion_required,
+                training_type: state.currentDraft.training_type,
+                estimated_minutes: state.currentDraft.estimated_minutes,
+                learning_outcomes: state.currentDraft.learning_outcomes,
+              }
+              : undefined,
           })
 
           set((currentState) => ({
@@ -385,18 +423,42 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
       lessonReviews: [],
       selectedLibraryFileIds: [],
       setBasics: (values, actor) => {
-        const wasNewDraft = get().currentDraft === null;
+        const state = get();
+        const wasNewDraft = state.currentDraft === null;
         const moduleId = resolveDraftModuleId(values.title);
+        const previousDraft = state.currentDraft;
 
         const currentDraft = {
           ...values,
+          audience_archetype: values.audience_archetype ?? DEFAULT_BASICS_VALUES.audience_archetype,
+          audience_refinement: values.audience_refinement ?? DEFAULT_BASICS_VALUES.audience_refinement,
+          completion_required: values.completion_required ?? DEFAULT_BASICS_VALUES.completion_required,
+          learning_outcomes: normalizeLearningOutcomes(values.learning_outcomes),
           updated_at: new Date().toISOString(),
         };
 
-        set({
+        const didMaterialBasicsChange =
+          !previousDraft ||
+          previousDraft.title !== currentDraft.title ||
+          previousDraft.audience_archetype !== currentDraft.audience_archetype ||
+          (previousDraft.audience_refinement ?? '') !== (currentDraft.audience_refinement ?? '') ||
+          previousDraft.completion_required !== currentDraft.completion_required ||
+          previousDraft.training_type !== currentDraft.training_type ||
+          JSON.stringify(previousDraft.learning_outcomes) !== JSON.stringify(currentDraft.learning_outcomes);
+
+        set((priorState) => ({
           currentDraft,
           ...resetPublishState,
-        });
+          ...(didMaterialBasicsChange
+            ? {
+              outline: null,
+              generatedModule: null,
+              critique: null,
+              lessonReviews: [],
+              outline_status: 'draft' as const,
+            }
+            : { outline_status: priorState.outline_status }),
+        }));
 
         if (shouldPersistToSupabase()) {
           void import('@/integrations/supabase/mutations')
@@ -440,6 +502,8 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
           ...resetPublishState,
         }),
       seedDraftFromModuleVersion: (version, actor) => {
+        const basics = version.draft_metadata?.basics;
+
         set({
           lastWriteError: null,
           currentDraft: {
@@ -450,10 +514,12 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
             assessment_version: version.assessment_version,
             title: version.module_title,
             parent_course_id: 'standalone',
-            audience: 'New hires',
-            criticality: 'required',
-            training_type: 'general_informational',
-            estimated_minutes: 20,
+            audience_archetype: basics?.audience_archetype ?? DEFAULT_BASICS_VALUES.audience_archetype,
+            audience_refinement: basics?.audience_refinement ?? DEFAULT_BASICS_VALUES.audience_refinement,
+            completion_required: basics?.completion_required ?? DEFAULT_BASICS_VALUES.completion_required,
+            training_type: basics?.training_type ?? DEFAULT_BASICS_VALUES.training_type,
+            learning_outcomes: normalizeLearningOutcomes(basics?.learning_outcomes),
+            estimated_minutes: basics?.estimated_minutes ?? DEFAULT_BASICS_VALUES.estimated_minutes,
             updated_at: new Date().toISOString(),
           },
           sourceMaterial: null,
@@ -492,6 +558,8 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
           return inferResumeRoute({ ...state, draft_metadata: item.draft_metadata });
         }
 
+        const dashboardBasics = item.draft_metadata?.basics;
+
         set({
           lastWriteError: null,
           currentDraft: {
@@ -500,10 +568,12 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
             version_number: item.version_number,
             title: item.module_title,
             parent_course_id: 'standalone',
-            audience: 'New hires',
-            criticality: 'required',
-            training_type: 'general_informational',
-            estimated_minutes: 20,
+            audience_archetype: dashboardBasics?.audience_archetype ?? DEFAULT_BASICS_VALUES.audience_archetype,
+            audience_refinement: dashboardBasics?.audience_refinement ?? DEFAULT_BASICS_VALUES.audience_refinement,
+            completion_required: dashboardBasics?.completion_required ?? DEFAULT_BASICS_VALUES.completion_required,
+            training_type: dashboardBasics?.training_type ?? DEFAULT_BASICS_VALUES.training_type,
+            learning_outcomes: normalizeLearningOutcomes(dashboardBasics?.learning_outcomes),
+            estimated_minutes: dashboardBasics?.estimated_minutes ?? DEFAULT_BASICS_VALUES.estimated_minutes,
             updated_at: new Date().toISOString(),
           },
           sourceMaterial: null,
@@ -524,6 +594,9 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
               const metadata = draftRow?.draft_metadata as DraftMetadataSnapshot | undefined
 
               if (!metadata) {
+                console.warn('[foundryDraftStore] resumeDraftFromAdminItem missing draft_metadata.basics; using defaults', {
+                  module_version_id: item.module_version_id,
+                });
                 return
               }
 

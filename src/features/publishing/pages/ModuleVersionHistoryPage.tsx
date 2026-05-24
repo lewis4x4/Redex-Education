@@ -191,6 +191,19 @@ export function ModuleVersionHistoryPage() {
                         Review source impact →
                       </Link>
                     ) : null}
+                    {Array.isArray((version.draft_metadata?.basics as { learning_outcomes?: string[] } | undefined)?.learning_outcomes) ? (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Learning outcomes</p>
+                        <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                          {((version.draft_metadata?.basics as { learning_outcomes?: string[] } | undefined)?.learning_outcomes ?? [])
+                            .slice(0, 3)
+                            .map((outcome) => (
+                              <li key={outcome}>• {outcome}</li>
+                            ))}
+                        </ul>
+                      </div>
+                    ) : null}
+
                     <dl className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
                       <div>
                         <dt className="font-semibold text-slate-900">Published</dt>

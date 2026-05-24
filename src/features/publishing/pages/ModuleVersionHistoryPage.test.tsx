@@ -95,6 +95,30 @@ describe('ModuleVersionHistoryPage', () => {
     expect(await screen.findByText('Devon Lee')).toBeInTheDocument()
   })
 
+  it('renders learning outcomes when draft metadata includes them', () => {
+    act(() => {
+      useModuleVersionsStore.setState({
+        versions: useModuleVersionsStore.getState().versions.map((version) =>
+          version.id === 'module-version-hr-basics-v1'
+            ? {
+                ...version,
+                draft_metadata: {
+                  basics: {
+                    learning_outcomes: ['identify escalation paths', 'complete required checklist', 'apply safety policy'] as unknown as never,
+                  },
+                },
+              }
+            : version,
+        ),
+      })
+    })
+
+    renderPage()
+
+    expect(screen.getByText('Learning outcomes')).toBeInTheDocument()
+    expect(screen.getByText('• identify escalation paths')).toBeInTheDocument()
+  })
+
   it('renders a stale source pill and source impact review link when a version is stale', () => {
     act(() => {
       useModuleVersionsStore.getState().markVersionStale('module-version-hr-basics-v1', true)

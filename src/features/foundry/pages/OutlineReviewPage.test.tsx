@@ -74,7 +74,7 @@ describe('OutlineReviewPage', () => {
 
     renderPage()
 
-    expect(screen.getByText('Generating outline…')).toBeInTheDocument()
+    expect(screen.getByText('AI is generating from your saved draft…')).toBeInTheDocument()
 
     await act(async () => {
       vi.advanceTimersByTime(600)
@@ -88,8 +88,9 @@ describe('OutlineReviewPage', () => {
   it('renders eyebrow, heading, 3 composed sections, and footer actions', async () => {
     renderPage()
 
-    expect(screen.getByText('REDEX AI COURSE FOUNDRY · STEP 4')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Review the generated outline' })).toBeInTheDocument()
+    expect(screen.getByText('REDEX AI COURSE FOUNDRY')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Outline review' })).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Foundry progress' })).toBeInTheDocument()
 
     expect(await screen.findByRole('heading', { name: 'Generated Outline' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Module and lesson outline' })).toBeInTheDocument()
@@ -110,7 +111,7 @@ describe('OutlineReviewPage', () => {
 
     expect(useFoundryDraftStore.getState().outline_status).toBe('approved')
     expect(screen.getByRole('button', { name: /continue.*module.*preview/i })).toBeInTheDocument()
-    expect(toastSuccessMock).toHaveBeenCalledWith('Outline approved')
+    expect(toastSuccessMock).toHaveBeenCalledWith('Saved to your draft')
   })
 
   it('keeps Edit outline disabled with expected tooltip', async () => {
@@ -119,6 +120,6 @@ describe('OutlineReviewPage', () => {
     const editButton = await screen.findByRole('button', { name: 'Edit outline' })
 
     expect(editButton).toBeDisabled()
-    expect(editButton).toHaveAttribute('title', 'Coming in Slice 3.2 — full module generation preview')
+    expect(editButton).toHaveAttribute('title', 'Manual outline editing coming soon.')
   })
 })

@@ -25,6 +25,15 @@ vi.mock('@/hooks/useProfile', () => ({
   useProfile: vi.fn(),
 }))
 
+vi.mock('@/integrations/supabase/queries/onboarding', () => ({
+  fetchAuditableModulesForOnboarding: vi.fn(async () => []),
+  fetchOnboardingCandidates: vi.fn(async () => []),
+}))
+
+vi.mock('@/integrations/supabase/queries/profiles', () => ({
+  fetchAllProfiles: vi.fn(async () => []),
+}))
+
 const supabaseAuthMocks = vi.hoisted(() => ({
   exchangeCodeForSession: vi.fn(() => new Promise(() => undefined)),
   onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
@@ -340,6 +349,38 @@ describe('Redex Education routes', () => {
     expect(screen.getByText('ADMIN · AUDIT')).toBeInTheDocument()
   })
 
+  it('renders OnboardNewPersonPage at /admin/onboard', async () => {
+    vi.stubEnv('VITE_MOCK_AUTH', 'true')
+    useAuthMock.mockReturnValue({
+      loading: false,
+      session: { access_token: 'token' },
+      user: { id: 'user-jordan-admin', email: 'jordan.patel@redex.example' },
+      role: 'admin',
+      refreshSession: vi.fn(),
+      signOut: vi.fn(),
+    } as never)
+
+    renderAt('/admin/onboard')
+
+    expect(await screen.findByRole('heading', { name: 'Onboard a new person' })).toBeInTheDocument()
+  })
+
+  it('renders PeopleListPage at /admin/people', async () => {
+    vi.stubEnv('VITE_MOCK_AUTH', 'true')
+    useAuthMock.mockReturnValue({
+      loading: false,
+      session: { access_token: 'token' },
+      user: { id: 'user-jordan-admin', email: 'jordan.patel@redex.example' },
+      role: 'admin',
+      refreshSession: vi.fn(),
+      signOut: vi.fn(),
+    } as never)
+
+    renderAt('/admin/people')
+
+    expect(await screen.findByRole('heading', { name: 'People' })).toBeInTheDocument()
+  })
+
   it('renders ModuleVersionHistoryPage at /admin/modules/:moduleId/versions', async () => {
     vi.stubEnv('VITE_MOCK_AUTH', 'true')
 
@@ -408,7 +449,7 @@ describe('Redex Education routes', () => {
 
     renderAt('/admin/foundry/start')
 
-    expect(await screen.findByRole('heading', { name: 'New module — basics' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Module basics' })).toBeInTheDocument()
   })
 
   it('renders SourceBinderInputPage at /admin/foundry/source', async () => {
@@ -416,8 +457,7 @@ describe('Redex Education routes', () => {
 
     renderAt('/admin/foundry/source')
 
-    expect(await screen.findByRole('heading', { name: 'Add source material' })).toBeInTheDocument()
-    expect(screen.getByText('REDEX AI COURSE FOUNDRY · STEP 2')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Source material' })).toBeInTheDocument()
   })
 
   it('renders FoundryQuestionsPage at /admin/foundry/questions', async () => {
@@ -425,7 +465,7 @@ describe('Redex Education routes', () => {
 
     renderAt('/admin/foundry/questions')
 
-    expect(await screen.findByRole('heading', { name: 'Setup questions' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Generation guidance' })).toBeInTheDocument()
   })
 
   it('renders SourceLibraryPage at /admin/foundry/library', async () => {
@@ -441,7 +481,7 @@ describe('Redex Education routes', () => {
 
     renderAt('/admin/foundry/outline')
 
-    expect(await screen.findByRole('heading', { name: 'Review the generated outline' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Outline review' })).toBeInTheDocument()
   })
 
   it('renders ModuleGenerationPreviewPage at /admin/foundry/preview', async () => {

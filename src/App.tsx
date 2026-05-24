@@ -31,6 +31,14 @@ const AssignmentAdminPage = lazy(() =>
   import('@/features/assignments/pages/AssignmentAdminPage').then((m) => ({ default: m.AssignmentAdminPage })),
 )
 
+const OnboardNewPersonPage = lazy(() =>
+  import('@/features/onboarding/pages/OnboardNewPersonPage').then((m) => ({ default: m.OnboardNewPersonPage })),
+)
+
+const PeopleListPage = lazy(() =>
+  import('@/features/onboarding/pages/PeopleListPage').then((m) => ({ default: m.PeopleListPage })),
+)
+
 const AuditLogPage = lazy(() =>
   import('@/features/audit/pages/AuditLogPage').then((m) => ({ default: m.AuditLogPage })),
 )
@@ -279,6 +287,30 @@ function AuditLogRoute() {
   )
 }
 
+function OnboardNewPersonRoute() {
+  return (
+    <AppShell breadcrumb="Foundry › Onboarding">
+      <AuthGate requiredRole={['admin']}>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <OnboardNewPersonPage />
+        </Suspense>
+      </AuthGate>
+    </AppShell>
+  )
+}
+
+function PeopleListRoute() {
+  return (
+    <AppShell breadcrumb="Foundry › People">
+      <AuthGate requiredRole={['admin']}>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <PeopleListPage />
+        </Suspense>
+      </AuthGate>
+    </AppShell>
+  )
+}
+
 function ManagerRoute() {
   return (
     <AppShell breadcrumb="Team">
@@ -476,6 +508,9 @@ export default function App() {
       <Route path="/auth/callback" element={<AuthCallbackRoute />} />
       <Route path="/admin" element={<AdminRoute />} />
       <Route path="/admin/assignments" element={<AssignmentAdminRoute />} />
+      <Route path="/admin/onboard" element={<OnboardNewPersonRoute />} />
+      <Route path="/admin/people" element={<PeopleListRoute />} />
+      <Route path="/admin/people/:id" element={<PeopleListRoute />} />
       <Route path="/admin/audit" element={<AuditLogRoute />} />
       <Route path="/admin/source-impact" element={<SourceImpactReviewRoute />} />
       <Route path="/admin/modules/:moduleId/versions" element={<ModuleVersionHistoryRoute />} />

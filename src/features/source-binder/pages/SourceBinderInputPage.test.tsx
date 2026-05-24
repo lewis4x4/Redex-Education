@@ -49,9 +49,11 @@ describe('SourceBinderInputPage', () => {
       useFoundryDraftStore.getState().setBasics({
         title: 'Draft ready',
         parent_course_id: 'standalone',
-        audience: 'Ops',
-        criticality: 'required',
+        audience_archetype: 'operations',
+        audience_refinement: '',
+        completion_required: 'required',
         training_type: 'operational',
+        learning_outcomes: [{ id: 'outcome-1', text: 'Execute daily operations with policy compliance.' }],
         estimated_minutes: 30,
       })
     })
@@ -73,9 +75,10 @@ describe('SourceBinderInputPage', () => {
   it('renders page header and source binder child sections', () => {
     renderWithRoutes()
 
-    expect(screen.getByText('REDEX AI COURSE FOUNDRY · STEP 2')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Add source material' })).toBeInTheDocument()
-    expect(screen.getByText(/paste markdown or upload an \.md file to get started/i)).toBeInTheDocument()
+    expect(screen.getByText('REDEX AI COURSE FOUNDRY')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Source material' })).toBeInTheDocument()
+    expect(screen.getByText(/paste markdown, upload an \.md file, or pick from the Source Library\./i)).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Foundry progress' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Paste source material' })).toBeInTheDocument()
     expect(screen.getByText('Upload a markdown file')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Preview' })).toBeInTheDocument()

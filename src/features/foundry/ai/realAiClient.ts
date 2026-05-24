@@ -10,6 +10,9 @@ import {
   RegenerateWithFixesOutputSchema,
   validateAiOutput,
 } from './aiSchemas';
+import type { GeneratedLessonContent, LessonReviewItem, LessonType, SourceMaterial } from '@/types/training';
+import { fetchSourceFiles, fetchSourceFileVersions, fetchSourceSections } from '@/integrations/supabase/queries/source_library';
+import { formatAudienceForAi } from '@/features/foundry/lib/audienceFormat';
 import type {
   AnalyzeSourceOutput,
   CourseFoundryAiClient,
@@ -25,6 +28,89 @@ const SUBMIT_GENERATION_JOB_FUNCTION = 'submit-generation-job';
 const GENERATION_PIPELINE_NOT_DEPLOYED = 'Generation pipeline not deployed yet';
 const POLL_INTERVAL_MS = 2_000;
 const MAX_POLL_ATTEMPTS = 900;
+
+const PROMPT_KEY_BY_LESSON_TYPE: Record<LessonType, PromptKey> = {
+  text: 'lesson_generation.text',
+  quiz: 'lesson_generation.quiz',
+  checklist: 'lesson_generation.checklist',
+  acknowledgment: 'lesson_generation.acknowledgment',
+  scenario: 'lesson_generation.scenario',
+  video: 'lesson_generation.video',
+  coach: 'lesson_generation.coach',
+  assignment: 'lesson_generation.assignment',
+  reflection_prompt: 'lesson_generation.reflection_prompt',
+};
+
+function toLessonReviewItem(lesson: GeneratedLessonContent): LessonReviewItem {
+  return {
+    lesson_index: lesson.lesson_index,
+    module_index: lesson.module_index,
+    lesson_title: lesson.title,
+    confidence: lesson.status === 'ready_for_approval' ? 'high' : lesson.status === 'unsupported_claim' ? 'unsupported' : 'medium',
+    has_unsupported_claim: lesson.status === 'unsupported_claim',
+    unsupported_note: lesson.status_note,
+    status: 'pending',
+    source_excerpts: [],
+  };
+}
+
+function withDerivedLessonReviews(output: GenerateLessonsOutput): GenerateLessonsOutput {
+  if (Array.isArray(output.lesson_reviews) && output.lesson_reviews.length > 0) {
+    return output;
+  }
+
+  return {
+    ...output,
+    lesson_reviews: output.lessons.map(toLessonReviewItem),
+  };
+}
+
+function hasSourceContent(source: SourceMaterial): boolean {
+  return (source.raw_text ?? '').trim().length > 0 || source.sections.length > 0;
+}
+
+async function resolveLibraryBackedSource(source: SourceMaterial): Promise<SourceMaterial> {
+  if (hasSourceContent(source)) {
+    return source;
+  }
+
+  const { useFoundryDraftStore } = await import('@/features/foundry/store/foundryDraftStore');
+  const selectedLibraryFileIds = useFoundryDraftStore.getState().selectedLibraryFileIds;
+
+  if (selectedLibraryFileIds.length === 0) {
+    return source;
+  }
+
+  const sourceFiles = await fetchSourceFiles();
+  const selectedFiles = sourceFiles.filter((file) => selectedLibraryFileIds.includes(file.id));
+  const allSections = [] as SourceMaterial['sections'];
+
+  for (const file of selectedFiles) {
+    const versions = await fetchSourceFileVersions(file.id);
+    const latestVersion = versions[0];
+
+    if (!latestVersion) {
+      continue;
+    }
+
+    const sections = await fetchSourceSections(latestVersion.id);
+    allSections.push(...sections);
+  }
+
+  if (allSections.length === 0) {
+    return source;
+  }
+
+  return {
+    id: `library-${selectedLibraryFileIds.join('-')}`,
+    title: 'Drive Library Selection',
+    type: 'markdown',
+    processing_status: 'processed',
+    raw_text: allSections.map((section) => `## ${section.heading}\n\n${section.body}`).join('\n\n'),
+    raw_text_preview: allSections.map((section) => section.body).join('\n\n').slice(0, 500),
+    sections: allSections,
+  };
+}
 
 type SupabaseClient = typeof import('@/integrations/supabase/client').supabase;
 
@@ -320,22 +406,36 @@ export const realAiClient: CourseFoundryAiClient = {
     });
   },
 
-  generateOutline(input): Promise<GenerateOutlineOutput> {
+  async generateOutline(input): Promise<GenerateOutlineOutput> {
+    const sources = await resolveLibraryBackedSource(input.sources);
+
     return submitGenerationJob({
       operation: 'generateOutline',
       promptKey: 'outline_generation',
-      input,
+      input: {
+        ...input,
+        basics: {
+          ...input.basics,
+          audience: formatAudienceForAi(input.basics),
+        },
+        sources,
+      },
       schema: GenerateOutlineOutputSchema,
     });
   },
 
-  generateLessons(input): Promise<GenerateLessonsOutput> {
-    return submitGenerationJob({
+  async generateLessons(input): Promise<GenerateLessonsOutput> {
+    const firstLessonType = input.outline.modules[0]?.lessons[0]?.lesson_type ?? 'text';
+    const promptKey = PROMPT_KEY_BY_LESSON_TYPE[firstLessonType];
+    const sources = await resolveLibraryBackedSource(input.sources);
+    const output = await submitGenerationJob({
       operation: 'generateLessons',
-      promptKey: 'lesson_generation.text',
-      input,
+      promptKey,
+      input: { ...input, sources },
       schema: GenerateLessonsOutputSchema,
     });
+
+    return withDerivedLessonReviews(output);
   },
 
   generateAssessment(input): Promise<GenerateAssessmentOutput> {
@@ -347,11 +447,13 @@ export const realAiClient: CourseFoundryAiClient = {
     });
   },
 
-  critiqueModule(input): Promise<CritiqueModuleOutput> {
+  async critiqueModule(input): Promise<CritiqueModuleOutput> {
+    const sources = await resolveLibraryBackedSource(input.sources);
+
     return submitGenerationJob({
       operation: 'critiqueModule',
       promptKey: 'self_critique',
-      input,
+      input: { ...input, sources },
       schema: CritiqueModuleOutputSchema,
     });
   },

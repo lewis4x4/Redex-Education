@@ -39,6 +39,7 @@ function createStorageMock(): Storage {
 describe('ModuleGenerationPreviewPage', () => {
   let ModuleGenerationPreviewPage: (typeof import('./ModuleGenerationPreviewPage'))['ModuleGenerationPreviewPage']
   let useFoundryDraftStore: (typeof import('@/features/foundry/store/foundryDraftStore'))['useFoundryDraftStore']
+  let aiModule: typeof import('@/features/foundry/ai')
 
   beforeEach(async () => {
     vi.resetModules()
@@ -50,6 +51,7 @@ describe('ModuleGenerationPreviewPage', () => {
     })
 
     ;({ useFoundryDraftStore } = await import('@/features/foundry/store/foundryDraftStore'))
+    aiModule = await import('@/features/foundry/ai')
     ;({ ModuleGenerationPreviewPage } = await import('./ModuleGenerationPreviewPage'))
 
     act(() => {
@@ -112,6 +114,20 @@ describe('ModuleGenerationPreviewPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Final Quiz' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /Generated quiz preview/i })).toBeInTheDocument()
+  })
+
+  it('shows error alert with retry when generation fails', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(aiModule, 'getCourseFoundryAiClient').mockReturnValue({
+      ...aiModule.mockAiClient,
+      generateLessons: vi.fn().mockRejectedValue(new Error('pg_cron unavailable')),
+    })
+    renderPage()
+
+    await user.click(screen.getByRole('button', { name: /Generate Full Module in One Click/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("We couldn't generate the module.")
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
   })
 
   it('keeps Continue → Self-critique enabled and navigates to critique route on click', async () => {

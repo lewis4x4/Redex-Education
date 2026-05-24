@@ -275,14 +275,15 @@ export function QuestionWizard({ initialValues, onSubmit, onCancel }: QuestionWi
           </Button>
 
           {currentStep < TOTAL_STEPS ? (
-            <Button type="button" onClick={handleNext} className="bg-redex-red text-white hover:bg-redex-red-hover">
+            <Button type="button" onClick={handleNext} variant="brand">
               Next
             </Button>
           ) : (
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="bg-redex-red text-white hover:bg-redex-red-hover disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+              variant="brand"
+              className="disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
             >
               Submit
             </Button>

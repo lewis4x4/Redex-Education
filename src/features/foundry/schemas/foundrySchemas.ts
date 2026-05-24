@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CANONICAL_AUDIENCES } from '@/lib/education';
 import type { SetupAnswers } from '@/lib/education';
 import type { ModuleBasicsFormValues } from '../types';
 
@@ -12,6 +13,15 @@ export const TRAINING_TYPE_VALUES = [
   'general_informational',
 ] as const;
 
+const learningOutcomeSchema = z.object({
+  id: z.string().min(1),
+  text: z
+    .string()
+    .min(8, 'Each outcome needs at least 8 characters')
+    .max(180, 'Keep each outcome under 180 characters')
+    .trim(),
+});
+
 export const moduleBasicsSchema = z.object({
   title: z
     .string()
@@ -19,13 +29,18 @@ export const moduleBasicsSchema = z.object({
     .max(120, 'Module title must be 120 characters or fewer')
     .trim(),
   parent_course_id: z.string().min(1, 'Choose a parent course or Standalone'),
-  audience: z
+  audience_archetype: z.enum(CANONICAL_AUDIENCES),
+  audience_refinement: z
     .string()
-    .min(2, 'Add a target audience (e.g. "New hires")')
-    .max(80, 'Audience must be 80 characters or fewer')
-    .trim(),
-  criticality: z.enum(['required', 'optional']),
+    .max(80, 'Audience refinement must be 80 characters or fewer')
+    .trim()
+    .optional(),
+  completion_required: z.enum(['required', 'recommended', 'optional']),
   training_type: z.enum(TRAINING_TYPE_VALUES),
+  learning_outcomes: z
+    .array(learningOutcomeSchema)
+    .min(1, 'Add at least one learning outcome')
+    .max(3, 'Maximum 3 learning outcomes'),
   estimated_minutes: z
     .number({ message: 'Enter a target duration in minutes' })
     .int('Whole minutes only')

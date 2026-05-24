@@ -5,14 +5,10 @@ import { toast } from 'sonner'
 import { z } from 'zod'
 
 import { Button } from '@/components/ui/button'
-import { usePublishedModulesStore } from '@/features/publishing/store/publishedModulesStore'
-import { MOCK_LEARNER_ANA, MOCK_LEARNER_DEVON, MOCK_LEARNER_MARCUS } from '@/lib/education'
+import { useAssignmentAdmin } from '../hooks/useAssignmentAdmin'
 import { useActorInfo } from '@/hooks/useActorInfo'
-import type { Assignment, User } from '@/types/training'
+import type { Assignment } from '@/types/training'
 import { COHORTS } from '../lib/cohorts'
-import { useAssignmentStore } from '../store/assignmentStore'
-
-const ASSIGNABLE_USERS: User[] = [MOCK_LEARNER_MARCUS, MOCK_LEARNER_ANA, MOCK_LEARNER_DEVON]
 
 const assignmentFormSchema = z
   .object({
@@ -72,17 +68,16 @@ function formatDueToast(dateValue?: string): string {
   return `due ${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(`${dateValue}T00:00:00`))}`
 }
 
-function getAssigneeLabel(values: AssignmentFormValues): string {
+function getAssigneeLabel(values: AssignmentFormValues, assignableUsers: { id: string; display_name: string }[]): string {
   if (values.assigneeMode === 'cohort') {
     return COHORTS.find((cohort) => cohort.id === values.cohortId)?.label ?? 'selected cohort'
   }
 
-  return ASSIGNABLE_USERS.find((user) => user.id === values.assigneeUserId)?.display_name ?? 'selected learner'
+  return assignableUsers.find((user) => user.id === values.assigneeUserId)?.display_name ?? 'selected learner'
 }
 
 export function AssignmentForm({ onAssigned }: AssignmentFormProps) {
-  const createAssignment = useAssignmentStore((state) => state.createAssignment)
-  const publishedModules = usePublishedModulesStore((state) => state.publishedModules)
+  const { assignableUsers, publishedModules, createAssignment } = useAssignmentAdmin()
   const actor = useActorInfo()
   const moduleOptions = publishedModules.map((module) => ({
     value: module.module_version_id,
@@ -103,9 +98,9 @@ export function AssignmentForm({ onAssigned }: AssignmentFormProps) {
   })
   const assigneeModeField = register('assigneeMode')
 
-  const onSubmit = (values: AssignmentFormValues) => {
+  const onSubmit = async (values: AssignmentFormValues) => {
     const cohort = COHORTS.find((candidate) => candidate.id === values.cohortId)
-    const assignment = createAssignment({
+    const assignment = await createAssignment({
       module_version_id: values.moduleVersionId,
       assigned_by: actor?.userId ?? 'system',
       due_at: toDueAtIso(values.dueAt),
@@ -113,7 +108,7 @@ export function AssignmentForm({ onAssigned }: AssignmentFormProps) {
       ...(values.assigneeMode === 'cohort' && cohort ? { assignee_role: cohort.role } : {}),
     })
 
-    toast.success(`Assigned to ${getAssigneeLabel(values)} — ${formatDueToast(values.dueAt)}`)
+    toast.success(`Assigned to ${getAssigneeLabel(values, assignableUsers)} — ${formatDueToast(values.dueAt)}`)
     onAssigned?.(assignment)
     reset(getDefaultValues(firstModuleId))
     setAssigneeMode('user')
@@ -208,7 +203,7 @@ export function AssignmentForm({ onAssigned }: AssignmentFormProps) {
               {...register('assigneeUserId')}
             >
               <option value="">Select a learner</option>
-              {ASSIGNABLE_USERS.map((user) => (
+              {assignableUsers.map((user) => (
                 <option key={user.id} value={user.id}>
                   {user.display_name}
                 </option>
@@ -238,7 +233,7 @@ export function AssignmentForm({ onAssigned }: AssignmentFormProps) {
               ))}
             </select>
             <p id="cohortId-help" className="text-xs text-slate-500">
-              Groups map to role-based mock assignments for this slice.
+              Audience groups assign to every member of the selected role.
             </p>
             <p id="cohortId-error" aria-live="polite" className="text-sm text-red-600">
               {errors.cohortId?.message ?? '\u00a0'}

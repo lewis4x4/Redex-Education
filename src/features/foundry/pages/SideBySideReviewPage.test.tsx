@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { MOCK_GENERATED_MODULE } from '@/features/foundry/data/mockGeneratedModule'
 import { MOCK_LESSON_REVIEWS } from '@/features/foundry/data/mockLessonReviews'
 
 function createStorageMock(): Storage {
@@ -92,6 +93,20 @@ describe('SideBySideReviewPage', () => {
     expect(await screen.findByText('2 approved')).toBeInTheDocument()
     expect(screen.getByText('4 pending')).toBeInTheDocument()
     expect(screen.getByText('0 need regeneration')).toBeInTheDocument()
+  })
+
+  it('renders immediately in real mode when generated lessons exist (no loading lock)', async () => {
+    vi.stubEnv('VITE_AI_MODE', 'real')
+    act(() => {
+      useFoundryDraftStore.getState().setGeneratedModule(MOCK_GENERATED_MODULE)
+      useFoundryDraftStore.getState().clearLessonReviews()
+    })
+
+    renderPage()
+
+    expect(screen.queryByText('Loading review data…')).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Generated content' })).toBeInTheDocument()
+    vi.unstubAllEnvs()
   })
 
   it('keeps Continue enabled and navigates to blockers page on click', async () => {

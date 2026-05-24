@@ -18,6 +18,10 @@ const EXPECTED_PROMPT_VERSIONS = {
   'lesson_generation.scenario': 'v1',
   'lesson_generation.acknowledgment': 'v1',
   'lesson_generation.quiz': 'v1',
+  'lesson_generation.video': 'v1',
+  'lesson_generation.coach': 'v1',
+  'lesson_generation.assignment': 'v1',
+  'lesson_generation.reflection_prompt': 'v1',
   'lesson_generation.video_script': 'v1',
   'lesson_generation.hotspot_diagram': 'v1',
   'lesson_generation.drag_to_order': 'v1',
@@ -53,7 +57,7 @@ describe('PROMPT_REGISTRY', () => {
       definition.id.key.startsWith('lesson_generation.'),
     )
 
-    expect(lessonPrompts).toHaveLength(9)
+    expect(lessonPrompts).toHaveLength(13)
 
     for (const definition of lessonPrompts) {
       expect(definition.system).toContain(CLOSED_CONTENT_PREAMBLE)
@@ -92,8 +96,14 @@ describe('PROMPT_REGISTRY', () => {
     }
   })
 
+  it('includes learning outcomes in every prompt user template', () => {
+    for (const definition of listPrompts()) {
+      expect(definition.userTemplate).toContain('{{learningOutcomes}}')
+    }
+  })
+
   it('locks the registry count', () => {
-    expect(listPrompts()).toHaveLength(17)
-    expect(listPrompts().length).toMatchInlineSnapshot(`17`)
+    expect(listPrompts()).toHaveLength(21)
+    expect(listPrompts().length).toMatchInlineSnapshot(`21`)
   })
 })

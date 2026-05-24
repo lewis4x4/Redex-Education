@@ -63,8 +63,8 @@ describe('FoundryStartPage', () => {
   it('renders the foundry basics header and form', () => {
     renderWithRoutes()
 
-    expect(screen.getByText('REDEX AI COURSE FOUNDRY')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'New module — basics' })).toBeInTheDocument()
+    expect(screen.getByText('REDEX AI COURSE FOUNDRY · STEP 1')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Module basics' })).toBeInTheDocument()
     expect(
       screen.getByText('Give your module a name and audience. The Foundry will use these to tailor the next steps.'),
     ).toBeInTheDocument()
@@ -77,11 +77,11 @@ describe('FoundryStartPage', () => {
 
     await user.type(screen.getByRole('textbox', { name: /module title/i }), 'Safety Basics')
     await user.selectOptions(screen.getByRole('combobox', { name: /parent course/i }), 'course-orientation-001')
-    await user.type(screen.getByRole('textbox', { name: /audience/i }), 'All employees')
+    await user.selectOptions(screen.getByRole('combobox', { name: /^audience/i }), 'all_employees')
+    await user.type(screen.getByRole('textbox', { name: /audience refinement/i }), 'US team')
     await user.click(screen.getByRole('radio', { name: /optional/i }))
     await user.selectOptions(screen.getByRole('combobox', { name: /training type/i }), 'safety')
-    await user.clear(screen.getByRole('spinbutton', { name: /estimated duration target/i }))
-    await user.type(screen.getByRole('spinbutton', { name: /estimated duration target/i }), '35')
+    await user.type(screen.getByPlaceholderText(/describe a concrete post-training capability/i), 'Use safe work practices in daily routines')
     await user.click(screen.getByRole('button', { name: /continue → add source material/i }))
 
     expect(await screen.findByText('Reached source route')).toBeInTheDocument()
@@ -89,10 +89,10 @@ describe('FoundryStartPage', () => {
       expect.objectContaining({
         title: 'Safety Basics',
         parent_course_id: 'course-orientation-001',
-        audience: 'All employees',
-        criticality: 'optional',
+        audience_archetype: 'all_employees',
+        audience_refinement: 'US team',
+        completion_required: 'optional',
         training_type: 'safety',
-        estimated_minutes: 35,
       }),
     )
   })
@@ -102,9 +102,11 @@ describe('FoundryStartPage', () => {
       useFoundryDraftStore.getState().setBasics({
         title: 'Existing draft title',
         parent_course_id: 'standalone',
-        audience: 'New hires',
-        criticality: 'optional',
+        audience_archetype: 'new_hire',
+        audience_refinement: '',
+        completion_required: 'optional',
         training_type: 'hr',
+        learning_outcomes: [{ id: 'outcome-1', text: 'Complete onboarding in the first week' }],
         estimated_minutes: 25,
       })
     })
@@ -113,6 +115,6 @@ describe('FoundryStartPage', () => {
 
     expect(screen.getByRole('textbox', { name: /module title/i })).toHaveValue('Existing draft title')
     expect(screen.getByRole('radio', { name: /optional/i })).toBeChecked()
-    expect(screen.getByRole('spinbutton', { name: /estimated duration target/i })).toHaveValue(25)
+    expect(screen.getByDisplayValue('Complete onboarding in the first week')).toBeInTheDocument()
   })
 })

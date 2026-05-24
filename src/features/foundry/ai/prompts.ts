@@ -9,6 +9,9 @@ import {
 
 const citeRule = `${CITATION_SENTINEL} the source section it draws from using the format \`[source: <section_id>]\`. If a claim cannot be cited, flag it as \`[NEEDS_REVIEW: <reason>]\` instead of presenting it as Redex policy.`
 
+const LEARNING_OUTCOMES_SYSTEM_RULE =
+  'The author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.'
+
 const prompt = (
   key: PromptKey,
   version: string,
@@ -19,22 +22,23 @@ const prompt = (
 })
 
 const system = (...parts: readonly string[]) =>
-  [REDEX_POLICY_GUARDRAIL, citeRule, JSON_OUTPUT_RULE, ...parts].join('\n\n')
+  [REDEX_POLICY_GUARDRAIL, citeRule, JSON_OUTPUT_RULE, LEARNING_OUTCOMES_SYSTEM_RULE, ...parts].join('\n\n')
 
 const lessonSystem = (...parts: readonly string[]) =>
-  [REDEX_POLICY_GUARDRAIL, CLOSED_CONTENT_PREAMBLE, JSON_OUTPUT_RULE, ...parts].join('\n\n')
+  [REDEX_POLICY_GUARDRAIL, CLOSED_CONTENT_PREAMBLE, JSON_OUTPUT_RULE, LEARNING_OUTCOMES_SYSTEM_RULE, ...parts].join('\n\n')
 
-const sourceVariables = ['sourceBlocks'] as const
+const sourceVariables = ['sourceBlocks', 'learningOutcomes'] as const
 const lessonVariables = [
   'moduleBasics',
   'courseOutline',
   'lessonOutline',
   'sourceBlocks',
   'setupAnswers',
+  'learningOutcomes',
 ] as const
 
 const lessonTemplate =
-  'Generate content for this lesson.\n\nModule basics:\n{{moduleBasics}}\n\nCourse outline:\n{{courseOutline}}\n\nLesson outline:\n{{lessonOutline}}\n\nSetup answers:\n{{setupAnswers}}\n\nApproved source blocks:\n{{sourceBlocks}}'
+  'Generate content for this lesson.\n\nLearning outcomes:\n{{learningOutcomes}}\n\nModule basics:\n{{moduleBasics}}\n\nCourse outline:\n{{courseOutline}}\n\nLesson outline:\n{{lessonOutline}}\n\nSetup answers:\n{{setupAnswers}}\n\nApproved source blocks:\n{{sourceBlocks}}'
 
 const PROMPT_HISTORY = {
   source_analysis: [
@@ -44,11 +48,12 @@ const PROMPT_HISTORY = {
       system: [
         REDEX_POLICY_GUARDRAIL,
         JSON_OUTPUT_RULE,
+        LEARNING_OUTCOMES_SYSTEM_RULE,
         'Analyze the supplied Redex source binder as evidence, not as learner-facing training copy. Identify stable section_id values, headings, summaries, topic tags, authority levels, placeholder status, conflicts, and missing-source risks. Do not infer Redex policy beyond the supplied binder.',
       ].join('\n\n'),
       userTemplate:
-        'Analyze this source binder and return SourceAnalysisOutput.\n\nSource binder:\n{{sourceBinder}}',
-      requiredVariables: ['sourceBinder'],
+        'Analyze this source binder and return SourceAnalysisOutput.\n\nLearning outcomes:\n{{learningOutcomes}}\n\nSource binder:\n{{sourceBinder}}',
+      requiredVariables: ['sourceBinder', 'learningOutcomes'],
       outputSchemaName: 'SourceAnalysisOutput',
       requiresCitations: false,
       enforcedRules: ['Flags placeholders and missing policy instead of inventing content'],
@@ -62,7 +67,7 @@ const PROMPT_HISTORY = {
         'Review the source binder, source analysis, and target audience. Generate 3–5 admin setup questions that materially affect structure, assessment strictness, scenario context, or learner framing. Each question must explain why the answer matters and cite the source section or setup gap that motivated it.',
       ),
       userTemplate:
-        'Infer setup questions and return SetupQuestionInferenceOutput.\n\nTarget audience:\n{{targetAudience}}\n\nSource analysis:\n{{sourceAnalysis}}\n\nSource blocks:\n{{sourceBlocks}}',
+        'Infer setup questions and return SetupQuestionInferenceOutput.\n\nLearning outcomes:\n{{learningOutcomes}}\n\nTarget audience:\n{{targetAudience}}\n\nSource analysis:\n{{sourceAnalysis}}\n\nSource blocks:\n{{sourceBlocks}}',
       requiredVariables: ['targetAudience', 'sourceAnalysis', ...sourceVariables],
       outputSchemaName: 'SetupQuestionInferenceOutput',
       requiresCitations: true,
@@ -77,7 +82,7 @@ const PROMPT_HISTORY = {
         'Create a CourseOutlineDraft that sequences lessons from simple context to applied practice and assessment. Every lesson summary, objective, prerequisite, and Redex policy point must cite supporting source sections. If source support is missing, include a missing-source warning instead of fabricating policy.',
       ),
       userTemplate:
-        'Generate a CourseOutlineDraft.\n\nModule basics:\n{{moduleBasics}}\n\nSetup answers:\n{{setupAnswers}}\n\nSource blocks:\n{{sourceBlocks}}',
+        'Generate a CourseOutlineDraft.\n\nLearning outcomes:\n{{learningOutcomes}}\n\nModule basics:\n{{moduleBasics}}\n\nSetup answers:\n{{setupAnswers}}\n\nSource blocks:\n{{sourceBlocks}}',
       requiredVariables: ['moduleBasics', 'setupAnswers', ...sourceVariables],
       outputSchemaName: 'CourseOutlineDraft',
       requiresCitations: true,
@@ -157,6 +162,64 @@ const PROMPT_HISTORY = {
       ],
     }),
   ],
+  'lesson_generation.video': [
+    prompt('lesson_generation.video', 'v1', {
+      description:
+        'Generate a source-grounded video lesson with script segments, notes, and transcript provenance.',
+      system: lessonSystem(
+        VIDEO_SEGMENT_RULE,
+        'Generate VideoLessonContent with script segments, visual notes when useful, source citations, and checkpoint questions. Every segment must include derived_from_section_ids for transcript-into-corpus provenance and must be omitted or flagged if it cannot be tied to approved source sections.',
+      ),
+      userTemplate: lessonTemplate,
+      requiredVariables: lessonVariables,
+      outputSchemaName: 'VideoLessonContent',
+      requiresCitations: true,
+      enforcedRules: [
+        'One segment = one idea',
+        'Target 60–120 seconds per segment',
+        'derived_from_section_ids required per segment',
+      ],
+    }),
+  ],
+  'lesson_generation.coach': [
+    prompt('lesson_generation.coach', 'v1', {
+      description: 'Generate a source-grounded coach lesson with prompts and guidance.',
+      system: lessonSystem(
+        'Generate CoachLessonContent with an intro and practical prompts grounded in cited source sections. Flag missing support instead of inventing policy.',
+      ),
+      userTemplate: lessonTemplate,
+      requiredVariables: lessonVariables,
+      outputSchemaName: 'CoachLessonContent',
+      requiresCitations: true,
+      enforcedRules: ['Coach prompts must be source-grounded'],
+    }),
+  ],
+  'lesson_generation.assignment': [
+    prompt('lesson_generation.assignment', 'v1', {
+      description: 'Generate a source-grounded assignment lesson with clear instructions and rubric guidance.',
+      system: lessonSystem(
+        'Generate AssignmentLessonContent with explicit instructions, completion evidence, and rubric criteria grounded in source citations.',
+      ),
+      userTemplate: lessonTemplate,
+      requiredVariables: lessonVariables,
+      outputSchemaName: 'AssignmentLessonContent',
+      requiresCitations: true,
+      enforcedRules: ['Assignment instructions must be source-grounded'],
+    }),
+  ],
+  'lesson_generation.reflection_prompt': [
+    prompt('lesson_generation.reflection_prompt', 'v1', {
+      description: 'Generate a source-grounded reflection prompt lesson.',
+      system: lessonSystem(
+        'Generate ReflectionPromptLessonContent with one clear reflective prompt grounded in cited source material.',
+      ),
+      userTemplate: lessonTemplate,
+      requiredVariables: lessonVariables,
+      outputSchemaName: 'ReflectionPromptLessonContent',
+      requiresCitations: true,
+      enforcedRules: ['Reflection prompt must be source-grounded'],
+    }),
+  ],
   'lesson_generation.video_script': [
     prompt('lesson_generation.video_script', 'v1', {
       description:
@@ -226,7 +289,7 @@ const PROMPT_HISTORY = {
         'Generate assessment items for the Slice 11.2 item-bank schema shape. Each item must include competency tags, criticality, difficulty, item type, prompt, expected answer or scoring rubric, remediation guidance, and cited source sections. Use recognition, free_recall, sequencing, confidence_rated, and scenario-style items only where source supports them.',
       ),
       userTemplate:
-        'Generate assessment items and return AssessmentGenerationOutput.\n\nModule basics:\n{{moduleBasics}}\n\nCourse outline:\n{{courseOutline}}\n\nSetup answers:\n{{setupAnswers}}\n\nApproved source blocks:\n{{sourceBlocks}}',
+        'Generate assessment items and return AssessmentGenerationOutput.\n\nLearning outcomes:\n{{learningOutcomes}}\n\nModule basics:\n{{moduleBasics}}\n\nCourse outline:\n{{courseOutline}}\n\nSetup answers:\n{{setupAnswers}}\n\nApproved source blocks:\n{{sourceBlocks}}',
       requiredVariables: ['moduleBasics', 'courseOutline', 'setupAnswers', ...sourceVariables],
       outputSchemaName: 'AssessmentGenerationOutput',
       requiresCitations: true,
@@ -241,7 +304,7 @@ const PROMPT_HISTORY = {
         'Review generated artifacts for unsupported claims, missing citations, invented Redex policy, unresolved source conflicts, placeholder leakage, stale prompt versions, and publish blockers. Also flag Slice 11.7 issues: weak_assessment_design, missing_worked_example, inert_content, cognitive_overload, and segment_too_long. Return severity, affected artifact id, source section ids, explanation, and actionable fix; do not rewrite content in this pass.',
       ),
       userTemplate:
-        'Critique these generated artifacts and return SelfCritiqueOutput.\n\nPrompt ids used:\n{{promptIds}}\n\nSource blocks:\n{{sourceBlocks}}\n\nCourse outline:\n{{courseOutline}}\n\nGenerated lessons:\n{{generatedLessons}}\n\nGenerated assessments:\n{{generatedAssessments}}',
+        'Critique these generated artifacts and return SelfCritiqueOutput.\n\nLearning outcomes:\n{{learningOutcomes}}\n\nPrompt ids used:\n{{promptIds}}\n\nSource blocks:\n{{sourceBlocks}}\n\nCourse outline:\n{{courseOutline}}\n\nGenerated lessons:\n{{generatedLessons}}\n\nGenerated assessments:\n{{generatedAssessments}}',
       requiredVariables: [
         'promptIds',
         ...sourceVariables,
@@ -268,7 +331,7 @@ const PROMPT_HISTORY = {
         'Regenerate only affected sections of the existing lesson using critique issues and fixes-to-apply. Preserve unaffected structure, ids, citations, and approved wording where possible. If a requested fix cannot be supported by source, flag it as unsupported. Return content in the same lesson output schema as the input lesson type.',
       ),
       userTemplate:
-        'Regenerate the affected lesson sections.\n\nExisting lesson:\n{{existingLesson}}\n\nCritique issues:\n{{critiqueIssues}}\n\nFixes to apply:\n{{fixesToApply}}\n\nApproved source blocks:\n{{sourceBlocks}}',
+        'Regenerate the affected lesson sections.\n\nLearning outcomes:\n{{learningOutcomes}}\n\nExisting lesson:\n{{existingLesson}}\n\nCritique issues:\n{{critiqueIssues}}\n\nFixes to apply:\n{{fixesToApply}}\n\nApproved source blocks:\n{{sourceBlocks}}',
       requiredVariables: ['existingLesson', 'critiqueIssues', 'fixesToApply', ...sourceVariables],
       outputSchemaName: 'RegeneratedLessonContent',
       requiresCitations: true,
@@ -283,7 +346,7 @@ const PROMPT_HISTORY = {
         "Perform section-scoped regeneration for job_type: 'section'. Regenerate only lessons or fragments bound to the supplied source_section_id and module_version_id. Use the target source block as primary authority; use other source blocks only for context or conflict detection. If the target section is missing, placeholder, unclear, or unsupported, return review-needed results instead of fake policy.",
       ),
       userTemplate:
-        'Regenerate only lessons bound to the target source section.\n\nModule version id:\n{{moduleVersionId}}\n\nTarget source section id:\n{{sourceSectionId}}\n\nLessons bound to section:\n{{boundLessons}}\n\nTarget source block:\n{{targetSourceBlock}}\n\nOther approved source blocks:\n{{sourceBlocks}}',
+        'Regenerate only lessons bound to the target source section.\n\nLearning outcomes:\n{{learningOutcomes}}\n\nModule version id:\n{{moduleVersionId}}\n\nTarget source section id:\n{{sourceSectionId}}\n\nLessons bound to section:\n{{boundLessons}}\n\nTarget source block:\n{{targetSourceBlock}}\n\nOther approved source blocks:\n{{sourceBlocks}}',
       requiredVariables: [
         'moduleVersionId',
         'sourceSectionId',
@@ -306,11 +369,12 @@ const PROMPT_HISTORY = {
       system: [
         REDEX_POLICY_GUARDRAIL,
         JSON_OUTPUT_RULE,
+        LEARNING_OUTCOMES_SYSTEM_RULE,
         'You are a strict grounding judge. Decide whether the supplied source section ENTAILS the generated claim. Use only the section text. Return entailed=false when the claim adds policy, timing, people, obligations, exceptions, or certainty not present in the source. Provide one concise sentence of reasoning.',
       ].join('\n\n'),
       userTemplate:
-        'Does this source section entail the claim? Return EntailmentCheckOutput.\n\nClaim:\n{{claim}}\n\nSource section:\n{{sourceSection}}',
-      requiredVariables: ['claim', 'sourceSection'],
+        'Does this source section entail the claim? Return EntailmentCheckOutput.\n\nLearning outcomes:\n{{learningOutcomes}}\n\nClaim:\n{{claim}}\n\nSource section:\n{{sourceSection}}',
+      requiredVariables: ['learningOutcomes', 'claim', 'sourceSection'],
       outputSchemaName: 'EntailmentCheckOutput',
       requiresCitations: false,
       enforcedRules: ['No outside knowledge', 'Strict entailment only'],

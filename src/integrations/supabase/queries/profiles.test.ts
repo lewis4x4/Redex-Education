@@ -75,4 +75,13 @@ describe('profiles queries', () => {
 
     await expect(fetchProfilesByManagerId('manager-1')).rejects.toThrow('reports failed')
   })
+
+  it('fetchAssignableUsers delegates to profile list query', async () => {
+    const rows = [{ id: 'user-1' }]
+    orderMock.mockResolvedValueOnce({ data: rows, error: null })
+    const { fetchAssignableUsers } = await import('./profiles')
+
+    await expect(fetchAssignableUsers()).resolves.toEqual([{ id: 'mapped-user-1' }])
+    expect(orderMock).toHaveBeenCalledWith('display_name', { ascending: true })
+  })
 })

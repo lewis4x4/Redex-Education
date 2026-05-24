@@ -14,7 +14,7 @@ export function AssignmentAdminPage() {
         <p className="text-sm font-semibold uppercase tracking-[3px] text-redex-red">ADMIN · ASSIGNMENTS</p>
         <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Manage assignments</h1>
         <p className="max-w-2xl text-sm leading-relaxed text-slate-600">
-          Assign published Redex training to an individual learner or a mock audience group, then confirm it appears in local assignment state.
+          Assign published Redex training to an individual learner or an audience group, and set a due date.
         </p>
       </header>
 
@@ -23,7 +23,7 @@ export function AssignmentAdminPage() {
           <h2 id="assignment-form-heading" className="text-xl font-semibold tracking-tight text-slate-900">
             New assignment
           </h2>
-          <p className="mt-1 text-sm text-slate-600">Start with HR Basics and choose Marcus, Ana, Devon, or a new-hire cohort.</p>
+          <p className="mt-1 text-sm text-slate-600">Choose a published module, select a learner or audience group, and set a due date.</p>
         </div>
         <AssignmentForm />
       </section>

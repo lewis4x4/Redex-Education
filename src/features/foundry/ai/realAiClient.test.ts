@@ -40,8 +40,28 @@ function createSupabaseMock(rows: unknown[]) {
   };
 }
 
-async function importRealAiClient(supabaseMock: ReturnType<typeof createSupabaseMock>['supabase']) {
+async function importRealAiClient(
+  supabaseMock: ReturnType<typeof createSupabaseMock>['supabase'],
+  options?: {
+    selectedLibraryFileIds?: string[];
+    sourceLibraryMocks?: {
+      fetchSourceFiles?: () => Promise<Array<{ id: string; title: string }>>;
+      fetchSourceFileVersions?: () => Promise<Array<{ id: string }>>;
+      fetchSourceSections?: () => Promise<Array<{ id: string; level: 2; heading: string; body: string; position_index: number; has_placeholders: boolean }>>;
+    };
+  },
+) {
   vi.doMock('@/integrations/supabase/client', () => ({ supabase: supabaseMock }));
+  vi.doMock('@/features/foundry/store/foundryDraftStore', () => ({
+    useFoundryDraftStore: {
+      getState: () => ({ selectedLibraryFileIds: options?.selectedLibraryFileIds ?? [] }),
+    },
+  }));
+  vi.doMock('@/integrations/supabase/queries/source_library', () => ({
+    fetchSourceFiles: options?.sourceLibraryMocks?.fetchSourceFiles ?? (async () => []),
+    fetchSourceFileVersions: options?.sourceLibraryMocks?.fetchSourceFileVersions ?? (async () => []),
+    fetchSourceSections: options?.sourceLibraryMocks?.fetchSourceSections ?? (async () => []),
+  }));
   return import('./realAiClient');
 }
 
@@ -49,6 +69,8 @@ describe('realAiClient', () => {
   afterEach(() => {
     vi.resetModules();
     vi.doUnmock('@/integrations/supabase/client');
+    vi.doUnmock('@/features/foundry/store/foundryDraftStore');
+    vi.doUnmock('@/integrations/supabase/queries/source_library');
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.useRealTimers();
@@ -219,6 +241,132 @@ describe('realAiClient', () => {
         promptId: { key: 'regenerate_section', version: 'v1' },
       },
     });
+  });
+
+  it.each([
+    ['text', 'lesson_generation.text'],
+    ['quiz', 'lesson_generation.quiz'],
+    ['checklist', 'lesson_generation.checklist'],
+    ['acknowledgment', 'lesson_generation.acknowledgment'],
+    ['scenario', 'lesson_generation.scenario'],
+    ['video', 'lesson_generation.video'],
+    ['coach', 'lesson_generation.coach'],
+    ['assignment', 'lesson_generation.assignment'],
+    ['reflection_prompt', 'lesson_generation.reflection_prompt'],
+  ] as const)('uses matching prompt key for %s lessons', async (lessonType, expectedPromptKey) => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://redex-test.supabase.co');
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key');
+    const supabase = createSupabaseMock([
+      {
+        id: 'generation-job-1',
+        status: 'succeeded',
+        stage_map: { generate_lessons: { status: 'succeeded', cost_cents: 1 } },
+        current_stage: null,
+        output_payload: {
+          final: {
+            module_title: 'Module',
+            lessons: [{ lesson_index: 0, module_index: 0, title: 'Lesson', lesson_type: lessonType, status: 'draft' }],
+            generated_at: new Date().toISOString(),
+            is_complete: true,
+          },
+        },
+        last_error_message: null,
+        actual_cost_cents: 1,
+        cost_breakdown: { generate_lessons: 1 },
+      },
+    ]);
+    const { realAiClient } = await importRealAiClient(supabase.supabase);
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ status: 'queued', job_id: 'generation-job-1' }, { status: 202 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await realAiClient.generateLessons({
+      outline: {
+        course_title: 'Module',
+        description: 'Desc',
+        learning_objectives: ['Obj'],
+        modules: [{ title: 'M1', lessons: [{ title: 'L1', lesson_type: lessonType, estimated_minutes: 5 }] }],
+      },
+      sources: DEFAULT_AI_SOURCE_MATERIAL,
+    });
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(requestInit.body)).inputPayload.promptId.key).toBe(expectedPromptKey);
+  });
+
+  it('hydrates source content from selected library files when source material is empty', async () => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://redex-test.supabase.co');
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key');
+    const supabase = createSupabaseMock([
+      {
+        id: 'generation-job-1',
+        status: 'succeeded',
+        stage_map: { outline: { status: 'succeeded', cost_cents: 1 } },
+        current_stage: null,
+        output_payload: { outline: MOCK_GENERATED_OUTLINE, final: MOCK_GENERATED_OUTLINE },
+        last_error_message: null,
+        actual_cost_cents: 1,
+        cost_breakdown: { outline: 1 },
+      },
+    ]);
+    const { realAiClient } = await importRealAiClient(supabase.supabase, {
+      selectedLibraryFileIds: ['file-1'],
+      sourceLibraryMocks: {
+        fetchSourceFiles: async () => [{ id: 'file-1', title: 'HR doc' }],
+        fetchSourceFileVersions: async () => [{ id: 'version-1' }],
+        fetchSourceSections: async () => [
+          { id: 'section-1', level: 2, heading: 'Policy', body: 'Use PTO system.', position_index: 0, has_placeholders: false },
+        ],
+      },
+    });
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ status: 'queued', job_id: 'generation-job-1' }, { status: 202 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await realAiClient.generateOutline({
+      basics: DEFAULT_AI_MODULE_BASICS,
+      sources: DEFAULT_AI_SOURCE_MATERIAL,
+      setupAnswers: DEFAULT_AI_SETUP_ANSWERS,
+    });
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(requestInit.body));
+    expect(body.inputPayload.input.sources.raw_text).toContain('Use PTO system.');
+    expect(body.inputPayload.input.sources.sections).toHaveLength(1);
+  });
+
+  it('passes full self-critique context payload', async () => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://redex-test.supabase.co');
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key');
+    const supabase = createSupabaseMock([
+      {
+        id: 'generation-job-1',
+        status: 'succeeded',
+        stage_map: { self_critique: { status: 'succeeded', cost_cents: 1 } },
+        current_stage: null,
+        output_payload: {
+          final: { module_title: 'Module', generated_at: new Date().toISOString(), issues: [], blocks_publish: false },
+        },
+        last_error_message: null,
+        actual_cost_cents: 1,
+        cost_breakdown: { self_critique: 1 },
+      },
+    ]);
+    const { realAiClient } = await importRealAiClient(supabase.supabase);
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ status: 'queued', job_id: 'generation-job-1' }, { status: 202 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await realAiClient.critiqueModule({
+      module: { module_title: 'Module', lessons: [], generated_at: new Date().toISOString(), is_complete: true },
+      sources: DEFAULT_AI_SOURCE_MATERIAL,
+      promptIds: ['outline_generation@v1', 'lesson_generation.text@v1'],
+      courseOutline: MOCK_GENERATED_OUTLINE,
+      generatedAssessments: { assessment_lesson_id: 'a1', questions: [] },
+    });
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(requestInit.body));
+    expect(body.inputPayload.input.promptIds).toEqual(['outline_generation@v1', 'lesson_generation.text@v1']);
+    expect(body.inputPayload.input.courseOutline).toEqual(MOCK_GENERATED_OUTLINE);
+    expect(body.inputPayload.input.generatedAssessments).toEqual({ assessment_lesson_id: 'a1', questions: [] });
   });
 
   it('throws a clear not-deployed error when the edge function returns 404', async () => {

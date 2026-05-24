@@ -2,12 +2,12 @@ import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAssignmentStore } from '@/features/assignments/store/assignmentStore';
+import { useModuleVersionsStore } from '@/features/publishing/store/moduleVersionsStore';
 import { useMyProgress } from '@/hooks/useEducation';
 import { DEMO_HR_BASICS_COURSE } from '@/lib/education';
 import type { Assignment, Course, Enrollment, LearnerProfile, Lesson } from '@/lib/education';
-import { ArrowRight, CheckCircle2, Circle, Clock, HelpCircle, Lock } from 'lucide-react';
+import { ArrowRight, Circle, Clock, HelpCircle, Lock } from 'lucide-react';
 
-// Temporary inline progress
 function Progress({ value, className }: { value: number; className?: string }) {
   const boundedValue = Math.min(100, Math.max(0, value));
 
@@ -20,10 +20,7 @@ function Progress({ value, className }: { value: number; className?: string }) {
       aria-valuenow={boundedValue}
       aria-label="Onboarding progress"
     >
-      <div 
-        className="h-full bg-redex-red transition-all" 
-        style={{ width: `${boundedValue}%` }} 
-      />
+      <div className="h-full bg-redex-red transition-all" style={{ width: `${boundedValue}%` }} />
     </div>
   );
 }
@@ -59,61 +56,67 @@ interface LearnerDashboardPageProps {
   onStartJourney?: () => void;
 }
 
-/**
- * Learner Journey Dashboard - Slice 1.2 foundation
- * Answers the three core questions:
- * 1. What do I need to do now?
- * 2. How far along am I?
- * 3. Who can help me if I’m stuck?
- */
 export function LearnerDashboardPage({ learner, onContinue }: LearnerDashboardPageProps) {
   const { percentage, completed, total } = useMyProgress();
   const assignments = useAssignmentStore((state) => state.assignments);
+  const versions = useModuleVersionsStore((state) => state.versions);
   const displayName = learner?.preferred_name ?? learner?.display_name ?? 'Learner';
   const learnerUserId = learner?.user_id ?? null;
+  const learnerAssignments = useMemo(
+    () => (learnerUserId ? assignments.filter((assignment) => assignment.assignee_user_id === learnerUserId) : []),
+    [assignments, learnerUserId],
+  );
   const primaryAssignment = useMemo(
     () =>
-      learnerUserId
-        ? assignments.find(
-            (assignment) =>
-              assignment.assignee_user_id === learnerUserId &&
-              assignment.module_version_id === HR_BASICS_MODULE_VERSION_ID &&
-              assignment.status !== 'completed',
-          )
-        : undefined,
-    [assignments, learnerUserId],
+      learnerAssignments.find(
+        (assignment) => assignment.module_version_id === HR_BASICS_MODULE_VERSION_ID && assignment.status !== 'completed',
+      ) ?? learnerAssignments.find((assignment) => assignment.status !== 'completed'),
+    [learnerAssignments],
   );
   const dueState = getDueState(primaryAssignment);
 
-  // Live data from EducationContext (Task D1) + assignment store due state.
+  const primaryVersion = useMemo(
+    () => versions.find((version) => version.id === primaryAssignment?.module_version_id),
+    [versions, primaryAssignment?.module_version_id],
+  );
+
+  const learningOutcomes = useMemo(() => {
+    const basics = (primaryVersion?.draft_metadata?.basics ?? null) as { learning_outcomes?: string[] } | null;
+    return (basics?.learning_outcomes ?? []).filter(Boolean).slice(0, 2);
+  }, [primaryVersion])
+
   const currentAssignment = {
-    title: DEMO_HR_BASICS_COURSE.title,
+    title: primaryVersion?.module_title ?? DEMO_HR_BASICS_COURSE.title,
     progress: percentage,
     totalLessons: total,
     completedLessons: completed,
-    estimatedMinutesLeft: Math.max(
-      0,
-      Math.round(DEMO_HR_BASICS_COURSE.estimated_minutes * ((100 - percentage) / 100))
-    ),
+    estimatedMinutesLeft: Math.max(0, Math.round(DEMO_HR_BASICS_COURSE.estimated_minutes * ((100 - percentage) / 100))),
     dueInDays: dueState.dueInDays,
     dueLabel: dueState.label,
     isOverdue: dueState.isOverdue,
   };
   const progressValueClass = currentAssignment.progress > 0 ? 'text-redex-red' : 'text-slate-500';
 
+  const progressItems = learnerAssignments.map((assignment) => {
+    const version = versions.find((item) => item.id === assignment.module_version_id)
+    const statusLabel =
+      assignment.status === 'completed' ? 'Complete' : assignment.status === 'in_progress' ? 'In progress' : 'Not started'
+
+    return {
+      id: assignment.id,
+      title: version?.module_title ?? 'Assigned module',
+      statusLabel,
+    }
+  })
+
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
-        <p className="text-sm font-semibold uppercase tracking-[3px] text-redex-red">
-          YOUR LEARNING DASHBOARD
-        </p>
-        <h1 className="mt-2 text-2xl md:text-3xl font-semibold tracking-tight">
-          Good morning, {displayName}. 👋
-        </h1>
+        <p className="text-sm font-semibold uppercase tracking-[3px] text-redex-red">YOUR LEARNING DASHBOARD</p>
+        <h1 className="mt-2 text-2xl md:text-3xl font-semibold tracking-tight">Good morning, {displayName}. 👋</h1>
         <p className="text-slate-600 mt-2">Here's what you need to focus on today.</p>
       </div>
 
-      {/* Primary CTA Card - What do I need to do now? */}
       <Card className="rounded-2xl border-slate-200 bg-white shadow-md">
         <CardHeader className="p-6 pb-4 md:p-8 md:pb-4">
           <CardTitle className="flex items-start justify-between gap-4 text-lg md:text-xl">
@@ -135,6 +138,17 @@ export function LearnerDashboardPage({ learner, onContinue }: LearnerDashboardPa
             </div>
           </div>
 
+          {learningOutcomes.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">What you'll learn</p>
+              <ul className="space-y-1 text-sm text-slate-700">
+                {learningOutcomes.map((outcome) => (
+                  <li key={outcome}>• {outcome}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
           <div className="flex items-center gap-4">
             <div className="flex-1">
               <Progress value={currentAssignment.progress} className="h-3" />
@@ -148,11 +162,7 @@ export function LearnerDashboardPage({ learner, onContinue }: LearnerDashboardPa
           </div>
 
           <div className="space-y-2 pt-2">
-            <Button
-              size="lg"
-              className="w-full md:w-auto bg-redex-red hover:bg-redex-red-hover"
-              onClick={onContinue}
-            >
+            <Button size="lg" className="w-full md:w-auto" variant="brand" onClick={onContinue}>
               Continue Training <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
             <p className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -163,50 +173,30 @@ export function LearnerDashboardPage({ learner, onContinue }: LearnerDashboardPa
         </CardContent>
       </Card>
 
-      {/* Two column: Progress + Help */}
       <div className="grid md:grid-cols-2 gap-6">
-        {/* How far along am I? */}
         <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Your Onboarding Progress</CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-3 text-sm">
-              <li className="flex items-center justify-between gap-4">
-                <span>HR Basics</span>
-                <span className="flex items-center gap-2 font-medium text-emerald-600">
-                  <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
-                  Complete
-                </span>
-              </li>
-              <li className="flex items-center justify-between gap-4">
-                <span>Systems & Tools</span>
-                <span className="flex items-center gap-2 font-medium text-amber-600">
-                  <span className="flex w-4 h-4 items-center justify-center" aria-hidden="true">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                  </span>
-                  In Progress
-                </span>
-              </li>
-              <li className="flex items-center justify-between gap-4 text-slate-600">
-                <span>Safety & Compliance</span>
-                <span className="flex items-center gap-2 font-medium text-slate-500">
-                  <Circle className="w-4 h-4 text-slate-400" aria-hidden="true" />
-                  Not started
-                </span>
-              </li>
-              <li className="flex items-center justify-between gap-4 text-slate-600">
-                <span>Role-specific Training</span>
-                <span className="flex items-center gap-2 font-medium text-slate-500">
-                  <Circle className="w-4 h-4 text-slate-400" aria-hidden="true" />
-                  Not started
-                </span>
-              </li>
-            </ul>
+            {progressItems.length > 0 ? (
+              <ul className="space-y-3 text-sm">
+                {progressItems.map((item) => (
+                  <li key={item.id} className="flex items-center justify-between gap-4">
+                    <span>{item.title}</span>
+                    <span className="flex items-center gap-2 font-medium text-slate-600">
+                      <Circle className="w-4 h-4 text-slate-400" aria-hidden="true" />
+                      {item.statusLabel}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-600">No assigned modules yet.</p>
+            )}
           </CardContent>
         </Card>
 
-        {/* Who can help? */}
         <Card className="rounded-2xl border-slate-200 bg-white shadow-md">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -216,7 +206,7 @@ export function LearnerDashboardPage({ learner, onContinue }: LearnerDashboardPa
           <CardContent className="space-y-4 text-sm">
             <div>
               <div className="font-medium">Your Onboarding Buddy</div>
-              <div className="text-slate-600">Sarah Chen • People Ops</div>
+              <div className="text-slate-600">A buddy will be assigned during your first week.</div>
               <Button
                 variant="outline"
                 size="sm"
@@ -224,7 +214,7 @@ export function LearnerDashboardPage({ learner, onContinue }: LearnerDashboardPa
                 disabled
                 aria-describedby="buddy-contact-status"
               >
-                Message Sarah
+                Message buddy
               </Button>
             </div>
             <div id="buddy-contact-status" className="text-xs text-slate-500">

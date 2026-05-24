@@ -20,6 +20,14 @@ type PromptKey =
   | "source_analysis"
   | "outline_generation"
   | "lesson_generation.text"
+  | "lesson_generation.quiz"
+  | "lesson_generation.checklist"
+  | "lesson_generation.acknowledgment"
+  | "lesson_generation.scenario"
+  | "lesson_generation.video"
+  | "lesson_generation.coach"
+  | "lesson_generation.assignment"
+  | "lesson_generation.reflection_prompt"
   | "assessment_generation"
   | "self_critique"
   | "regenerate_with_fixes"
@@ -48,12 +56,14 @@ export interface GenerateOutlineInput {
   basics: unknown;
   sources: unknown;
   setupAnswers: unknown;
+  learning_outcomes?: Array<{ id: string; text: string }>;
 }
 
 export interface GenerateLessonsInput {
   outline: unknown;
   sources: unknown;
   targetSectionId?: string | null;
+  learning_outcomes?: Array<{ id: string; text: string }>;
 }
 
 export interface GenerateAssessmentInput {
@@ -65,6 +75,10 @@ export interface CritiqueModuleInput {
   module: unknown;
   sources: unknown;
   assessments?: unknown;
+  courseOutline?: unknown;
+  generatedAssessments?: unknown;
+  promptIds?: string[];
+  learning_outcomes?: Array<{ id: string; text: string }>;
 }
 
 export interface RegenerateWithFixesInput {
@@ -98,44 +112,84 @@ const REDEX_POLICY_GUARDRAIL = "You generate Redex Education training drafts onl
 const PROMPTS: Record<PromptKey, PromptDefinition> = {
   source_analysis: {
     id: { key: "source_analysis", version: "v1" },
-    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nAnalyze the supplied Redex source binder as evidence. Identify topic, authority, section count, placeholder status, and missing-source risks.`,
-    user: "Analyze this source binder and return AnalyzeSourceOutput.\n\nInput JSON:\n{{input}}",
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nAnalyze the supplied Redex source binder as evidence. Identify topic, authority, section count, placeholder status, and missing-source risks.`,
+    user: "Analyze this source binder and return AnalyzeSourceOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
   },
   outline_generation: {
     id: { key: "outline_generation", version: "v1" },
-    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nCreate a source-grounded CourseOutlineDraft. Unsupported lessons must be flagged in missing_source_notes instead of fabricated.`,
-    user: "Generate a CourseOutlineDraft.\n\nInput JSON:\n{{input}}",
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nCreate a source-grounded CourseOutlineDraft. Unsupported lessons must be flagged in missing_source_notes instead of fabricated.`,
+    user: "Generate a CourseOutlineDraft.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
   },
   "lesson_generation.text": {
     id: { key: "lesson_generation.text", version: "v1" },
-    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nGenerate source-grounded lesson drafts. Keep claims tied to supplied source sections and flag unsupported content.`,
-    user: "Generate lessons and return GenerateLessonsOutput.\n\nInput JSON:\n{{input}}",
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nGenerate source-grounded lesson drafts. Keep claims tied to supplied source sections and flag unsupported content.`,
+    user: "Generate lessons and return GenerateLessonsOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
+  },
+  "lesson_generation.quiz": {
+    id: { key: "lesson_generation.quiz", version: "v1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nGenerate source-grounded quiz lesson drafts.`,
+    user: "Generate lessons and return GenerateLessonsOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
+  },
+  "lesson_generation.checklist": {
+    id: { key: "lesson_generation.checklist", version: "v1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nGenerate source-grounded checklist lesson drafts.`,
+    user: "Generate lessons and return GenerateLessonsOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
+  },
+  "lesson_generation.acknowledgment": {
+    id: { key: "lesson_generation.acknowledgment", version: "v1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nGenerate source-grounded acknowledgment lesson drafts.`,
+    user: "Generate lessons and return GenerateLessonsOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
+  },
+  "lesson_generation.scenario": {
+    id: { key: "lesson_generation.scenario", version: "v1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nGenerate source-grounded scenario lesson drafts.`,
+    user: "Generate lessons and return GenerateLessonsOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
+  },
+  "lesson_generation.video": {
+    id: { key: "lesson_generation.video", version: "v1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nGenerate source-grounded video lesson drafts.`,
+    user: "Generate lessons and return GenerateLessonsOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
+  },
+  "lesson_generation.coach": {
+    id: { key: "lesson_generation.coach", version: "v1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nGenerate source-grounded coach lesson drafts.`,
+    user: "Generate lessons and return GenerateLessonsOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
+  },
+  "lesson_generation.assignment": {
+    id: { key: "lesson_generation.assignment", version: "v1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nGenerate source-grounded assignment lesson drafts.`,
+    user: "Generate lessons and return GenerateLessonsOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
+  },
+  "lesson_generation.reflection_prompt": {
+    id: { key: "lesson_generation.reflection_prompt", version: "v1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nGenerate source-grounded reflection prompt lesson drafts.`,
+    user: "Generate lessons and return GenerateLessonsOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
   },
   assessment_generation: {
     id: { key: "assessment_generation", version: "v1" },
-    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nGenerate source-grounded assessment questions with plausible distractors and remediation guidance.`,
-    user: "Generate assessments and return GenerateAssessmentOutput.\n\nInput JSON:\n{{input}}",
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nGenerate source-grounded assessment questions with plausible distractors and remediation guidance.`,
+    user: "Generate assessments and return GenerateAssessmentOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
   },
   self_critique: {
     id: { key: "self_critique", version: "v1" },
-    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nCritique generated Foundry content for unsupported claims, weak questions, missing citations, confusing language, and publish blockers.`,
-    user: "Critique generated artifacts and return CritiqueModuleOutput.\n\nInput JSON:\n{{input}}",
-  },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nCritique generated Foundry content for unsupported claims, weak questions, missing citations, confusing language, and publish blockers.`,
+    user: "Critique generated artifacts and return CritiqueModuleOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nPrompt ids:\n{{promptIds}}\n\nCourse outline:\n{{courseOutline}}\n\nGenerated assessments:\n{{generatedAssessments}}\n\nInput JSON:\n{{input}}",
+  }
   regenerate_with_fixes: {
     id: { key: "regenerate_with_fixes", version: "v1" },
-    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nRegenerate only the selected fixes and preserve unchanged source-grounded content.`,
-    user: "Regenerate with selected fixes and return GenerateLessonsOutput.\n\nInput JSON:\n{{input}}",
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nRegenerate only the selected fixes and preserve unchanged source-grounded content.`,
+    user: "Regenerate with selected fixes and return GenerateLessonsOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
   },
   regenerate_section: {
     id: { key: "regenerate_section", version: "v1" },
-    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nRegenerate only lessons bound to the target source section. Do not alter unrelated lessons.`,
-    user: "Regenerate the target source section and return RegenerateSectionOutput.\n\nInput JSON:\n{{input}}",
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nRegenerate only lessons bound to the target source section. Do not alter unrelated lessons.`,
+    user: "Regenerate the target source section and return RegenerateSectionOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
   },
   entailment_check: {
     id: { key: "entailment_check", version: "v1" },
-    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nYou are a strict grounding judge. Decide whether the source section ENTAILS the generated claim. Use only the section text. Return entailed=false when the claim adds policy, timing, people, obligations, exceptions, or certainty not present in the source. Provide one concise sentence of reasoning.`,
-    user: "Does the source section below ENTAIL the claim? Return EntailmentCheckOutput.\n\nInput JSON:\n{{input}}",
-  },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nYou are a strict grounding judge. Decide whether the source section ENTAILS the generated claim. Use only the section text. Return entailed=false when the claim adds policy, timing, people, obligations, exceptions, or certainty not present in the source. Provide one concise sentence of reasoning.`,
+    user: "Does the source section below ENTAIL the claim? Return EntailmentCheckOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
+  }
 };
 
 const LessonTypeSchema = z.enum([
@@ -342,7 +396,14 @@ function apiKeyFor(provider: AiProvider): string {
 }
 
 function buildUserPrompt(prompt: PromptDefinition, input: unknown): string {
-  return prompt.user.replace("{{input}}", JSON.stringify(input, null, 2));
+  const payload = isRecord(input) ? input : {};
+
+  return prompt.user
+    .replace("{{learning_outcomes}}", JSON.stringify(payload.learning_outcomes ?? [], null, 2))
+    .replace("{{promptIds}}", JSON.stringify(payload.promptIds ?? [], null, 2))
+    .replace("{{courseOutline}}", JSON.stringify(payload.courseOutline ?? null, null, 2))
+    .replace("{{generatedAssessments}}", JSON.stringify(payload.generatedAssessments ?? payload.assessments ?? null, null, 2))
+    .replace("{{input}}", JSON.stringify(input, null, 2));
 }
 
 function parseProviderJson(text: string): unknown {
@@ -505,6 +566,18 @@ export interface CourseFoundryAiClientServer {
   checkEntailment(input: EntailmentCheckInput): Promise<CostedAiResult<EntailmentCheckOutput>>;
 }
 
+const PROMPT_KEY_BY_LESSON_TYPE: Record<string, PromptKey> = {
+  text: "lesson_generation.text",
+  quiz: "lesson_generation.quiz",
+  checklist: "lesson_generation.checklist",
+  acknowledgment: "lesson_generation.acknowledgment",
+  scenario: "lesson_generation.scenario",
+  video: "lesson_generation.video",
+  coach: "lesson_generation.coach",
+  assignment: "lesson_generation.assignment",
+  reflection_prompt: "lesson_generation.reflection_prompt",
+};
+
 export function createCourseFoundryAiClientServer(): CourseFoundryAiClientServer {
   return {
     analyzeSource(input) {
@@ -514,7 +587,10 @@ export function createCourseFoundryAiClientServer(): CourseFoundryAiClientServer
       return invokeProvider("outline_generation", input, GenerateOutlineOutputSchema);
     },
     generateLessons(input) {
-      return invokeProvider("lesson_generation.text", input, GenerateLessonsOutputSchema);
+      const outlineRecord = input.outline as { modules?: Array<{ lessons?: Array<{ lesson_type?: string }> }> } | undefined;
+      const lessonType = outlineRecord?.modules?.[0]?.lessons?.[0]?.lesson_type ?? "text";
+      const promptKey = PROMPT_KEY_BY_LESSON_TYPE[lessonType] ?? "lesson_generation.text";
+      return invokeProvider(promptKey, input, GenerateLessonsOutputSchema);
     },
     generateAssessment(input) {
       return invokeProvider("assessment_generation", input, GenerateAssessmentOutputSchema);

@@ -1,4 +1,4 @@
-import type { Criticality, TrainingType } from '@/lib/education';
+import type { CanonicalAudience, LearningOutcome, TrainingType } from '@/lib/education';
 
 /**
  * Working draft of the basics step. Persisted via Zustand
@@ -24,12 +24,20 @@ export interface ModuleBasicsDraft {
   title: string;
   /** 'standalone' or an existing course ID */
   parent_course_id: 'standalone' | string;
-  /** Free-text audience description, e.g. "New hires" */
-  audience: string;
-  /** Reuses canonical Criticality enum — 'required' or 'optional' for this form */
-  criticality: Extract<Criticality, 'required' | 'optional'>;
+  /** Canonical audience archetype */
+  audience_archetype?: CanonicalAudience;
+  /** Optional admin-specific refinement shown alongside selected archetype. */
+  audience_refinement?: string;
+  /** Completion requirement for module consumers. */
+  completion_required?: 'required' | 'recommended' | 'optional';
   /** One of the 7 canonical training types */
   training_type: TrainingType;
+  /** Desired learning outcomes, 1-3 items. */
+  learning_outcomes?: LearningOutcome[];
+  /** @deprecated Temporary compatibility during parallel builder migration. */
+  audience?: string;
+  /** @deprecated Temporary compatibility during parallel builder migration. */
+  criticality?: 'required' | 'optional';
   /** Target duration in minutes, 5-300 */
   estimated_minutes: number;
   /** When the draft was last saved (ISO timestamp) */

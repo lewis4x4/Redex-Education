@@ -17,10 +17,17 @@ vi.mock('@/features/source-binder/components/SourceLibraryBrowser', () => ({
 }))
 
 vi.mock('@/features/foundry/store/foundryDraftStore', () => ({
-  useFoundryDraftStore: (selector: (state: { selectedLibraryFileIds: string[]; toggleLibraryFile: (id: string) => void }) => unknown) =>
+  useFoundryDraftStore: (
+    selector: (state: {
+      selectedLibraryFileIds: string[]
+      toggleLibraryFile: (id: string) => void
+      getPublishBlockers: () => []
+    }) => unknown,
+  ) =>
     selector({
       selectedLibraryFileIds: [],
       toggleLibraryFile: vi.fn(),
+      getPublishBlockers: () => [],
     }),
 }))
 
@@ -41,10 +48,11 @@ describe('SourceLibraryPage', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByText('REDEX AI COURSE FOUNDRY · SOURCE LIBRARY')).toBeInTheDocument()
+    expect(screen.getByText('REDEX AI COURSE FOUNDRY')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Source Library' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sync from Drive' })).toBeInTheDocument()
     expect(screen.getByText('Source Library Browser Mock')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Back to source binder' })).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Foundry progress' })).toBeInTheDocument()
   })
 })

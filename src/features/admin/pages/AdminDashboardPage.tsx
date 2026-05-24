@@ -5,6 +5,7 @@ import { AdminMetricCard } from '@/features/admin/components/AdminMetricCard'
 import { AssignmentsEntryCard } from '@/features/admin/components/AssignmentsEntryCard'
 import { CourseStatusList } from '@/features/admin/components/CourseStatusList'
 import { FoundryEntryCard } from '@/features/admin/components/FoundryEntryCard'
+import { Button } from '@/components/ui/button'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
 import { useAdminSummary } from '@/hooks/useAdminSummary'
 import { useAuth } from '@/hooks/useAuth'
@@ -122,9 +123,23 @@ export function AdminDashboardPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         <FoundryEntryCard onStart={() => navigate('/admin/foundry/start')} isDisabled={false} />
         <AssignmentsEntryCard onStart={() => navigate('/admin/assignments')} isDisabled={false} />
+        <section className="rounded-2xl border border-redex-red/20 bg-redex-red/[0.04] p-6 shadow-sm md:p-8">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[2px] text-redex-red">Onboarding</p>
+              <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Welcome a new hire</h3>
+            </div>
+          </div>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-600">
+            Welcome a new hire and auto-assign required training.
+          </p>
+          <Button type="button" variant="brand" className="mt-6" onClick={() => navigate('/admin/onboard')}>
+            Start onboarding →
+          </Button>
+        </section>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

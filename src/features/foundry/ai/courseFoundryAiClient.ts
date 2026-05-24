@@ -22,22 +22,30 @@ export interface AnalyzeSourceOutput {
   missing_required_topics: string[];
 }
 
+export interface LearningOutcomeInput {
+  id: string;
+  text: string;
+}
+
 export interface GenerateOutlineInput {
   basics: ModuleBasicsDraft;
   sources: SourceMaterial;
   setupAnswers: SetupAnswers;
+  learning_outcomes?: LearningOutcomeInput[];
 }
 export type GenerateOutlineOutput = CourseOutlineDraft;
 
 export interface GenerateLessonsInput {
   outline: CourseOutlineDraft;
   sources: SourceMaterial;
+  learning_outcomes?: LearningOutcomeInput[];
 }
-export type GenerateLessonsOutput = GeneratedModulePreview;
+export type GenerateLessonsOutput = GeneratedModulePreview & { lesson_reviews?: LessonReviewItem[] };
 
 export interface GenerateAssessmentInput {
   module: GeneratedModulePreview;
   sources: SourceMaterial;
+  learning_outcomes?: LearningOutcomeInput[];
 }
 export type GenerateAssessmentOutput = {
   assessment_lesson_id: string;
@@ -47,6 +55,10 @@ export type GenerateAssessmentOutput = {
 export interface CritiqueModuleInput {
   module: GeneratedModulePreview;
   sources: SourceMaterial;
+  courseOutline?: CourseOutlineDraft;
+  generatedAssessments?: GenerateAssessmentOutput;
+  promptIds?: string[];
+  learning_outcomes?: LearningOutcomeInput[];
 }
 export type CritiqueModuleOutput = SelfCritiqueReport;
 
@@ -55,6 +67,7 @@ export interface RegenerateWithFixesInput {
   critique: SelfCritiqueReport;
   selectedFixes: string[];
   sources: SourceMaterial;
+  learning_outcomes?: LearningOutcomeInput[];
 }
 export type RegenerateWithFixesOutput = GeneratedModulePreview;
 
@@ -63,6 +76,7 @@ export interface RegenerateSectionInput {
   sourceSectionId: string;
   affectedLessonIds: string[];
   sources: SourceMaterial;
+  learning_outcomes?: LearningOutcomeInput[];
 }
 export interface RegenerateSectionOutput {
   regeneratedLessons: Lesson[];

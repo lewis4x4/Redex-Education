@@ -18,6 +18,11 @@ export const DEFAULT_AI_MODULE_BASICS: ModuleBasicsDraft = {
   criticality: 'required',
   training_type: 'hr',
   estimated_minutes: 20,
+  learning_outcomes: [
+    { id: 'outcome-1', text: 'Describe Redex workplace safety expectations in your own words.' },
+    { id: 'outcome-2', text: 'Identify the correct escalation path for HR and payroll questions.' },
+    { id: 'outcome-3', text: 'Complete new-hire onboarding tasks using the approved checklist.' },
+  ],
   updated_at: '2026-05-23T00:00:00.000Z',
 };
 

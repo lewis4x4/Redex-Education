@@ -39,6 +39,7 @@ const profileRow: ProfileRow = {
   role: 'learner',
   department: null,
   manager_id: null,
+  start_date: null,
   created_at: ISO,
   updated_at: ISO,
 }

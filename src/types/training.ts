@@ -145,6 +145,34 @@ export type TrainingType =
   | 'role_specific'
   | 'general_informational';
 
+export const CANONICAL_AUDIENCES = [
+  'new_hire',
+  'all_employees',
+  'field_team',
+  'managers',
+  'customer_support',
+  'sales',
+  'operations',
+  'compliance_officers',
+  'foundry_authors',
+  'leadership',
+] as const;
+
+export type CanonicalAudience = (typeof CANONICAL_AUDIENCES)[number];
+
+export const CANONICAL_AUDIENCE_LABELS: Record<CanonicalAudience, string> = {
+  new_hire: 'New hires',
+  all_employees: 'All employees',
+  field_team: 'Field team',
+  managers: 'Managers',
+  customer_support: 'Customer support',
+  sales: 'Sales',
+  operations: 'Operations',
+  compliance_officers: 'Compliance officers',
+  foundry_authors: 'Foundry authors',
+  leadership: 'Leadership',
+};
+
 export const TRAINING_TYPE_LABELS: Record<TrainingType, string> = {
   hr: 'HR',
   operational: 'Operational',
@@ -177,6 +205,9 @@ export interface User {
   email: string;
   display_name: string;
   role: Role;
+  department?: string;
+  manager_id?: UUID;
+  start_date?: string;
   created_at: ISODateTime;
   updated_at: ISODateTime;
 }
@@ -189,6 +220,8 @@ export interface LearnerProfile {
   preferred_name?: string;
   role?: string;
   department?: string;
+  manager_id?: UUID;
+  start_date?: string;
   current_streak_days: number;
   total_learning_minutes: number;
   certificates_earned: number;
@@ -717,11 +750,26 @@ export type FoundryDraftStage =
   | 'blockers'
   | 'published';
 
+export interface LearningOutcome {
+  /** Stable client UUID for editing UX. */
+  id: string;
+  /** Bullet text: "Submit an expense report through the new ERP system within their first week." */
+  text: string;
+}
+
 export interface FoundryDraftMetadata {
   current_stage?: FoundryDraftStage;
   last_actor?: {
     user_id?: UUID;
     display_name?: string;
+  };
+  basics?: {
+    audience_archetype?: CanonicalAudience;
+    audience_refinement?: string;
+    completion_required?: 'required' | 'recommended' | 'optional';
+    training_type?: TrainingType;
+    estimated_minutes?: number;
+    learning_outcomes?: LearningOutcome[];
   };
   [key: string]: unknown;
 }
@@ -816,6 +864,7 @@ export const AUDIT_EVENT_TYPES = [
   'quiz_attempted',
   'source_change_detected',
   'stale_lesson_regenerated',
+  'user_onboarded',
 ] as const;
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];
@@ -828,7 +877,7 @@ export interface AuditLog {
   event_type: AuditEventType;
   actor_user_id: UUID;
   actor_name: string;
-  entity_type: 'module' | 'module_version' | 'source_file' | 'assignment' | 'lesson' | 'quiz';
+  entity_type: 'module' | 'module_version' | 'source_file' | 'assignment' | 'lesson' | 'quiz' | 'user';
   entity_id: string;
   entity_label: string;
   occurred_at: ISODateTime;

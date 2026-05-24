@@ -6,8 +6,9 @@ import { FoundryEntryCard } from './FoundryEntryCard'
 
 describe('FoundryEntryCard', () => {
   it('renders the eyebrow, headline, and all setup bullets', () => {
-    render(<FoundryEntryCard />)
+    const { container } = render(<FoundryEntryCard />)
 
+    expect(container.firstElementChild).toHaveClass('flex', 'flex-col', 'h-full')
     expect(screen.getByText('Course Foundry')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /create a new module/i })).toBeInTheDocument()
     expect(screen.getByText('Paste source markdown or upload SOPs')).toBeInTheDocument()
@@ -20,6 +21,7 @@ describe('FoundryEntryCard', () => {
 
     const cta = screen.getByRole('button', { name: /start new module/i })
     expect(cta).toBeDisabled()
+    expect(cta.parentElement).toHaveClass('mt-auto', 'pt-6')
     expect(cta).toHaveAttribute('title', 'Coming soon — Course Foundry start flow')
     expect(screen.getByText('Coming soon')).toBeInTheDocument()
   })

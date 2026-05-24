@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AlertOctagon } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -13,7 +13,7 @@ import {
 } from '@/lib/education'
 import { GeneratedSourceCompare } from '@/features/foundry/components/GeneratedSourceCompare'
 import { ReviewActionBar } from '@/features/foundry/components/ReviewActionBar'
-import { getCourseFoundryInitialLessonReviews } from '@/features/foundry/ai'
+import { getCourseFoundryAiMode, getCourseFoundryInitialLessonReviews } from '@/features/foundry/ai'
 import { useMockGenerationDelay } from '@/features/foundry/lib/useMockGenerationDelay'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
 
@@ -64,16 +64,40 @@ export function SideBySideReviewPage() {
   const approveLessonReview = useFoundryDraftStore((state) => state.approveLessonReview)
   const rejectLessonReview = useFoundryDraftStore((state) => state.rejectLessonReview)
   const isPublishBlocked = useFoundryDraftStore((state) => state.isPublishBlocked)
+  const generatedModule = useFoundryDraftStore((state) => state.generatedModule)
 
   const [selectedLessonKey, setSelectedLessonKey] = useState<string | null>(null)
+  const [generationError, setGenerationError] = useState<string | null>(null)
 
   useMockGenerationDelay({
-    shouldGenerate: lessonReviews.length === 0,
+    shouldGenerate: getCourseFoundryAiMode() !== 'real' && lessonReviews.length === 0,
     delayMs: 500,
     populate: () => {
-      void getCourseFoundryInitialLessonReviews().then(setLessonReviews)
+      void getCourseFoundryInitialLessonReviews()
+        .then(setLessonReviews)
+        .catch((error: unknown) => setGenerationError(error instanceof Error ? error.message : String(error)))
     },
   })
+
+  useEffect(() => {
+    if (lessonReviews.length > 0 || !generatedModule?.lessons.length) {
+      return
+    }
+
+    setLessonReviews(
+      generatedModule.lessons.map((lesson) => ({
+        lesson_index: lesson.lesson_index,
+        module_index: lesson.module_index,
+        lesson_title: lesson.title,
+        confidence:
+          lesson.status === 'ready_for_approval' ? 'high' : lesson.status === 'unsupported_claim' ? 'unsupported' : 'medium',
+        has_unsupported_claim: lesson.status === 'unsupported_claim',
+        unsupported_note: lesson.status_note,
+        status: 'pending',
+        source_excerpts: [],
+      })),
+    )
+  }, [generatedModule, lessonReviews.length, setLessonReviews])
 
   const selectedReview = useMemo(() => {
     if (lessonReviews.length === 0) {
@@ -129,7 +153,24 @@ export function SideBySideReviewPage() {
         </div>
       ) : null}
 
-      {selectedReview === null ? (
+      {generationError ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-800 shadow-sm" role="alert">
+          <p className="font-semibold">We couldn't load review data.</p>
+          <p className="mt-1 text-red-700">{generationError}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setGenerationError(null)
+              void getCourseFoundryInitialLessonReviews()
+                .then(setLessonReviews)
+                .catch((error: unknown) => setGenerationError(error instanceof Error ? error.message : String(error)))
+            }}
+            className="mt-3 inline-flex rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+          >
+            Retry
+          </button>
+        </div>
+      ) : selectedReview === null ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-[15px] text-slate-600 leading-[1.45]">Loading review data…</p>
         </div>

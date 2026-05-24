@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { FoundryStepper } from '@/features/foundry/components/FoundryStepper'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
 import { DriveSyncButton } from '@/features/source-binder/components/DriveSyncButton'
 import { SourceLibraryBrowser } from '@/features/source-binder/components/SourceLibraryBrowser'
@@ -54,14 +55,14 @@ export function SourceLibraryPage() {
   return (
     <section className="mx-auto max-w-6xl space-y-6 md:space-y-8">
       <header className="space-y-2">
-        <p className="text-sm font-semibold uppercase tracking-[3px] text-redex-red">
-          REDEX AI COURSE FOUNDRY · SOURCE LIBRARY
-        </p>
+        <p className="text-sm font-semibold uppercase tracking-[3px] text-redex-red">REDEX AI COURSE FOUNDRY</p>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl">Source Library</h1>
         <p className="max-w-3xl text-[15px] leading-[1.45] text-slate-600">
           Files ingested from the Redex Google Drive `_library/` folder. Authority-tagged and version-tracked.
         </p>
       </header>
+
+      <FoundryStepper />
 
       <Card className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

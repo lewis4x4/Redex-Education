@@ -280,6 +280,61 @@ function sourceSectionsFromValue(value: unknown): SourceSection[] {
   return [...ownSection, ...nestedSections, ...sourceSections, ...snakeSourceSections];
 }
 
+async function hydrateSourcesFromLibrarySelection(
+  supabase: RedexSupabaseClient,
+  input: Record<string, unknown>,
+): Promise<unknown> {
+  const selectedLibraryFileIds = Array.isArray(input.selectedLibraryFileIds)
+    ? input.selectedLibraryFileIds.filter((value): value is string => typeof value === "string")
+    : [];
+  const existingSources = input.sources;
+
+  if (
+    selectedLibraryFileIds.length === 0 ||
+    !isRecord(existingSources) ||
+    (typeof existingSources.raw_text === "string" && existingSources.raw_text.trim().length > 0)
+  ) {
+    return existingSources;
+  }
+
+  const { data: files, error: filesError } = await supabase
+    .from("source_files")
+    .select("id,title,current_version_id")
+    .in("id", selectedLibraryFileIds);
+
+  if (filesError || !files) {
+    return existingSources;
+  }
+
+  const sections: Array<Record<string, unknown>> = [];
+  for (const file of files) {
+    if (!file.current_version_id) continue;
+    const { data: sectionRows } = await supabase
+      .from("source_sections")
+      .select("id,level,heading,body,position_index,has_placeholders")
+      .eq("source_file_version_id", file.current_version_id)
+      .order("position_index", { ascending: true });
+
+    for (const section of sectionRows ?? []) {
+      sections.push(section);
+    }
+  }
+
+  if (sections.length === 0) {
+    return existingSources;
+  }
+
+  return {
+    id: `library-${selectedLibraryFileIds.join("-")}`,
+    title: "Drive Library Selection",
+    type: "markdown",
+    processing_status: "processed",
+    raw_text: sections.map((section) => `## ${String(section.heading ?? "")}` + "\n\n" + String(section.body ?? "")).join("\n\n"),
+    raw_text_preview: sections.map((section) => String(section.body ?? "")).join("\n\n").slice(0, 500),
+    sections,
+  };
+}
+
 function markerText(reasons: string[]): string {
   return uniqueStrings(reasons).map((reason) => `[NEEDS_REVIEW: ${reason}]`).join(" ");
 }
@@ -495,6 +550,7 @@ async function runAiStage(job: GenerationJobRow, stage: StageName, supabase: Red
   const aiClient = createCourseFoundryAiClientServer();
   const input = baseInput(job);
   const outputs = outputPayload(job);
+  const hydratedSources = await hydrateSourcesFromLibrarySelection(supabase, input);
 
   switch (stage) {
     case "parse":
@@ -502,8 +558,9 @@ async function runAiStage(job: GenerationJobRow, stage: StageName, supabase: Red
     case "outline":
       return aiClient.generateOutline({
         basics: input.basics ?? {},
-        sources: input.sources ?? {},
+        sources: hydratedSources ?? {},
         setupAnswers: input.setupAnswers ?? {},
+        learning_outcomes: Array.isArray(input.learning_outcomes) ? input.learning_outcomes as Array<{ id: string; text: string }> : undefined,
       });
     case "generate_lessons":
       if (job.job_type === "section" || operationFor(job) === "regenerateSection") {
@@ -526,8 +583,9 @@ async function runAiStage(job: GenerationJobRow, stage: StageName, supabase: Red
 
       return aiClient.generateLessons({
         outline: input.outline ?? outputs.outline ?? {},
-        sources: input.sources ?? {},
+        sources: hydratedSources ?? {},
         targetSectionId: job.target_section_id,
+        learning_outcomes: Array.isArray(input.learning_outcomes) ? input.learning_outcomes as Array<{ id: string; text: string }> : undefined,
       });
     case "source_binding":
       return runSourceBindingStage(job, supabase);
@@ -565,8 +623,12 @@ async function runAiStage(job: GenerationJobRow, stage: StageName, supabase: Red
     case "self_critique":
       return aiClient.critiqueModule({
         module: input.module ?? boundGeneratedModule(outputs) ?? {},
-        sources: input.sources ?? {},
+        sources: hydratedSources ?? {},
         assessments: input.assessments ?? outputs.generate_assessments ?? null,
+        generatedAssessments: input.generatedAssessments ?? outputs.generate_assessments ?? null,
+        courseOutline: input.courseOutline ?? outputs.outline ?? null,
+        promptIds: Array.isArray(input.promptIds) ? input.promptIds.filter((value): value is string => typeof value === 'string') : [],
+        learning_outcomes: Array.isArray(input.learning_outcomes) ? input.learning_outcomes as Array<{ id: string; text: string }> : undefined,
       });
     case "assemble":
       return {

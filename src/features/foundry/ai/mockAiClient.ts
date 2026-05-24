@@ -146,7 +146,16 @@ export const mockAiClient: CourseFoundryAiClient = {
       });
     }
 
-    return validateAiOutput(GenerateLessonsOutputSchema, cloneJson(MOCK_GENERATED_MODULE));
+    const outcomeVerb = input.learning_outcomes?.[0]?.text.split(' ')[0]
+    const generated = cloneJson(MOCK_GENERATED_MODULE)
+
+    if (outcomeVerb) {
+      generated.lessons = generated.lessons.map((lesson, index) =>
+        index < 3 ? { ...lesson, title: `${lesson.title} — ${outcomeVerb}` } : lesson,
+      )
+    }
+
+    return validateAiOutput(GenerateLessonsOutputSchema, generated);
   },
 
   async generateAssessment() {
@@ -159,8 +168,21 @@ export const mockAiClient: CourseFoundryAiClient = {
     return validateAiOutput(GenerateAssessmentOutputSchema, cloneJson(output));
   },
 
-  async critiqueModule() {
-    return validateAiOutput(CritiqueModuleOutputSchema, cloneJson(MOCK_SELF_CRITIQUE));
+  async critiqueModule(input) {
+    const report = cloneJson(MOCK_SELF_CRITIQUE)
+
+    if (input.learning_outcomes?.length) {
+      report.issues = report.issues.map((issue, index) =>
+        index === 0
+          ? {
+              ...issue,
+              detail: `${issue.detail} Outcome focus: ${input.learning_outcomes?.[0]?.text}`,
+            }
+          : issue,
+      )
+    }
+
+    return validateAiOutput(CritiqueModuleOutputSchema, report);
   },
 
   async regenerateWithFixes(input) {

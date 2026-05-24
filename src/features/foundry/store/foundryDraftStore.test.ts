@@ -69,9 +69,11 @@ describe('useFoundryDraftStore', () => {
     useFoundryDraftStore.getState().setBasics({
       title,
       parent_course_id: 'standalone',
-      audience: 'New hires',
-      criticality: 'required',
+      audience_archetype: 'new_hire',
+      audience_refinement: '',
+      completion_required: 'required',
       training_type: 'general_informational',
+      learning_outcomes: [{ id: 'outcome-1', text: 'Complete the required onboarding workflow.' }],
       estimated_minutes: 20,
     })
     useFoundryDraftStore.getState().setCritique({
@@ -95,9 +97,11 @@ describe('useFoundryDraftStore', () => {
       useFoundryDraftStore.getState().setBasics({
         title: 'Field Safety Refresher',
         parent_course_id: 'standalone',
-        audience: 'New hires',
-        criticality: 'required',
+        audience_archetype: 'new_hire',
+        audience_refinement: '',
+        completion_required: 'required',
         training_type: 'safety',
+        learning_outcomes: [{ id: 'outcome-1', text: 'Apply safety process steps in real scenarios.' }],
         estimated_minutes: 30,
       })
     })
@@ -107,13 +111,49 @@ describe('useFoundryDraftStore', () => {
       expect.objectContaining({
         title: 'Field Safety Refresher',
         parent_course_id: 'standalone',
-        audience: 'New hires',
-        criticality: 'required',
+        audience_archetype: 'new_hire',
+        audience_refinement: '',
+        completion_required: 'required',
         training_type: 'safety',
+        learning_outcomes: [{ id: 'outcome-1', text: 'Apply safety process steps in real scenarios.' }],
         estimated_minutes: 30,
       }),
     )
     expect(typeof draft?.updated_at).toBe('string')
+  })
+
+  it('setBasics invalidates downstream generation state when material basics change', () => {
+    act(() => {
+      useFoundryDraftStore.getState().setBasics({
+        title: 'Field Safety Refresher',
+        parent_course_id: 'standalone',
+        audience_archetype: 'new_hire',
+        audience_refinement: '',
+        completion_required: 'required',
+        training_type: 'safety',
+        learning_outcomes: [{ id: 'outcome-1', text: 'Apply safety process steps in real scenarios.' }],
+        estimated_minutes: 30,
+      })
+      useFoundryDraftStore.getState().setOutline(MOCK_GENERATED_OUTLINE)
+      useFoundryDraftStore.getState().setGeneratedModule(MOCK_GENERATED_MODULE)
+      useFoundryDraftStore.getState().setCritique(MOCK_SELF_CRITIQUE)
+      useFoundryDraftStore.getState().setLessonReviews(MOCK_LESSON_REVIEWS)
+      useFoundryDraftStore.getState().setBasics({
+        title: 'Field Safety Refresher Updated',
+        parent_course_id: 'standalone',
+        audience_archetype: 'all_employees',
+        audience_refinement: 'North America',
+        completion_required: 'optional',
+        training_type: 'compliance',
+        learning_outcomes: [{ id: 'outcome-2', text: 'Report incidents using the escalation protocol.' }],
+        estimated_minutes: 45,
+      })
+    })
+
+    expect(useFoundryDraftStore.getState().outline).toBeNull()
+    expect(useFoundryDraftStore.getState().generatedModule).toBeNull()
+    expect(useFoundryDraftStore.getState().critique).toBeNull()
+    expect(useFoundryDraftStore.getState().lessonReviews).toEqual([])
   })
 
   it('setBasics records module_created once for a new draft', () => {
@@ -122,17 +162,21 @@ describe('useFoundryDraftStore', () => {
       useFoundryDraftStore.getState().setBasics({
         title: 'Field Safety Refresher',
         parent_course_id: 'standalone',
-        audience: 'New hires',
-        criticality: 'required',
+        audience_archetype: 'new_hire',
+        audience_refinement: '',
+        completion_required: 'required',
         training_type: 'safety',
+        learning_outcomes: [{ id: 'outcome-1', text: 'Apply safety process steps in real scenarios.' }],
         estimated_minutes: 30,
       })
       useFoundryDraftStore.getState().setBasics({
         title: 'Field Safety Refresher Updated',
         parent_course_id: 'standalone',
-        audience: 'New hires',
-        criticality: 'required',
+        audience_archetype: 'new_hire',
+        audience_refinement: '',
+        completion_required: 'required',
         training_type: 'safety',
+        learning_outcomes: [{ id: 'outcome-1', text: 'Apply safety process steps in real scenarios.' }],
         estimated_minutes: 35,
       })
     })
@@ -145,9 +189,11 @@ describe('useFoundryDraftStore', () => {
       useFoundryDraftStore.getState().setBasics({
         title: 'Draft to clear',
         parent_course_id: 'standalone',
-        audience: 'Field team',
-        criticality: 'optional',
+        audience_archetype: 'field_team',
+        audience_refinement: '',
+        completion_required: 'optional',
         training_type: 'operational',
+        learning_outcomes: [{ id: 'outcome-1', text: 'Use the operational workflow without assistance.' }],
         estimated_minutes: 20,
       })
     })
@@ -164,9 +210,11 @@ describe('useFoundryDraftStore', () => {
       useFoundryDraftStore.getState().setBasics({
         title: 'Persist me',
         parent_course_id: 'course-001',
-        audience: 'Managers',
-        criticality: 'required',
+        audience_archetype: 'managers',
+        audience_refinement: '',
+        completion_required: 'required',
         training_type: 'compliance',
+        learning_outcomes: [{ id: 'outcome-1', text: 'Identify and escalate compliance incidents correctly.' }],
         estimated_minutes: 40,
       })
     })
@@ -228,9 +276,11 @@ describe('useFoundryDraftStore', () => {
       useFoundryDraftStore.getState().setBasics({
         title: 'Draft',
         parent_course_id: 'standalone',
-        audience: 'Ops',
-        criticality: 'required',
+        audience_archetype: 'operations',
+        audience_refinement: '',
+        completion_required: 'required',
         training_type: 'operational',
+        learning_outcomes: [{ id: 'outcome-1', text: 'Execute core operations tasks with policy alignment.' }],
         estimated_minutes: 15,
       })
       useFoundryDraftStore.getState().setSourceMaterial({
@@ -257,9 +307,11 @@ describe('useFoundryDraftStore', () => {
       useFoundryDraftStore.getState().setBasics({
         title: 'Persist draft + source',
         parent_course_id: 'course-001',
-        audience: 'Managers',
-        criticality: 'required',
+        audience_archetype: 'managers',
+        audience_refinement: '',
+        completion_required: 'required',
         training_type: 'compliance',
+        learning_outcomes: [{ id: 'outcome-1', text: 'Identify and escalate compliance incidents correctly.' }],
         estimated_minutes: 40,
       })
       useFoundryDraftStore.getState().setSourceMaterial({
@@ -631,9 +683,11 @@ describe('useFoundryDraftStore', () => {
       useFoundryDraftStore.getState().setBasics({
         title: 'Basics-only draft',
         parent_course_id: 'standalone',
-        audience: 'New hires',
-        criticality: 'required',
+        audience_archetype: 'new_hire',
+        audience_refinement: '',
+        completion_required: 'required',
         training_type: 'general_informational',
+        learning_outcomes: [{ id: 'outcome-1', text: 'Complete baseline onboarding requirements independently.' }],
         estimated_minutes: 20,
       })
       didPublish = useFoundryDraftStore.getState().setPublished()
@@ -837,7 +891,7 @@ describe('useFoundryDraftStore', () => {
         title: dashboardDraft.module_title,
         version_number: dashboardDraft.version_number,
         parent_course_id: 'standalone',
-        audience: 'New hires',
+        audience_archetype: 'new_hire',
       }),
     )
     expect(useFoundryDraftStore.getState().generatedModule).toBeNull()
@@ -1024,9 +1078,11 @@ describe('useFoundryDraftStore Supabase dispatch', () => {
   const basics = {
     title: 'Supabase Safety',
     parent_course_id: 'standalone',
-    audience: 'New hires',
-    criticality: 'required' as const,
+    audience_archetype: 'new_hire' as const,
+    audience_refinement: '',
+    completion_required: 'required' as const,
     training_type: 'safety' as const,
+    learning_outcomes: [{ id: 'outcome-1', text: 'Apply safety process steps in real scenarios.' }],
     estimated_minutes: 20,
   }
 
@@ -1058,7 +1114,18 @@ describe('useFoundryDraftStore Supabase dispatch', () => {
       expect(useFoundryDraftStore.getState().currentDraft?.persisted_course_id).toBe('course-1')
     })
     await vi.waitFor(() => {
-      expect(upsertModuleDraft).toHaveBeenCalledWith(expect.objectContaining({ current_stage: 'basics' }))
+      expect(upsertModuleDraft).toHaveBeenCalledWith(
+        expect.objectContaining({
+          current_stage: 'basics',
+          basics: expect.objectContaining({
+            audience_archetype: 'new_hire',
+            completion_required: 'required',
+            learning_outcomes: expect.arrayContaining([
+              expect.objectContaining({ text: 'Apply safety process steps in real scenarios.' }),
+            ]),
+          }),
+        }),
+      )
     })
     await vi.waitFor(() => {
       expect(useFoundryDraftStore.getState().currentDraft?.id).toBe('module-version-2')
@@ -1085,6 +1152,14 @@ describe('useFoundryDraftStore Supabase dispatch', () => {
       version_number: 1,
       draft_metadata: {
         current_stage: 'questions',
+        basics: {
+          audience_archetype: 'all_employees',
+          audience_refinement: 'Support ops',
+          completion_required: 'recommended',
+          training_type: 'operational',
+          estimated_minutes: 60,
+          learning_outcomes: [{ id: 'outcome-1', text: 'Handle support escalations with the approved process.' }],
+        },
         selectedLibraryFileIds: ['drive-file-99'],
       },
     })
@@ -1106,6 +1181,22 @@ describe('useFoundryDraftStore Supabase dispatch', () => {
     })
     await vi.waitFor(() => {
       expect(useFoundryDraftStore.getState().selectedLibraryFileIds).toEqual(['drive-file-99'])
+    })
+    await vi.waitFor(() => {
+      expect(useFoundryDraftStore.getState().currentDraft).toEqual(
+        expect.objectContaining({
+          audience_archetype: 'all_employees',
+          audience_refinement: 'Support ops',
+          completion_required: 'recommended',
+          training_type: 'operational',
+          estimated_minutes: 60,
+        }),
+      )
+      expect(useFoundryDraftStore.getState().currentDraft?.learning_outcomes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ text: 'Handle support escalations with the approved process.' }),
+        ]),
+      )
     })
   })
 

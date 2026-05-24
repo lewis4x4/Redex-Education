@@ -8,9 +8,11 @@ const currentDraft = {
   version_number: 1,
   title: 'Field Safety Refresher',
   parent_course_id: 'standalone',
-  audience: 'New hires',
-  criticality: 'required',
+  audience_archetype: 'new_hire',
+  audience_refinement: '',
+  completion_required: 'required',
   training_type: 'general_informational',
+  learning_outcomes: [{ id: 'outcome-1', text: 'Complete onboarding tasks independently.' }],
   estimated_minutes: 20,
   updated_at: '2026-05-24T00:00:00.000Z',
 } as const satisfies FoundryResumeState['currentDraft']

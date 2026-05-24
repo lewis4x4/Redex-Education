@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { MOCK_GENERATED_MODULE } from '@/features/foundry/data/mockGeneratedModule'
 import { MOCK_LESSON_REVIEWS } from '@/features/foundry/data/mockLessonReviews'
 import { MOCK_SELF_CRITIQUE } from '@/features/foundry/data/mockSelfCritique'
 
@@ -61,11 +62,15 @@ describe('PublishBlockersPage', () => {
     useFoundryDraftStore.getState().setBasics({
       title: 'HR Basics at Redex',
       parent_course_id: 'standalone',
-      audience: 'New hires',
-      criticality: 'required',
+      audience_archetype: 'new_hire',
+      audience_refinement: '',
+      completion_required: 'required',
       training_type: 'general_informational',
+      learning_outcomes: [{ id: 'outcome-1', text: 'Complete onboarding tasks independently.' }],
       estimated_minutes: 20,
     })
+    useFoundryDraftStore.getState().setGeneratedModule(MOCK_GENERATED_MODULE)
+    useFoundryDraftStore.getState().setLessonReviews(MOCK_LESSON_REVIEWS)
   }
 
   function seedApprovedModule() {
@@ -93,20 +98,24 @@ describe('PublishBlockersPage', () => {
   }
 
   it('renders eyebrow, heading, subhead, and back link', () => {
+    act(() => {
+      seedBasics()
+    })
+
     renderPage()
 
-    expect(screen.getByText('REDEX AI COURSE FOUNDRY · STEP 8')).toBeInTheDocument()
+    expect(screen.getByText('REDEX AI COURSE FOUNDRY')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1, name: 'Publish blockers' })).toBeInTheDocument()
     expect(screen.getByText('All outstanding items that prevent this module from being published.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '← Back to side-by-side review' })).toBeInTheDocument()
-    expect(screen.getByText('Draft')).toBeInTheDocument()
+    expect(screen.getByText('Blocked')).toBeInTheDocument()
   })
 
-  it('falls back to HR Basics MOCK_PUBLISH_BLOCKERS when foundry data is empty', () => {
-    const { container } = renderPage()
+  it('shows empty state when no foundry data exists', () => {
+    renderPage()
 
-    expect(container.querySelectorAll('article')).toHaveLength(3)
-    expect(screen.getByText('Lesson: Payroll and Timekeeping Basics')).toBeInTheDocument()
+    expect(screen.getByText('No active draft to check yet.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back to outline' })).toBeInTheDocument()
   })
 
   it('disables Publish module when blockers remain', () => {
@@ -130,7 +139,7 @@ describe('PublishBlockersPage', () => {
 
     renderPage()
 
-    expect(screen.getByText('Draft')).toBeInTheDocument()
+    expect(screen.getByText('Blocked')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Publish module' })).toBeDisabled()
   })
 
@@ -143,7 +152,7 @@ describe('PublishBlockersPage', () => {
 
     expect(screen.getByText('Approved')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Publish module' })).toBeEnabled()
-    expect(screen.getByText('✓ Module is clear to publish.')).toBeInTheDocument()
+    expect(screen.getByText('Saved to your draft')).toBeInTheDocument()
   })
 
   it('publishes, timestamps the store, and navigates to the published route', async () => {
@@ -169,7 +178,7 @@ describe('PublishBlockersPage', () => {
     renderPage()
 
     expect(screen.getByText('Published')).toBeInTheDocument()
-    expect(screen.getByText('✓ Module published.')).toBeInTheDocument()
+    expect(screen.getByText('Module published.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'View publish confirmation' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Publish module' })).toBeDisabled()
   })

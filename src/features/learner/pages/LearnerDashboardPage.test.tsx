@@ -4,6 +4,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { LearnerDashboardPage } from './LearnerDashboardPage';
 import { useAssignmentStore } from '@/features/assignments/store/assignmentStore';
+import { useModuleVersionsStore } from '@/features/publishing/store/moduleVersionsStore';
 import { useMyProgress } from '@/hooks/useEducation';
 import {
   MOCK_HR_ONBOARDING_ASSIGNMENT,
@@ -38,6 +39,7 @@ describe('LearnerDashboardPage HR Basics assignment', () => {
   beforeEach(() => {
     act(() => {
       useAssignmentStore.getState().resetAssignments();
+      useModuleVersionsStore.getState().resetVersions();
     });
 
     useMyProgressMock.mockReturnValue({
@@ -52,7 +54,7 @@ describe('LearnerDashboardPage HR Basics assignment', () => {
   it('shows HR Basics as Marcus primary assignment with six lessons and 20 minutes remaining', () => {
     render(<LearnerDashboardPage learner={MOCK_LEARNER_MARCUS_PROFILE} />);
 
-    expect(screen.getByText('HR Basics at Redex')).toBeInTheDocument();
+    expect(screen.getAllByText('HR Basics at Redex').length).toBeGreaterThan(0);
     expect(screen.getByText(/0 of 6 lessons complete/i)).toBeInTheDocument();
     expect(screen.getByText(/~20 minutes remaining/i)).toBeInTheDocument();
   });
@@ -109,6 +111,33 @@ describe('LearnerDashboardPage HR Basics assignment', () => {
 
     expect(screen.getByText('Overdue')).toBeInTheDocument();
   });
+
+  it('shows outcomes preview when module version metadata includes learning outcomes', () => {
+    act(() => {
+      useModuleVersionsStore.setState({
+        versions: [
+          {
+            id: 'module-version-hr-basics-v1',
+            module_id: 'hr-basics-mod-001',
+            module_title: 'HR Basics at Redex',
+            version_number: 1,
+            status: 'published',
+            created_at: new Date().toISOString(),
+            draft_metadata: {
+              basics: {
+                learning_outcomes: ['identify escalation paths', 'complete onboarding checklist', 'apply PTO policy'] as unknown as never,
+              },
+            },
+          },
+        ],
+      })
+    })
+
+    render(<LearnerDashboardPage learner={MOCK_LEARNER_MARCUS_PROFILE} />)
+
+    expect(screen.getByText("What you'll learn")).toBeInTheDocument()
+    expect(screen.getByText('• identify escalation paths')).toBeInTheDocument()
+  })
 
   it('routes Continue Training to the HR Basics module player', async () => {
     const user = userEvent.setup();

@@ -6,7 +6,7 @@ import { requireMutationData, throwOnMutationError } from './_response'
 
 type AssignmentStatus = Assignment['status']
 
-export async function insertAssignment(input: {
+export async function createAssignment(input: {
   id?: UUID
   module_version_id: UUID
   assignee_user_id?: UUID
@@ -33,6 +33,8 @@ export async function insertAssignment(input: {
   throwOnMutationError('insert assignment', result.error)
   return mapAssignmentRow(requireMutationData('insert assignment', result.data))
 }
+
+export const insertAssignment = createAssignment
 
 export async function updateAssignmentStatus(input: { id: UUID; status: AssignmentStatus }): Promise<Assignment> {
   const result = await safeRetry(() =>

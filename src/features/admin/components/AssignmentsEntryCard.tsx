@@ -10,7 +10,7 @@ const ASSIGNMENTS_DISABLED_TITLE = 'Assignments open in this slice'
 
 export function AssignmentsEntryCard({ onStart, isDisabled }: AssignmentsEntryCardProps) {
   return (
-    <Card className="rounded-2xl border border-redex-red/20 bg-redex-red/[0.04] p-6 shadow-sm md:p-8">
+    <Card className="flex h-full flex-col rounded-2xl border border-redex-red/20 bg-redex-red/[0.04] p-6 shadow-sm md:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[2px] text-redex-red">Assignments</p>
@@ -33,16 +33,18 @@ export function AssignmentsEntryCard({ onStart, isDisabled }: AssignmentsEntryCa
         <li>Set a due date and confirm</li>
       </ul>
 
-      <Button
-        type="button"
-        onClick={onStart}
-        disabled={isDisabled}
-        title={isDisabled ? ASSIGNMENTS_DISABLED_TITLE : undefined}
-        variant="brand"
-        className="mt-6 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
-      >
-        Open assignments →
-      </Button>
+      <div className="mt-auto pt-6">
+        <Button
+          type="button"
+          onClick={onStart}
+          disabled={isDisabled}
+          title={isDisabled ? ASSIGNMENTS_DISABLED_TITLE : undefined}
+          variant="brand"
+          className="disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+        >
+          Open assignments →
+        </Button>
+      </div>
     </Card>
   )
 }

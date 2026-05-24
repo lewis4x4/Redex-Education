@@ -20,6 +20,7 @@ import type {
   UUID,
 } from '@/types/training'
 import type { ModuleBasicsDraft } from '@/features/foundry/types'
+import { CANONICAL_AUDIENCE_LABELS } from '@/types/training'
 import { normalizeClientUUID, safeRetry, stableClientUUID } from './_idempotency'
 import { requireMutationData, throwOnMutationError } from './_response'
 
@@ -30,6 +31,7 @@ export interface UpsertModuleDraftInput {
   module_title: string
   current_stage: FoundryDraftStage
   actor?: { user_id: UUID; display_name: string }
+  basics?: import('@/types/training').FoundryDraftMetadata['basics']
 }
 
 function slugify(value: string): string {
@@ -73,7 +75,7 @@ export async function createModuleDraft(draft: ModuleBasicsDraft): Promise<Cours
           org_id: normalizeClientUUID(DEFAULT_ORG_ID, 'orgs'),
           title: draft.title,
           slug,
-          description: `Audience: ${draft.audience}`,
+          description: `Audience: ${CANONICAL_AUDIENCE_LABELS[draft.audience_archetype ?? 'new_hire']}${draft.audience_refinement ? ` (${draft.audience_refinement})` : ''}`,
           status: 'draft',
           level: 'foundational',
           estimated_minutes: draft.estimated_minutes,
@@ -224,7 +226,8 @@ export async function upsertModuleDraft(input: UpsertModuleDraftInput): Promise<
   const draftMetadata = {
     current_stage: input.current_stage,
     ...(input.actor ? { last_actor: input.actor } : {}),
-  } as Json
+    ...(input.basics ? { basics: input.basics } : {}),
+  } as unknown as Json
 
   const existingResult = await safeRetry(() =>
     supabase
