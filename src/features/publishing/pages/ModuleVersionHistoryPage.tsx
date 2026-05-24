@@ -4,9 +4,9 @@ import { Link, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ModuleStateBadge } from '@/features/foundry/components/ModuleStateBadge'
+import { useModuleVersionHistory } from '@/features/publishing/hooks/useModuleVersionHistory'
 import type { ModuleApprovalState } from '@/features/publishing/lib/moduleStates'
 import { getCompletedLearnersForVersion } from '@/features/publishing/lib/versionCompletions'
-import { useModuleVersionsStore } from '@/features/publishing/store/moduleVersionsStore'
 import { useAssignmentStore } from '@/features/assignments/store/assignmentStore'
 import { useAssessmentAttemptStore } from '@/features/progress/store/assessmentAttemptStore'
 import { MOCK_ORG_PEOPLE } from '@/lib/education'
@@ -46,24 +46,11 @@ function getLatestVersionId(versions: ModuleVersion[]): string | undefined {
 
 export function ModuleVersionHistoryPage() {
   const { moduleId = '' } = useParams<{ moduleId: string }>()
-  const allVersions = useModuleVersionsStore((state) => state.versions)
+  const { versions, loading, error, refetch, archiveVersion, archivingVersionId } = useModuleVersionHistory(moduleId)
   const assignments = useAssignmentStore((state) => state.assignments)
   const attempts = useAssessmentAttemptStore((state) => state.attempts)
   const [expandedVersionIds, setExpandedVersionIds] = useState<Set<string>>(new Set())
-
-  const versions = useMemo(
-    () =>
-      [...allVersions]
-        .filter((version) => version.module_id === moduleId)
-        .sort((a, b) => {
-          if (a.version_number !== b.version_number) {
-            return b.version_number - a.version_number
-          }
-
-          return b.created_at.localeCompare(a.created_at)
-        }),
-    [allVersions, moduleId],
-  )
+  const [pendingArchiveVersionId, setPendingArchiveVersionId] = useState<string | null>(null)
   const latestVersionId = getLatestVersionId(versions)
   const moduleTitle = versions[0]?.module_title ?? 'Module'
   const versionLearners = useMemo(
@@ -95,6 +82,15 @@ export function ModuleVersionHistoryPage() {
     })
   }
 
+  const confirmArchive = async (versionId: string) => {
+    try {
+      await archiveVersion(versionId)
+      setPendingArchiveVersionId(null)
+    } catch {
+      // The hook owns error state. Keep confirmation open so the admin can retry or cancel.
+    }
+  }
+
   return (
     <section className="mx-auto max-w-5xl space-y-6 md:space-y-8">
       <header className="space-y-3">
@@ -112,12 +108,29 @@ export function ModuleVersionHistoryPage() {
         </div>
       </header>
 
-      {versions.length === 0 ? (
+      {versions.length === 0 && loading ? (
+        <Card className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm" role="status" aria-live="polite">
+          <h2 className="text-lg font-semibold text-slate-900">Loading version history…</h2>
+          <p className="mt-2 text-sm text-slate-600">Fetching the latest module versions.</p>
+        </Card>
+      ) : null}
+
+      {error ? (
+        <Card className="rounded-3xl border border-red-200 bg-red-50 p-5 shadow-sm" role="alert">
+          <h2 className="text-base font-semibold text-red-900">Unable to update version history</h2>
+          <p className="mt-2 text-sm text-red-800">{error.message}</p>
+          <Button className="mt-4" variant="outline" onClick={refetch}>
+            Try again
+          </Button>
+        </Card>
+      ) : null}
+
+      {versions.length === 0 && !loading && !error ? (
         <Card className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
           <h2 className="text-lg font-semibold text-slate-900">No versions yet</h2>
           <p className="mt-2 text-sm text-slate-600">Publish a module to start tracking version history.</p>
         </Card>
-      ) : (
+      ) : versions.length > 0 ? (
         <div className="space-y-4" aria-label="Module versions">
           {versions.map((version) => {
             const learners = versionLearners.get(version.id) ?? []
@@ -167,16 +180,47 @@ export function ModuleVersionHistoryPage() {
                     </dl>
                   </div>
 
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 md:min-w-56">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Completed by</p>
-                    <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{learners.length}</p>
-                    <Button
-                      className="mt-3 w-full justify-center"
-                      variant="outline"
-                      onClick={() => toggleVersion(version.id)}
-                    >
+                  <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:min-w-56">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Completed by</p>
+                      <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{learners.length}</p>
+                    </div>
+                    <Button className="w-full justify-center" variant="outline" onClick={() => toggleVersion(version.id)}>
                       {isExpanded ? 'Hide learners' : 'Show learners'}
                     </Button>
+                    {version.status !== 'archived' ? (
+                      pendingArchiveVersionId === version.id ? (
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3" aria-live="polite">
+                          <p className="text-sm font-semibold text-amber-900">Archive this version?</p>
+                          <div className="mt-3 flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              disabled={archivingVersionId === version.id}
+                              onClick={() => void confirmArchive(version.id)}
+                            >
+                              Confirm
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={archivingVersionId === version.id}
+                              onClick={() => setPendingArchiveVersionId(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button
+                          className="w-full justify-center"
+                          variant="outline"
+                          onClick={() => setPendingArchiveVersionId(version.id)}
+                        >
+                          Archive version
+                        </Button>
+                      )
+                    ) : null}
                   </div>
                 </div>
 
@@ -199,7 +243,7 @@ export function ModuleVersionHistoryPage() {
             )
           })}
         </div>
-      )}
+      ) : null}
     </section>
   )
 }

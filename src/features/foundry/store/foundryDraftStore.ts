@@ -15,6 +15,7 @@ import { useAuditLogStore } from '@/features/audit/store/auditLogStore';
 import { stableClientUUID } from '@/integrations/supabase/mutations/_idempotency';
 import { getDataSource } from '@/lib/education/dataSource';
 import { toWriteError, type WriteError } from '@/lib/education/writeErrors';
+import { inferResumeRoute, type FoundryResumeRoute } from '@/features/foundry/lib/resumeRoute';
 import { inferModuleState } from '@/features/publishing/lib/moduleStates';
 import { useModuleVersionsStore } from '@/features/publishing/store/moduleVersionsStore';
 import { usePublishedModulesStore } from '@/features/publishing/store/publishedModulesStore';
@@ -28,6 +29,13 @@ type MaybeModuleVersionCarrier = {
   id?: unknown;
   module_version_id?: unknown;
 };
+
+export interface FoundryResumeAdminItem {
+  module_version_id: string;
+  module_id: string;
+  module_title: string;
+  version_number: number;
+}
 
 function readStringProperty(source: MaybeModuleVersionCarrier | null | undefined, key: keyof MaybeModuleVersionCarrier) {
   const value = source?.[key];
@@ -226,6 +234,8 @@ interface FoundryDraftState {
   resetFoundryDraft: () => void;
   /** Seed a new working draft from a forked module version. */
   seedDraftFromModuleVersion: (version: ModuleVersion, actor?: ActorInfo) => void;
+  /** Resume a dashboard draft, preserving state when it already matches the active draft. */
+  resumeDraftFromAdminItem: (item: FoundryResumeAdminItem) => FoundryResumeRoute;
   /** Side-by-side review state for generated lessons */
   lessonReviews: LessonReviewItem[];
   /** Overwrite lesson review state */
@@ -389,6 +399,45 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
             metadata: { module_id: version.module_id, version_number: version.version_number },
           }, actor);
         }
+      },
+      resumeDraftFromAdminItem: (item) => {
+        const state = get();
+        const draft = state.currentDraft;
+        const matchesCurrentDraft =
+          draft !== null &&
+          (draft.id === item.module_version_id ||
+            (draft.module_id === item.module_id && draft.version_number === item.version_number));
+
+        if (matchesCurrentDraft) {
+          return inferResumeRoute(state);
+        }
+
+        set({
+          lastWriteError: null,
+          currentDraft: {
+            id: item.module_version_id,
+            module_id: item.module_id,
+            version_number: item.version_number,
+            title: item.module_title,
+            parent_course_id: 'standalone',
+            audience: 'New hires',
+            criticality: 'required',
+            training_type: 'general_informational',
+            estimated_minutes: 20,
+            updated_at: new Date().toISOString(),
+          },
+          sourceMaterial: null,
+          setupAnswers: null,
+          outline: null,
+          outline_status: 'draft',
+          generatedModule: null,
+          critique: null,
+          lessonReviews: [],
+          selectedLibraryFileIds: [],
+          ...resetPublishState,
+        });
+
+        return inferResumeRoute(get());
       },
       setPublished: (actor) => {
         const state = get();

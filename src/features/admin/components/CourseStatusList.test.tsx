@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 
 import { CourseStatusList, type CourseStatusListItem } from './CourseStatusList'
@@ -44,5 +45,45 @@ describe('CourseStatusList', () => {
 
     expect(screen.getByLabelText('4 items')).toBeInTheDocument()
     expect(screen.getByText('4')).toBeInTheDocument()
+  })
+
+  it('renders item titles as links when getItemHref returns a path', () => {
+    render(
+      <MemoryRouter>
+        <CourseStatusList title="Module statuses" items={items} getItemHref={(item) => `/admin/modules/${item.id}/versions`} />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('link', { name: 'Field Safety Refresher' })).toHaveAttribute(
+      'href',
+      '/admin/modules/1/versions',
+    )
+  })
+
+  it('renders optional item actions separately from title links', () => {
+    render(
+      <MemoryRouter>
+        <CourseStatusList
+          title="Module statuses"
+          items={items}
+          getItemHref={(item) => `/admin/modules/${item.id}/versions`}
+          renderItemActions={(item) => <button type="button">Action for {item.title}</button>}
+        />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('link', { name: 'Field Safety Refresher' })).toHaveAttribute(
+      'href',
+      '/admin/modules/1/versions',
+    )
+    expect(screen.getByRole('button', { name: 'Action for Field Safety Refresher' })).toBeInTheDocument()
+  })
+
+  it('keeps titles static and renders no actions when optional props are omitted', () => {
+    render(<CourseStatusList title="Module statuses" items={items} />)
+
+    expect(screen.queryByRole('link', { name: 'Field Safety Refresher' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /action for/i })).not.toBeInTheDocument()
+    expect(screen.getByText('Field Safety Refresher')).toBeInTheDocument()
   })
 })

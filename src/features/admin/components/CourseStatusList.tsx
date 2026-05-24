@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { CheckCircle2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 import { Card } from '@/components/ui/card'
 
@@ -12,14 +13,18 @@ export interface CourseStatusListItem {
   meta?: string // e.g. "Updated 2 hours ago" or "Pending review by HR"
 }
 
-export interface CourseStatusListProps {
+export interface CourseStatusListProps<TItem extends CourseStatusListItem = CourseStatusListItem> {
   /** Section heading rendered above the list */
   title: string
-  items: CourseStatusListItem[]
+  items: TItem[]
   /** Rendered when items is empty — a tasteful all-caught-up affordance */
   emptyMessage?: string
   /** Optional icon for the empty state (defaults to CheckCircle2) */
   emptyIcon?: ReactNode
+  /** Optional per-item route; when present the title only is rendered as a link. */
+  getItemHref?: (item: TItem) => string | undefined
+  /** Optional per-item actions; row layout stays button-safe because only the title is linked. */
+  renderItemActions?: (item: TItem) => ReactNode
 }
 
 const STATUS_CLASS: Record<CourseStatusLabel, string> = {
@@ -29,12 +34,14 @@ const STATUS_CLASS: Record<CourseStatusLabel, string> = {
   Archived: 'bg-slate-50 text-slate-500',
 }
 
-export function CourseStatusList({
+export function CourseStatusList<TItem extends CourseStatusListItem = CourseStatusListItem>({
   title,
   items,
   emptyMessage = 'All caught up. No modules awaiting review.',
   emptyIcon,
-}: CourseStatusListProps) {
+  getItemHref,
+  renderItemActions,
+}: CourseStatusListProps<TItem>) {
   const hasItems = items.length > 0
 
   return (
@@ -48,22 +55,36 @@ export function CourseStatusList({
 
       {hasItems ? (
         <ul className="divide-y divide-slate-100" aria-label={`${title} modules`}>
-          {items.map((item) => (
-            <li key={item.id}>
-              <div className="flex items-start justify-between gap-4 px-5 py-4">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-slate-900">{item.title}</p>
-                  {item.meta ? <p className="mt-1 text-xs text-slate-500">{item.meta}</p> : null}
+          {items.map((item) => {
+            const href = getItemHref?.(item)
+            const actions = renderItemActions?.(item)
+
+            return (
+              <li key={item.id}>
+                <div className="flex items-start justify-between gap-4 px-5 py-4">
+                  <div className="min-w-0 flex-1">
+                    {href ? (
+                      <Link className="block truncate text-sm font-medium text-slate-900 hover:text-redex-red hover:underline" to={href}>
+                        {item.title}
+                      </Link>
+                    ) : (
+                      <p className="truncate text-sm font-medium text-slate-900">{item.title}</p>
+                    )}
+                    {item.meta ? <p className="mt-1 text-xs text-slate-500">{item.meta}</p> : null}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_CLASS[item.status]}`}
+                      aria-label={`Status: ${item.status}`}
+                    >
+                      {item.status}
+                    </span>
+                    {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+                  </div>
                 </div>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_CLASS[item.status]}`}
-                  aria-label={`Status: ${item.status}`}
-                >
-                  {item.status}
-                </span>
-              </div>
-            </li>
-          ))}
+              </li>
+            )
+          })}
         </ul>
       ) : (
         <div className="flex flex-col items-center justify-center gap-3 px-5 py-10 text-center">

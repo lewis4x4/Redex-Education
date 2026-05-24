@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -109,5 +109,93 @@ describe('ModuleVersionHistoryPage', () => {
     renderPage('unknown-module')
 
     expect(screen.getByRole('heading', { name: 'No versions yet' })).toBeInTheDocument()
+  })
+
+  it('shows archive confirmation on click and hides it on cancel', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(screen.getByRole('button', { name: 'Archive version' }))
+
+    expect(screen.getByText('Archive this version?')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByText('Archive this version?')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Archive version' })).toBeInTheDocument()
+  })
+
+  it('confirms archive through the hook and keeps the version visible with an Archived badge', async () => {
+    const user = userEvent.setup()
+    const originalArchiveVersion = useModuleVersionsStore.getState().archiveVersion
+    const archiveVersionSpy = vi.fn(originalArchiveVersion)
+
+    act(() => {
+      useModuleVersionsStore.setState({ archiveVersion: archiveVersionSpy })
+    })
+
+    renderPage()
+
+    await user.click(screen.getByRole('button', { name: 'Archive version' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm' }))
+
+    expect(archiveVersionSpy).toHaveBeenCalledWith('module-version-hr-basics-v1')
+    expect(screen.getByRole('heading', { name: 'v1' })).toBeInTheDocument()
+    expect(screen.getByText('Archived')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Archive version' })).not.toBeInTheDocument()
+  })
+
+  it('hides the archive affordance for already archived versions', () => {
+    act(() => {
+      useModuleVersionsStore.getState().archiveVersion('module-version-hr-basics-v1')
+    })
+
+    renderPage()
+
+    expect(screen.getByText('Archived')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Archive version' })).not.toBeInTheDocument()
+  })
+})
+
+describe('ModuleVersionHistoryPage supabase states', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.stubEnv('VITE_DATA_SOURCE', 'supabase')
+
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: createStorageMock(),
+    })
+  })
+
+  afterEach(() => {
+    vi.doUnmock('@/lib/education/moduleVersions')
+    vi.unstubAllEnvs()
+  })
+
+  it('shows an error alert without also rendering the empty history state', async () => {
+    vi.doMock('@/lib/education/moduleVersions', () => ({
+      getModuleVersionHistory: vi.fn().mockRejectedValue(new Error('network down')),
+      archiveModuleVersion: vi.fn(),
+    }))
+
+    const { ModuleVersionHistoryPage } = await import('./ModuleVersionHistoryPage')
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    render(
+      <MemoryRouter initialEntries={['/admin/modules/hr-basics-mod-001/versions']}>
+        <Routes>
+          <Route path="/admin/modules/:moduleId/versions" element={<ModuleVersionHistoryPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Unable to update version history')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'No versions yet' })).not.toBeInTheDocument()
+    warnSpy.mockRestore()
   })
 })

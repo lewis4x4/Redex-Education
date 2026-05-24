@@ -866,8 +866,14 @@ export interface EducationFacade {
 // ============================================================
 
 export interface AdminModuleListItem {
-  /** Stable identifier for a module in admin list views. */
+  /** Stable row key for admin list views; remains the module_version id for back-compat. */
   id: string;
+  /** Stable module id used for module-level routes. */
+  module_id: UUID;
+  /** Stable module version id; should match `id`. */
+  module_version_id: UUID;
+  /** Human-readable version sequence number for this module version. */
+  version_number: number;
   /** Human-readable module title shown in dashboard lists. */
   title: string;
   /** Current admin lifecycle state for the module. */

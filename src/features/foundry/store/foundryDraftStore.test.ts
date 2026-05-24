@@ -801,6 +801,181 @@ describe('useFoundryDraftStore', () => {
     }
     expect(parsed.state.selectedLibraryFileIds).toEqual([])
   })
+
+  const dashboardDraft = {
+    module_version_id: 'module-version-field-safety-refresher-v1',
+    module_id: 'field-safety-refresher-mod-001',
+    module_title: 'Field Safety Refresher',
+    version_number: 1,
+  }
+
+  function setSetupAnswers() {
+    useFoundryDraftStore.getState().setSetupAnswers({
+      criticality: 'operational',
+      assessment_style: 'standard_quiz',
+      audience_notes: 'New hires',
+      experience_notes: 'First week',
+      estimated_minutes: 20,
+      source_control: 'strict',
+      requires_admin_approval: true,
+      requires_safety_review: false,
+    })
+  }
+
+  it('resumeDraftFromAdminItem seeds a fresh dashboard draft and routes to source', () => {
+    let route = ''
+
+    act(() => {
+      route = useFoundryDraftStore.getState().resumeDraftFromAdminItem(dashboardDraft)
+    })
+
+    expect(route).toBe('/admin/foundry/source')
+    expect(useFoundryDraftStore.getState().currentDraft).toEqual(
+      expect.objectContaining({
+        id: dashboardDraft.module_version_id,
+        module_id: dashboardDraft.module_id,
+        title: dashboardDraft.module_title,
+        version_number: dashboardDraft.version_number,
+        parent_course_id: 'standalone',
+        audience: 'New hires',
+      }),
+    )
+    expect(useFoundryDraftStore.getState().generatedModule).toBeNull()
+    expect(useFoundryDraftStore.getState().critique).toBeNull()
+    expect(useFoundryDraftStore.getState().lessonReviews).toEqual([])
+    expect(useFoundryDraftStore.getState().publishStatus).toBe('draft')
+  })
+
+  it('resumeDraftFromAdminItem preserves same-draft source, setup, and outline state', () => {
+    act(() => {
+      useFoundryDraftStore.getState().resumeDraftFromAdminItem(dashboardDraft)
+      useFoundryDraftStore.getState().toggleLibraryFile('drive-file-1')
+      setSetupAnswers()
+      useFoundryDraftStore.getState().setOutline(MOCK_GENERATED_OUTLINE)
+      useFoundryDraftStore.getState().approveOutline()
+    })
+
+    const setupAnswers = useFoundryDraftStore.getState().setupAnswers
+    const outline = useFoundryDraftStore.getState().outline
+    let route = ''
+
+    act(() => {
+      route = useFoundryDraftStore.getState().resumeDraftFromAdminItem({
+        ...dashboardDraft,
+        module_version_id: 'alternate-version-id-same-module-and-number',
+      })
+    })
+
+    expect(route).toBe('/admin/foundry/preview')
+    expect(useFoundryDraftStore.getState().selectedLibraryFileIds).toEqual(['drive-file-1'])
+    expect(useFoundryDraftStore.getState().setupAnswers).toBe(setupAnswers)
+    expect(useFoundryDraftStore.getState().outline).toBe(outline)
+    expect(useFoundryDraftStore.getState().outline_status).toBe('approved')
+  })
+
+  it('resumeDraftFromAdminItem returns the helper-inferred route for each draft stage', () => {
+    const cases: Array<[string, () => void, string]> = [
+      ['source', () => undefined, '/admin/foundry/source'],
+      ['questions', () => useFoundryDraftStore.getState().toggleLibraryFile('drive-file-1'), '/admin/foundry/questions'],
+      [
+        'outline',
+        () => {
+          useFoundryDraftStore.getState().toggleLibraryFile('drive-file-1')
+          setSetupAnswers()
+        },
+        '/admin/foundry/outline',
+      ],
+      [
+        'preview',
+        () => {
+          useFoundryDraftStore.getState().toggleLibraryFile('drive-file-1')
+          setSetupAnswers()
+          useFoundryDraftStore.getState().setOutline(MOCK_GENERATED_OUTLINE)
+          useFoundryDraftStore.getState().approveOutline()
+        },
+        '/admin/foundry/preview',
+      ],
+      [
+        'critique',
+        () => {
+          useFoundryDraftStore.getState().toggleLibraryFile('drive-file-1')
+          setSetupAnswers()
+          useFoundryDraftStore.getState().setOutline(MOCK_GENERATED_OUTLINE)
+          useFoundryDraftStore.getState().approveOutline()
+          useFoundryDraftStore.getState().setGeneratedModule(MOCK_GENERATED_MODULE)
+        },
+        '/admin/foundry/critique',
+      ],
+      [
+        'side-by-side',
+        () => {
+          useFoundryDraftStore.getState().toggleLibraryFile('drive-file-1')
+          setSetupAnswers()
+          useFoundryDraftStore.getState().setOutline(MOCK_GENERATED_OUTLINE)
+          useFoundryDraftStore.getState().approveOutline()
+          useFoundryDraftStore.getState().setGeneratedModule(MOCK_GENERATED_MODULE)
+          useFoundryDraftStore.getState().setCritique({ ...MOCK_SELF_CRITIQUE, issues: [], blocks_publish: false })
+        },
+        '/admin/foundry/sidebyside',
+      ],
+      [
+        'blockers',
+        () => {
+          useFoundryDraftStore.getState().toggleLibraryFile('drive-file-1')
+          setSetupAnswers()
+          useFoundryDraftStore.getState().setOutline(MOCK_GENERATED_OUTLINE)
+          useFoundryDraftStore.getState().approveOutline()
+          useFoundryDraftStore.getState().setGeneratedModule(MOCK_GENERATED_MODULE)
+          useFoundryDraftStore.getState().setCritique({ ...MOCK_SELF_CRITIQUE, issues: [], blocks_publish: false })
+          useFoundryDraftStore.getState().setLessonReviews(MOCK_LESSON_REVIEWS)
+        },
+        '/admin/foundry/blockers',
+      ],
+      [
+        'published',
+        () => {
+          useFoundryDraftStore.getState().toggleLibraryFile('drive-file-1')
+          setSetupAnswers()
+          useFoundryDraftStore.getState().setOutline(MOCK_GENERATED_OUTLINE)
+          useFoundryDraftStore.getState().approveOutline()
+          useFoundryDraftStore.getState().setGeneratedModule(MOCK_GENERATED_MODULE)
+          useFoundryDraftStore.getState().setCritique({ ...MOCK_SELF_CRITIQUE, issues: [], blocks_publish: false })
+          useFoundryDraftStore
+            .getState()
+            .setLessonReviews(MOCK_LESSON_REVIEWS.map((review) => ({ ...review, status: 'approved' as const })))
+          useFoundryDraftStore.setState({ publishStatus: 'published' })
+        },
+        '/admin/foundry/published',
+      ],
+    ]
+
+    for (const [, seedStage, expectedRoute] of cases) {
+      act(() => {
+        useFoundryDraftStore.getState().resetFoundryDraft()
+        useFoundryDraftStore.getState().resumeDraftFromAdminItem(dashboardDraft)
+        seedStage()
+      })
+
+      let route = ''
+      act(() => {
+        route = useFoundryDraftStore.getState().resumeDraftFromAdminItem(dashboardDraft)
+      })
+
+      expect(route).toBe(expectedRoute)
+    }
+  })
+
+  it('resumeDraftFromAdminItem does not record audit events', () => {
+    act(() => {
+      useAuditLogStore.setState({ events: [] })
+    })
+
+    act(() => {
+      useFoundryDraftStore.getState().resumeDraftFromAdminItem(dashboardDraft)
+    })
+
+    expect(useAuditLogStore.getState().events).toEqual([])
+  })
 })
 
 describe('useFoundryDraftStore Supabase dispatch', () => {

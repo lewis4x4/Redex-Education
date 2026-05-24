@@ -209,3 +209,17 @@ export async function publishModuleVersion(input: {
   throwOnMutationError('publish module version', result.error)
   return mapModuleVersionRow(requireMutationData('publish module version', result.data))
 }
+
+export async function archiveModuleVersion(versionId: UUID): Promise<ModuleVersion> {
+  const result = await safeRetry(() =>
+    supabase
+      .from('module_versions')
+      .update({ status: 'archived', updated_at: new Date().toISOString() })
+      .eq('id', versionId)
+      .select('*')
+      .single(),
+  )
+
+  throwOnMutationError('archive module version', result.error)
+  return mapModuleVersionRow(requireMutationData('archive module version', result.data))
+}

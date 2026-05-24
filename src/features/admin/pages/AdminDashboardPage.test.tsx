@@ -4,13 +4,30 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AdminDashboardPage } from './AdminDashboardPage'
+import { useAdminSummary } from '@/hooks/useAdminSummary'
 import { useProfile } from '@/hooks/useProfile'
+import { MOCK_ADMIN_SUMMARY } from '@/features/admin/data/mockAdmin'
+
+const foundryDraftStoreMock = vi.hoisted(() => ({
+  resumeDraftFromAdminItem: vi.fn(),
+}))
 
 vi.mock('@/hooks/useProfile', () => ({
   useProfile: vi.fn(),
 }))
+vi.mock('@/hooks/useAdminSummary', () => ({
+  useAdminSummary: vi.fn(),
+}))
+vi.mock('@/features/foundry/store/foundryDraftStore', () => ({
+  useFoundryDraftStore: {
+    getState: () => ({
+      resumeDraftFromAdminItem: foundryDraftStoreMock.resumeDraftFromAdminItem,
+    }),
+  },
+}))
 
 const useProfileMock = vi.mocked(useProfile)
+const useAdminSummaryMock = vi.mocked(useAdminSummary)
 
 function LocationProbe() {
   const location = useLocation()
@@ -19,7 +36,15 @@ function LocationProbe() {
 
 describe('AdminDashboardPage', () => {
   beforeEach(() => {
+    foundryDraftStoreMock.resumeDraftFromAdminItem.mockReset()
+    foundryDraftStoreMock.resumeDraftFromAdminItem.mockReturnValue('/admin/foundry/source')
     useProfileMock.mockReturnValue({ profile: null, loading: false, refetch: vi.fn() })
+    useAdminSummaryMock.mockReturnValue({
+      summary: MOCK_ADMIN_SUMMARY,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    })
   })
 
   function renderPage() {
@@ -104,11 +129,93 @@ describe('AdminDashboardPage', () => {
     expect(screen.getByRole('list', { name: 'Drafts modules' })).toBeInTheDocument()
     expect(screen.getByRole('list', { name: 'Needs review modules' })).toBeInTheDocument()
     expect(screen.getByRole('list', { name: 'Published modules' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'View HR Basics versions →' })).toHaveAttribute(
-      'href',
-      '/admin/modules/hr-basics-mod-001/versions',
-    )
+    expect(screen.queryByRole('link', { name: 'View HR Basics versions →' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Source Impact Review →' })).toHaveAttribute('href', '/admin/source-impact')
     expect(screen.getByRole('link', { name: 'Audit log →' })).toHaveAttribute('href', '/admin/audit')
+  })
+
+  it('renders every mock dashboard row title as a module version-history link', () => {
+    renderPage()
+
+    const rows = [
+      ...MOCK_ADMIN_SUMMARY.drafts,
+      ...MOCK_ADMIN_SUMMARY.needs_review,
+      ...MOCK_ADMIN_SUMMARY.published,
+    ]
+
+    for (const row of rows) {
+      expect(screen.getByRole('link', { name: row.title })).toHaveAttribute(
+        'href',
+        `/admin/modules/${row.module_id}/versions`,
+      )
+    }
+  })
+
+  it('routes a dashboard draft Resume draft action into Foundry', async () => {
+    const user = userEvent.setup()
+    const draft = MOCK_ADMIN_SUMMARY.drafts[0]!
+
+    render(
+      <MemoryRouter initialEntries={['/admin']}>
+        <Routes>
+          <Route
+            path="/admin"
+            element={
+              <>
+                <AdminDashboardPage />
+                <LocationProbe />
+              </>
+            }
+          />
+          <Route path="/admin/foundry/:step" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await user.click(screen.getByRole('button', { name: `Resume draft: ${draft.title}` }))
+
+    expect(foundryDraftStoreMock.resumeDraftFromAdminItem).toHaveBeenCalledWith({
+      module_version_id: draft.module_version_id,
+      module_id: draft.module_id,
+      module_title: draft.title,
+      version_number: draft.version_number,
+    })
+    expect(screen.getByTestId('location-path')).toHaveTextContent('/admin/foundry/source')
+  })
+
+  it('renders a loading status while the summary is being fetched', () => {
+    useAdminSummaryMock.mockReturnValue({
+      summary: null,
+      loading: true,
+      error: null,
+      refetch: vi.fn(),
+    })
+
+    renderPage()
+
+    const status = screen.getByRole('status')
+    expect(status).toHaveTextContent(/loading dashboard/i)
+    expect(status).toHaveAttribute('aria-busy', 'true')
+    expect(screen.queryByRole('heading', { name: 'Learners in progress' })).not.toBeInTheDocument()
+  })
+
+  it('renders an error alert with a retry button when fetch fails', async () => {
+    const refetch = vi.fn()
+    useAdminSummaryMock.mockReturnValue({
+      summary: null,
+      loading: false,
+      error: new Error('Cannot reach Supabase'),
+      refetch,
+    })
+    const user = userEvent.setup()
+
+    renderPage()
+
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent(/couldn't load your dashboard/i)
+    expect(alert).toHaveTextContent('Cannot reach Supabase')
+
+    await user.click(screen.getByRole('button', { name: /try again/i }))
+    expect(refetch).toHaveBeenCalledTimes(1)
   })
 })

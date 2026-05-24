@@ -1,4 +1,5 @@
 import type {
+  AdminDashboardSummary,
   AssessmentAttempt,
   Assignment,
   Course,
@@ -7,6 +8,7 @@ import type {
   LessonProgress,
   Module,
   ModuleSourceBinding,
+  ModuleVersion,
   SourceFile,
   SourceFileVersion,
   SourceSection,
@@ -91,4 +93,19 @@ export async function getSourceSections(sourceFileVersionId: string): Promise<So
 export async function getModuleSourceBindings(moduleVersionId: string): Promise<ModuleSourceBinding[]> {
   const { fetchModuleSourceBindings } = await import('@/integrations/supabase/queries/source_library')
   return fetchModuleSourceBindings(moduleVersionId)
+}
+
+export async function getModuleVersionHistory(moduleId: string): Promise<ModuleVersion[]> {
+  const { fetchModuleVersionHistory } = await import('@/integrations/supabase/queries/moduleVersions')
+  return fetchModuleVersionHistory(moduleId)
+}
+
+export async function archiveModuleVersion(versionId: string): Promise<ModuleVersion> {
+  const { archiveModuleVersion: archiveSupabaseModuleVersion } = await import('@/integrations/supabase/mutations/foundry')
+  return archiveSupabaseModuleVersion(versionId)
+}
+
+export async function getAdminSummary(): Promise<AdminDashboardSummary> {
+  const { fetchAdminSummary } = await import('@/integrations/supabase/queries/admin')
+  return fetchAdminSummary()
 }

@@ -235,7 +235,7 @@ This Build Bible should not replace the roadmap. The roadmap explains what to bu
 
 ## Current Work
 
-Slice 9.2 — Docs & Build Bible Reconciliation is in progress. The next code slice is Slice 8.3 — Replace Mock Reads With Supabase Reads; v2 Part 1 remains the hard Finish-Line gate before Phase 10+. Slice 9.1 — real HR-approved content — is a parallel people-process track and must start in lockstep with Slice 8.3 so backend wiring is not blocked by missing approved source material (`docs/Redex_Education_Phase10-13_Roadmap_v2_20260523.md`).
+Pilot-gate prep continues. **Module Management UI** is complete: dashboard rows link to module version history, Draft rows can resume into Foundry, and version-history cards now archive versions with inline confirmation. The next active item is the real end-to-end AI-generation smoke test against the HR content Brian uploaded to Drive `_library/`. v2 Part 1 close-out remains the hard Finish-Line gate before Phase 10+ (`docs/Redex_Education_Phase10-13_Roadmap_v2_20260523.md`).
 
 ---
 
@@ -4248,5 +4248,90 @@ Resulting `Exposed schemas`: `public, graphql_public, redex`
 - This Build Bible entry as the canonical record of the diagnosis
 
 **Next operator who sets up a new Supabase project for this app**: add `redex` to Exposed Schemas BEFORE running migrations. If you forget, you'll hit PGRST106 the first time any client tries to query a redex table.
+
+---
+
+## 2026-05-24 — Slice: Real Admin Dashboard (replace MOCK_ADMIN_SUMMARY with Supabase aggregates)
+
+**Status**: ✅ Completed.
+
+**Context**: Brian signed in as admin on production and discovered the `/admin` dashboard was still rendering hard-coded mock numbers — "HR Onboarding — Pilot Module" lived as a JavaScript constant in `src/features/admin/data/mockAdmin.ts`, not a real database row. This slice rewires the dashboard to real Supabase queries while keeping mock mode byte-identical so the 633-test baseline holds.
+
+**Files added**:
+- `src/integrations/supabase/queries/admin.ts` — `fetchAdminSummary()` aggregator. Runs three queries in parallel via `Promise.all`:
+  1. `module_versions` ordered by `updated_at DESC`, bucketed client-side into Draft / Needs review / Published lists. `approved` is included in the Needs-review bucket (semantically still requires an admin publishing action). `archived` is excluded from the dashboard surface entirely.
+  2. `user_training_enrollments` count where `status='active'` (uses `{ count: 'exact', head: true }` for zero-row efficiency).
+  3. `assignments` selecting only `status, due_at`. Active = anything ≠ completed. Overdue = `status='overdue'` OR (`status ≠ completed` AND `due_at < now`). Completion rate = `completed / total * 100`, rounded; returns 0% with no assignments.
+  - Includes a local `formatRelativePast()` helper using `Intl.RelativeTimeFormat` (extended to weeks/months/years vs the AuditEventRow precedent so meta strings can render "Published 1 week ago", "Published 2 months ago").
+- `src/integrations/supabase/queries/admin.test.ts` — 8 unit tests covering all three buckets, the assignment summary math, the empty-list / null-count edge cases, and the three error-propagation paths.
+- `src/lib/education/admin.ts` — facade `getAdminSummary()` dispatching via `getDataSource()`. Mock branch returns `MOCK_ADMIN_SUMMARY`; Supabase branch delegates to `supabaseDataProvider.getAdminSummary()`. Mirrors `lib/education/courses.ts` line-for-line.
+- `src/hooks/useAdminSummary.ts` — React hook returning `{ summary, loading, error, refetch }`. **Mock fast-path**: when `getDataSource() === 'mock'`, returns `MOCK_ADMIN_SUMMARY` synchronously with `loading: false`, so the existing dashboard tests (which use `getByRole` without `findBy*`) continue to pass without modification. **Supabase path**: lazy-imports the data provider, fetches on mount with cancel-on-unmount, exposes refetch (no-op in mock mode). `setLoading(true)` + `setError(null)` are deferred via `queueMicrotask` to satisfy the `react-hooks/set-state-in-effect` rule (matches the precedent in `hooks/useProfile.ts`).
+- `src/hooks/useAdminSummary.test.tsx` — 5 tests covering both branches plus refetch behavior in both modes.
+
+**Files modified**:
+- `src/features/admin/pages/AdminDashboardPage.tsx` — replaced direct `MOCK_ADMIN_SUMMARY` import with `useAdminSummary()`. When `summary === null` the page renders a polite `<div role="status" aria-live="polite" aria-busy>` loading card or, on failure, a `<div role="alert">` error card with a "Try again" button wired to `refetch`. The happy-path render is otherwise unchanged so the existing test invariants hold.
+- `src/features/admin/pages/AdminDashboardPage.test.tsx` — mock `useAdminSummary` in `beforeEach` to return `MOCK_ADMIN_SUMMARY` (preserving every existing assertion); added two new cases for the loading and error fallback branches (8 tests total, +2 vs prior).
+- `src/lib/education/supabaseDataProvider.ts` — added `getAdminSummary()` passthrough wrapping the new query module via lazy `await import(...)` so mock-mode builds don't pull the supabase client.
+- `src/lib/education/index.ts` — re-exported `getAdminSummary` from the public facade.
+- `src/integrations/supabase/queries/index.ts` — added `export * from './admin'`.
+
+**Verification**:
+- ✅ `npm run typecheck` — green.
+- ✅ `npm run lint` — 0 errors / 0 warnings (caught one `react-hooks/set-state-in-effect` violation on the first pass; resolved by the `queueMicrotask` defer above).
+- ✅ `npm test -- --run` — **648 passed, 1 skipped, 115 test files** (**+15 tests** versus the Slice 9.2 baseline of 633). Eval gates all hold at 100%.
+- ✅ `npm run build` — green; new lazy chunk `dist/assets/admin-*.js` ≈ 2.12 kB / 0.99 kB gzip.
+
+**Acceptance criteria**:
+- ✅ Real Supabase queries replace `MOCK_ADMIN_SUMMARY` for the four required tables.
+- ✅ Dispatch happens via existing `getDataSource()` facade (mock vs supabase) — no new env switches.
+- ✅ Mock-mode UI/test behavior identical; no existing test required modification beyond the new hook-mock seed in `beforeEach`.
+- ✅ Row→domain mapping stays at the integration boundary (`queries/admin.ts` consumes `ModuleVersionRow`, returns the canonical `AdminDashboardSummary` domain shape).
+- ✅ Loading and error UX exist on the dashboard for real-mode failures.
+
+**Known scope deferred** (intentionally — these are the next two slices the handoff calls out):
+- **Module Management UI**: clicking a draft from the dashboard should reopen it in the Foundry workflow at the right stage; archive action; link to `/admin/modules/:moduleId/versions` from the dashboard for any module. Today's dashboard only links to `hr-basics-mod-001` by hard-coded slug.
+- **Real end-to-end smoke test**: Brian creates a real HR Basics module via `/admin/foundry/start` against his uploaded Drive `_library/` content. Expect ~$0.30–$0.50 Anthropic spend; verify `generation_jobs` cron worker drives the pipeline to publish.
+- **Pagination/limits**: lists are returned unbounded (the org has <10 modules in any bucket today). If a real customer accumulates 100+ drafts the dashboard would slow; add `.limit(20)` per bucket then.
+- **Learner-dashboard "Onboarding Progress" sidebar**: still hardcoded (separate P2 follow-up the handoff already tagged).
+- **Manager dashboard mock-vs-supabase parity**: `getDirectReports` is already wired, but the surrounding mock progress data on `ManagerDashboardPage` is not yet a dispatch point — left for a future slice.
+
+**Next**: Module Management UI, then the live AI-generation smoke test.
+
+---
+
+## 2026-05-24 — Slice: Module Management UI
+
+**Status**: ✅ Completed.
+
+**Context**: This slice closed the module-management gap left by the Real Admin Dashboard. Phases A–C had already landed the admin row identity contract, per-row dashboard links, Draft-row Foundry resume, Supabase module-version history query, archive mutation, and education facade passthroughs. Phase D finishes the UI by moving version history behind a mock-fast / Supabase-async hook and adding the final archive affordance on the version-history page only.
+
+**Files added**:
+- `src/features/publishing/hooks/useModuleVersionHistory.ts` — version-history adapter hook returning `{ versions, loading, error, refetch, archiveVersion, archivingVersionId }`. Mock mode reads synchronously from `useModuleVersionsStore`, filters by `moduleId`, uses the store `archiveVersion()` action, and keeps `refetch` as a no-op. Supabase mode lazy-imports `lib/education/moduleVersions`, fetches with cancel-on-unmount, defers `setLoading(true)` / `setError(null)` through `queueMicrotask`, archives through the facade, then refreshes the list.
+- `src/features/publishing/hooks/useModuleVersionHistory.test.tsx` — 6 tests covering mock synchronous reads, mock no-op refetch, mock archive path, Supabase load path, Supabase error capture, and Supabase archive-then-refresh flow.
+
+**Files modified**:
+- `src/features/publishing/pages/ModuleVersionHistoryPage.tsx` — refactored from direct `useModuleVersionsStore` reads to `useModuleVersionHistory(moduleId)`. Added polite loading state, alert error state with `Try again`, and inline two-step archive confirmation per non-archived version card. Existing learner-completion expansion remains intact. Archived versions remain visible with the `Archived` badge, and already archived cards hide the archive affordance.
+- `src/features/publishing/pages/ModuleVersionHistoryPage.test.tsx` — kept all existing version-history behaviors green and added 3 tests for archive confirmation/cancel, confirm/archive visibility, and already-archived hidden affordance.
+- `docs/redex_education_build_bible.md` — updated Current Work and recorded this completion entry.
+
+**Verification**:
+- ✅ `npm run typecheck` — 0 errors.
+- ✅ `npm run lint` — 0 errors / 0 warnings.
+- ✅ `npm test -- --run` — **686 passed, 118 test files** (**+10 tests** in this Phase D pass; ≥676 target met). Vitest still emits the pre-existing Node `--localstorage-file` warning, but all tests pass.
+- ✅ `npm run build` — succeeded; generated `ModuleVersionHistoryPage-Bu_5QNn6.js` ≈ 9.27 kB / 2.99 kB gzip plus the lazy module-version chunks.
+
+**Acceptance criteria**:
+- ✅ Dashboard rows link end-to-end to `/admin/modules/:moduleId/versions` using Phase A's `module_id` row identity.
+- ✅ Draft rows expose `Resume draft` and re-enter Foundry through Phase B's `resumeDraftFromAdminItem` route inference.
+- ✅ Version history loads from the new hook in both mock and Supabase modes.
+- ✅ Version-history cards expose archive only for non-archived versions, use inline Confirm/Cancel, disable controls while archiving, call the hook archive path, and keep the version visible after archive with the `Archived` badge.
+- ✅ Archive UI intentionally remains off the dashboard; dashboard stays navigation/resume-only.
+
+**Known scope deferred**:
+- Live RLS/browser verification of `archiveModuleVersion()` against production Supabase is deferred to the smoke-test pass.
+- Full persisted Foundry draft hydration beyond the safe local-store resume path remains a future persistence slice.
+- No new persisted audit taxonomy was added for archive; the status transition remains the source of truth until audit persistence is designed.
+
+**Next**: Run the live AI-generation smoke test against Brian's Drive `_library/` HR content, verifying generation job creation, worker completion, publish, dashboard visibility, and archive/version-history behavior against real data.
 
 ---

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fromMock = vi.hoisted(() => vi.fn())
 const upsertMock = vi.hoisted(() => vi.fn())
+const updateMock = vi.hoisted(() => vi.fn())
 const selectMock = vi.hoisted(() => vi.fn())
 const singleMock = vi.hoisted(() => vi.fn())
 const eqMock = vi.hoisted(() => vi.fn())
@@ -21,9 +22,10 @@ vi.mock('@/integrations/supabase/db-rows', () => ({
 }))
 
 function wireBuilder() {
-  const builder = { upsert: upsertMock, select: selectMock, single: singleMock, eq: eqMock }
+  const builder = { upsert: upsertMock, update: updateMock, select: selectMock, single: singleMock, eq: eqMock }
   fromMock.mockReturnValue(builder)
   upsertMock.mockReturnValue(builder)
+  updateMock.mockReturnValue(builder)
   selectMock.mockReturnValue(builder)
   eqMock.mockReturnValue(builder)
 }
@@ -143,5 +145,39 @@ describe('foundry mutations', () => {
     const { publishModuleVersion } = await import('./foundry')
 
     await expect(publishModuleVersion({ course_id: 'course-1', module_id: 'module-1', approved_by: 'user-admin' })).rejects.toThrow('Failed to publish module version: publish failed')
+  })
+
+  it('archiveModuleVersion marks a module version archived and returns the mapped row', async () => {
+    singleMock.mockResolvedValueOnce({ data: { id: 'row', status: 'archived' }, error: null })
+    const { archiveModuleVersion } = await import('./foundry')
+
+    await expect(archiveModuleVersion('module-version-1')).resolves.toEqual({ id: 'version-row' })
+    expect(fromMock).toHaveBeenCalledWith('module_versions')
+    expect(updateMock).toHaveBeenCalledWith({ status: 'archived', updated_at: expect.any(String) })
+    expect(eqMock).toHaveBeenCalledWith('id', 'module-version-1')
+    expect(selectMock).toHaveBeenCalledWith('*')
+    expect(mapModuleVersionRowMock).toHaveBeenCalledWith({ id: 'row', status: 'archived' })
+  })
+
+  it('archiveModuleVersion is idempotent for already archived rows returned by Supabase', async () => {
+    singleMock.mockResolvedValueOnce({ data: { id: 'already-archived', status: 'archived' }, error: null })
+    const { archiveModuleVersion } = await import('./foundry')
+
+    await expect(archiveModuleVersion('already-archived')).resolves.toEqual({ id: 'version-already-archived' })
+    expect(updateMock).toHaveBeenCalledWith({ status: 'archived', updated_at: expect.any(String) })
+  })
+
+  it('archiveModuleVersion throws when Supabase returns no row', async () => {
+    singleMock.mockResolvedValueOnce({ data: null, error: null })
+    const { archiveModuleVersion } = await import('./foundry')
+
+    await expect(archiveModuleVersion('missing-version')).rejects.toThrow('Failed to archive module version: Supabase returned no row')
+  })
+
+  it('archiveModuleVersion throws descriptive Supabase errors', async () => {
+    singleMock.mockResolvedValueOnce({ data: null, error: new Error('archive failed') })
+    const { archiveModuleVersion } = await import('./foundry')
+
+    await expect(archiveModuleVersion('module-version-1')).rejects.toThrow('Failed to archive module version: archive failed')
   })
 })
