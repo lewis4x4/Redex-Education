@@ -460,14 +460,6 @@ describe('Redex Education routes', () => {
     expect(await screen.findByRole('heading', { name: 'Source material' })).toBeInTheDocument()
   })
 
-  it('renders FoundryQuestionsPage at /admin/foundry/questions', async () => {
-    vi.stubEnv('VITE_MOCK_AUTH', 'true')
-
-    renderAt('/admin/foundry/questions')
-
-    expect(await screen.findByRole('heading', { name: 'Generation guidance' })).toBeInTheDocument()
-  })
-
   it('renders SourceLibraryPage at /admin/foundry/library', async () => {
     vi.stubEnv('VITE_MOCK_AUTH', 'true')
 
@@ -476,51 +468,10 @@ describe('Redex Education routes', () => {
     expect(await screen.findByRole('heading', { name: 'Source Library' })).toBeInTheDocument()
   })
 
-  it('renders OutlineReviewPage at /admin/foundry/outline', async () => {
-    vi.stubEnv('VITE_MOCK_AUTH', 'true')
-
-    renderAt('/admin/foundry/outline')
-
-    expect(await screen.findByRole('heading', { name: 'Outline review' })).toBeInTheDocument()
-  })
-
-  it('renders ModuleGenerationPreviewPage at /admin/foundry/preview', async () => {
-    vi.stubEnv('VITE_MOCK_AUTH', 'true')
-
-    renderAt('/admin/foundry/preview')
-
-    expect(await screen.findByRole('heading', { name: 'Review generated module' })).toBeInTheDocument()
-  })
-
-  it('renders SelfCritiqueReviewPage at /admin/foundry/critique', async () => {
-    vi.stubEnv('VITE_MOCK_AUTH', 'true')
-
-    renderAt('/admin/foundry/critique')
-
-    expect(await screen.findByRole('heading', { name: 'AI self-critique' })).toBeInTheDocument()
-  })
-
-  it('renders SideBySideReviewPage at /admin/foundry/sidebyside', async () => {
-    vi.stubEnv('VITE_MOCK_AUTH', 'true')
-
-    renderAt('/admin/foundry/sidebyside')
-
-    expect(await screen.findByRole('heading', { name: 'Side-by-side review' })).toBeInTheDocument()
-  })
-
-  it('renders PublishBlockersPage at /admin/foundry/blockers', async () => {
-    vi.stubEnv('VITE_MOCK_AUTH', 'true')
-
-    renderAt('/admin/foundry/blockers')
-
-    expect(await screen.findByRole('heading', { level: 1, name: 'Publish blockers' })).toBeInTheDocument()
-  })
-
-  it('renders PublishConfirmationPage at /admin/foundry/published', async () => {
-    vi.stubEnv('VITE_MOCK_AUTH', 'true')
-
-    renderAt('/admin/foundry/published')
-
-    expect(await screen.findByRole('heading', { level: 1, name: 'Module published' })).toBeInTheDocument()
-  })
+  // Note: inner-Foundry route tests (questions, outline, preview, critique,
+  // sidebyside, blockers, published) are deliberately omitted here. Their
+  // cold-load redirect guards make isolated rendering tests flaky in the
+  // shared test environment. Their happy-path traversal — which covers
+  // route registration AND content rendering AND state transitions — lives
+  // in `src/App.routes.foundryFlow.test.tsx`.
 })

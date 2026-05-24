@@ -34,9 +34,20 @@ jobs:
 
       - name: Test
         run: npm test -- --run
+        env:
+          # client.ts throws at module-init if neither Supabase creds nor
+          # VITE_MOCK_AUTH=true are set. Provide dummy creds so the client
+          # bootstraps; tests mock the actual supabase module where needed.
+          VITE_SUPABASE_URL: 'https://example.invalid'
+          VITE_SUPABASE_ANON_KEY: 'ci-dummy-anon-key'
+          VITE_MOCK_AUTH: 'false'
 
       - name: Build
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: 'https://example.invalid'
+          VITE_SUPABASE_ANON_KEY: 'ci-dummy-anon-key'
+          VITE_MOCK_AUTH: 'false'
 
       - name: Deno edge checks
         run: deno check supabase/functions/_shared/sourceBindingsWriter.ts supabase/functions/_shared/courseFoundryAiClientServer.ts supabase/functions/generation-worker/index.ts
