@@ -57,3 +57,7 @@ jobs:
 
       - name: Eval harness
         run: npm run eval
+        env:
+          VITE_SUPABASE_URL: 'https://example.invalid'
+          VITE_SUPABASE_ANON_KEY: 'ci-dummy-anon-key'
+          VITE_MOCK_AUTH: 'false'
