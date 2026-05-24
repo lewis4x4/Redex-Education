@@ -203,23 +203,20 @@ describe('EducationContext', () => {
       });
     });
 
-    it('writes initial empty state to localStorage on mount', async () => {
-      const setItemSpy = vi.spyOn(window.localStorage, 'setItem');
-
+    it('persists empty initial state to localStorage on mount', async () => {
       render(
         <EducationProvider>
           <div>mount</div>
         </EducationProvider>
       );
 
-      // React 18 strict mode + CI timing can produce 1 or 2 mount-time effect calls.
-      // What matters is that the empty-state write happens with the correct payload —
-      // not the exact call count.
+      // Behavior assertion (not implementation): after mount, localStorage
+      // contains the canonical empty-state payload. Spying on setItem call
+      // counts is too brittle across React 18 strict-mode + CI timing.
       await waitFor(() => {
-        expect(setItemSpy).toHaveBeenCalledWith(
-          STORAGE_KEY,
-          JSON.stringify({ lessonProgress: {} })
-        );
+        const stored = localStorage.getItem(STORAGE_KEY);
+        expect(stored).not.toBeNull();
+        expect(JSON.parse(stored ?? '{}')).toEqual({ lessonProgress: {} });
       });
     });
   });
