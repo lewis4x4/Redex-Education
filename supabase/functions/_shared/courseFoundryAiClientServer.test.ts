@@ -63,6 +63,41 @@ if (typeof Deno !== "undefined") {
     }
   });
 
+
+
+  Deno.test("server AI client normalizes incomplete source analysis output", async () => {
+    const originalFetch = globalThis.fetch;
+    Deno.env.set("AI_PROVIDER", "anthropic");
+    Deno.env.set("AI_PROVIDER_API_KEY", "test-key");
+    Deno.env.set("AI_MODEL", "claude-test");
+    globalThis.fetch = (() => {
+      return Promise.resolve(new Response(JSON.stringify({
+        content: [{ type: "text", text: JSON.stringify({
+          topic: "Wire Gauge & Type",
+          authority: "Unknown – no author, organisation, or credentialing body identifiable from the supplied material",
+        }) }],
+        usage: { input_tokens: 1000, output_tokens: 500 },
+      }), { status: 200 }));
+    }) as typeof fetch;
+
+    try {
+      const result = await createCourseFoundryAiClientServer().analyzeSource({ sources: { text: "source" } });
+
+      assertEquals(result.output, {
+        topic: "Wire Gauge & Type",
+        authority: "context",
+        sections_detected: 0,
+        has_placeholders: false,
+        missing_required_topics: [],
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+      Deno.env.delete("AI_PROVIDER");
+      Deno.env.delete("AI_PROVIDER_API_KEY");
+      Deno.env.delete("AI_MODEL");
+    }
+  });
+
   Deno.test("server AI client switches to OpenAI", async () => {
     const originalFetch = globalThis.fetch;
     const calls: Array<{ url: string; init?: RequestInit }> = [];

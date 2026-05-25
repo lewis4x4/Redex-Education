@@ -247,13 +247,35 @@ const CritiqueIssueCategorySchema = z.enum([
   "needs_admin_approval",
 ]);
 
+type AnalyzeSourceOutput = {
+  topic: string;
+  authority: "authoritative" | "supporting" | "context";
+  sections_detected: number;
+  has_placeholders: boolean;
+  missing_required_topics: string[];
+};
+
+const SourceAuthoritySchema = z.preprocess((value) => {
+  if (typeof value !== "string") {
+    return "context";
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === "authoritative" || normalized === "supporting" || normalized === "context") {
+    return normalized;
+  }
+
+  return "context";
+}, z.enum(["authoritative", "supporting", "context"]));
+
 export const AnalyzeSourceOutputSchema = z.object({
-  topic: z.string(),
-  authority: z.enum(["authoritative", "supporting", "context"]),
-  sections_detected: z.number().int().nonnegative(),
-  has_placeholders: z.boolean(),
-  missing_required_topics: z.array(z.string()),
-});
+  topic: z.string().catch("Untitled source"),
+  authority: SourceAuthoritySchema,
+  sections_detected: z.coerce.number().int().nonnegative().catch(0),
+  has_placeholders: z.boolean().catch(false),
+  missing_required_topics: z.array(z.string()).catch([]),
+}) as z.ZodType<AnalyzeSourceOutput>;
 
 const CourseOutlineLessonSchema = z.object({
   title: z.string(),

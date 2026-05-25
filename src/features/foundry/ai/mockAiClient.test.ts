@@ -172,6 +172,21 @@ describe('mockAiClient', () => {
     });
   });
 
+
+
+  it('normalizes incomplete source-analysis output instead of rejecting the generation job', () => {
+    expect(validateAiOutput(AnalyzeSourceOutputSchema, {
+      topic: 'Wire Gauge & Type',
+      authority: 'Unknown – no author, organisation, or credentialing body identifiable from the supplied material',
+    })).toEqual({
+      topic: 'Wire Gauge & Type',
+      authority: 'context',
+      sections_detected: 0,
+      has_placeholders: false,
+      missing_required_topics: [],
+    });
+  });
+
   it('generates the existing mock outline through the interface', async () => {
     const output = await mockAiClient.generateOutline({
       basics: DEFAULT_AI_MODULE_BASICS,

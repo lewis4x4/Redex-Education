@@ -50,13 +50,27 @@ const nonEmptyTrimmedString = z.string().trim().min(1);
 const safeSlugString = z.string().trim().regex(/^[a-z0-9][a-z0-9-]*$/u, 'Use lowercase kebab-case with no path separators.');
 const safeMarkdownFilename = z.string().trim().regex(/^[a-z0-9][a-z0-9_-]*\.md$/u, 'Use a safe lowercase markdown filename.');
 
+const SourceAuthoritySchema = z.preprocess((value) => {
+  if (typeof value !== 'string') {
+    return 'context';
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === 'authoritative' || normalized === 'supporting' || normalized === 'context') {
+    return normalized;
+  }
+
+  return 'context';
+}, z.enum(['authoritative', 'supporting', 'context']));
+
 export const AnalyzeSourceOutputSchema = z.object({
-  topic: z.string(),
-  authority: z.enum(['authoritative', 'supporting', 'context']),
-  sections_detected: z.number().int().nonnegative(),
-  has_placeholders: z.boolean(),
-  missing_required_topics: z.array(z.string()),
-}) satisfies z.ZodType<AnalyzeSourceOutput>;
+  topic: z.string().catch('Untitled source'),
+  authority: SourceAuthoritySchema,
+  sections_detected: z.coerce.number().int().nonnegative().catch(0),
+  has_placeholders: z.boolean().catch(false),
+  missing_required_topics: z.array(z.string()).catch([]),
+}) as z.ZodType<AnalyzeSourceOutput>;
 
 const PacketLearningOutcomeSchema = z.object({
   id: nonEmptyTrimmedString,
