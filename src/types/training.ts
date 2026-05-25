@@ -308,10 +308,86 @@ export type LessonContent =
   | HotspotLessonContent
   | OrderingLessonContent;
 
+export interface ReadingLessonBlockBase {
+  id: UUID;
+  source_section_ids?: UUID[];
+}
+
+export interface ReadingProseBlock extends ReadingLessonBlockBase {
+  kind: 'prose';
+  heading?: string;
+  anchor_id?: string;
+  markdown: string;
+}
+
+export interface ReadingCalloutBlock extends ReadingLessonBlockBase {
+  kind: 'callout';
+  tone: 'key_takeaway' | 'note';
+  title?: string;
+  markdown: string;
+}
+
+export interface ReadingPolicyQuoteBlock extends ReadingLessonBlockBase {
+  kind: 'policy_quote';
+  quote_markdown: string;
+  attribution?: string;
+  policy_ref?: string;
+}
+
+export interface ReadingInlineCheckBlock extends ReadingLessonBlockBase {
+  kind: 'inline_check';
+  prompt: string;
+  options: string[];
+  correct_option_index?: number;
+  feedback_correct_markdown?: string;
+  feedback_incorrect_markdown?: string;
+  feedback_neutral_markdown?: string;
+}
+
+export interface ReadingCollapsibleBlock extends ReadingLessonBlockBase {
+  kind: 'collapsible';
+  intent: 'reference';
+  title: string;
+  markdown: string;
+  default_open?: boolean;
+}
+
+export interface ReadingConfigBlock extends ReadingLessonBlockBase {
+  kind: 'config_block';
+  title?: string;
+  description_markdown?: string;
+  code: string;
+  copy_label?: string;
+}
+
+export interface ReadingImageBlock extends ReadingLessonBlockBase {
+  kind: 'image';
+  image_ref: {
+    source_image_id?: UUID;
+    storage_url?: string;
+    alt_text: string;
+    caption: string;
+    status?: 'pending_ingest' | 'ready' | 'failed';
+  };
+  text_equivalent_markdown: string;
+}
+
+export type ReadingLessonBlock =
+  | ReadingProseBlock
+  | ReadingCalloutBlock
+  | ReadingPolicyQuoteBlock
+  | ReadingInlineCheckBlock
+  | ReadingCollapsibleBlock
+  | ReadingConfigBlock
+  | ReadingImageBlock;
+
 export interface TextLessonContent {
   type: 'text';
-  body_markdown: string;
+  /** Legacy/fallback markdown. Old persisted lessons must continue rendering through this field. */
+  body_markdown?: string;
   estimated_read_minutes?: number;
+  /** Preferred Slice 10.7 structured reading model. Renderers use this when present. */
+  blocks?: ReadingLessonBlock[];
 }
 
 export interface ChecklistLessonContent {
@@ -772,6 +848,7 @@ export interface GeneratedLessonContent {
   title: string;
   lesson_type: LessonType;
   body_markdown?: string;
+  reading_blocks?: ReadingLessonBlock[];
   quiz_questions?: QuizQuestion[];
   acknowledgment_text?: string;
   ordering_steps?: OrderingStep[];

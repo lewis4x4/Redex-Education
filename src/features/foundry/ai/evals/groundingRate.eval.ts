@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { GeneratedModulePreview, SourceSection } from '@/types/training';
 
-import { assertThreshold, percent, printEvalSummary, sourceCitationIds, stripSourceCitations } from './evalShared';
+import { assertThreshold, generatedLessonClaimTexts, percent, printEvalSummary, sourceCitationIds } from './evalShared';
 
 const THRESHOLD = 95;
 
@@ -37,6 +37,26 @@ const fixtureModule: GeneratedModulePreview = {
       lesson_type: 'text',
       body_markdown:
         'People Ops is the first contact for HR questions. [source: section-hr-help]\n\nNew hires complete first-week setup tasks before the first week closes. [source: section-first-week]',
+      reading_blocks: [
+        {
+          id: 'grounding-prose-1',
+          kind: 'prose',
+          markdown: 'People Ops is the first contact for HR questions. [source: section-hr-help]',
+        },
+        {
+          id: 'grounding-callout-1',
+          kind: 'callout',
+          tone: 'note',
+          markdown: 'New hires complete first-week setup tasks before the first week closes. [source: section-first-week]',
+        },
+        {
+          id: 'grounding-reference-1',
+          kind: 'collapsible',
+          intent: 'reference',
+          title: 'Reference detail',
+          markdown: 'The first-week checklist includes a 30-day check-in. [source: section-first-week]',
+        },
+      ],
       status: 'draft',
     },
     {
@@ -58,11 +78,7 @@ const fixtureModule: GeneratedModulePreview = {
 };
 
 function claimTexts(module: GeneratedModulePreview): string[] {
-  return module.lessons.flatMap((lesson) => [
-    ...(lesson.body_markdown?.split(/\n+/u) ?? []),
-    ...(lesson.acknowledgment_text ? [lesson.acknowledgment_text] : []),
-    ...(lesson.quiz_questions ?? []).flatMap((question) => [question.question, ...question.options]),
-  ]).map((claim) => claim.trim()).filter((claim) => stripSourceCitations(claim).length > 0);
+  return module.lessons.flatMap((lesson) => generatedLessonClaimTexts(lesson));
 }
 
 describe('groundingRate eval', () => {

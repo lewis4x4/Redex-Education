@@ -244,16 +244,16 @@ describe('realAiClient', () => {
   });
 
   it.each([
-    ['text', 'lesson_generation.text'],
-    ['quiz', 'lesson_generation.quiz'],
-    ['checklist', 'lesson_generation.checklist'],
-    ['acknowledgment', 'lesson_generation.acknowledgment'],
-    ['scenario', 'lesson_generation.scenario'],
-    ['video', 'lesson_generation.video'],
-    ['coach', 'lesson_generation.coach'],
-    ['assignment', 'lesson_generation.assignment'],
-    ['reflection_prompt', 'lesson_generation.reflection_prompt'],
-  ] as const)('uses matching prompt key for %s lessons', async (lessonType, expectedPromptKey) => {
+    ['text', 'lesson_generation.text', 'v1.1'],
+    ['quiz', 'lesson_generation.quiz', 'v1'],
+    ['checklist', 'lesson_generation.checklist', 'v1'],
+    ['acknowledgment', 'lesson_generation.acknowledgment', 'v1'],
+    ['scenario', 'lesson_generation.scenario', 'v1'],
+    ['video', 'lesson_generation.video', 'v1.1'],
+    ['coach', 'lesson_generation.coach', 'v1'],
+    ['assignment', 'lesson_generation.assignment', 'v1'],
+    ['reflection_prompt', 'lesson_generation.reflection_prompt', 'v1'],
+  ] as const)('uses matching prompt key and version for %s lessons', async (lessonType, expectedPromptKey, expectedPromptVersion) => {
     vi.stubEnv('VITE_SUPABASE_URL', 'https://redex-test.supabase.co');
     vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'public-anon-key');
     const supabase = createSupabaseMock([
@@ -265,7 +265,16 @@ describe('realAiClient', () => {
         output_payload: {
           final: {
             module_title: 'Module',
-            lessons: [{ lesson_index: 0, module_index: 0, title: 'Lesson', lesson_type: lessonType, status: 'draft' }],
+            lessons: [
+              {
+                lesson_index: 0,
+                module_index: 0,
+                title: 'Lesson',
+                lesson_type: lessonType,
+                body_markdown: lessonType === 'text' ? 'Text body. [source: section-1]' : undefined,
+                status: 'draft',
+              },
+            ],
             generated_at: new Date().toISOString(),
             is_complete: true,
           },
@@ -290,7 +299,10 @@ describe('realAiClient', () => {
     });
 
     const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(JSON.parse(String(requestInit.body)).inputPayload.promptId.key).toBe(expectedPromptKey);
+    expect(JSON.parse(String(requestInit.body)).inputPayload.promptId).toEqual({
+      key: expectedPromptKey,
+      version: expectedPromptVersion,
+    });
   });
 
   it('hydrates source content from selected library files when source material is empty', async () => {

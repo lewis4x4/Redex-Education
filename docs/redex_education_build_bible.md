@@ -339,7 +339,7 @@ All Course Foundry prompts are individually versioned. Generated artifacts must 
 | `source_analysis` | `v1` | Analyze source binders, identify authority/topics/sections, and flag placeholders. |
 | `setup_question_inference` | `v1` | Generate 3–5 admin setup questions before outline generation. |
 | `outline_generation` | `v1` | Produce source-cited `CourseOutlineDraft` content from setup answers and approved source. |
-| `lesson_generation.text` | `v1` | Produce source-grounded structured text lessons. |
+| `lesson_generation.text` | `v1.1` | Produce source-grounded structured Reading Lesson v2 blocks with legacy `body_markdown` fallback. |
 | `lesson_generation.checklist` | `v1` | Produce source-grounded checklist lessons with `details_markdown`. |
 | `lesson_generation.scenario` | `v1` | Produce branching scenarios with worked examples, one decision per screen, feedback, and outcomes. |
 | `lesson_generation.acknowledgment` | `v1` | Produce policy acknowledgment content with statement markdown and signature requirements. |
@@ -353,6 +353,19 @@ All Course Foundry prompts are individually versioned. Generated artifacts must 
 | `self_critique` | `v1` | Review generated content for source support and pedagogical quality issues. |
 | `regenerate_with_fixes` | `v1` | Regenerate affected lesson sections from critique issues and fixes. |
 | `regenerate_section` | `v1` | Regenerate only lessons bound to a single source section for section-scoped jobs. |
+
+## Structured Reading Lesson Contract
+
+Slice 10.7 upgrades `text` lessons to Reading Lesson v2 without breaking legacy markdown lessons:
+
+- Canonical runtime shape: `TextLessonContent.blocks?: ReadingLessonBlock[]` plus optional legacy `body_markdown` fallback.
+- Foundry output shape: `reading_blocks?: ReadingLessonBlock[]` plus flattened `body_markdown` fallback for rollback and older clients.
+- Supported block kinds: `prose`, `callout`, `policy_quote`, `inline_check`, `collapsible`, `config_block`, and `image`.
+- `inline_check` blocks are non-graded practice and never affect ModulePlayer completion; text lessons remain manually completable.
+- `collapsible` blocks must be `intent: "reference"` and hold optional/reference depth only, never required procedure steps or assessed content.
+- `config_block` renders as copyable monospace text; no syntax-highlighting dependency is required.
+- `image` blocks are 10.8-compatible placeholders. In 10.7 they may render a supplied `storage_url`, but Drive image download, source parsing rewrites, and CSP updates remain owned by Slice 10.8.
+- Generated prose/callouts target approximately 8th-grade readability and are covered by the Foundry eval suite.
 
 ## AI Guardrail Rule
 

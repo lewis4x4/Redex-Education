@@ -143,7 +143,11 @@ function lessonContentFor(lesson: GeneratedLessonContent): LessonContent {
         checkpoints: lesson.checkpoints ?? lesson.video_checkpoints,
       };
     case 'text':
-      return { type: 'text', body_markdown: lesson.body_markdown ?? '' };
+      return {
+        type: 'text',
+        body_markdown: lesson.body_markdown ?? '',
+        blocks: lesson.reading_blocks,
+      };
     case 'hotspot_diagram':
       return {
         type: 'hotspot_diagram',

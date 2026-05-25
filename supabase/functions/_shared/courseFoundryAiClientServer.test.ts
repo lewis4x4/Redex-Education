@@ -181,6 +181,107 @@ if (typeof Deno !== "undefined") {
     }
   });
 
+  Deno.test("server generated text schema rejects reading_blocks without body_markdown fallback", async () => {
+    const originalFetch = globalThis.fetch;
+    Deno.env.set("AI_PROVIDER", "openai");
+    Deno.env.set("AI_PROVIDER_API_KEY", "test-key");
+    Deno.env.set("AI_MODEL", "openai-test");
+    globalThis.fetch = (() => {
+      return Promise.resolve(new Response(JSON.stringify({
+        output_text: JSON.stringify({
+          module_title: "HR Basics",
+          lessons: [
+            {
+              lesson_index: 0,
+              module_index: 0,
+              title: "Welcome",
+              lesson_type: "text",
+              reading_blocks: [
+                { id: "block-1", kind: "prose", markdown: "Welcome to Redex. [source: section-1]" },
+              ],
+              status: "draft",
+            },
+          ],
+          generated_at: "2026-05-25T03:00:00.000Z",
+          is_complete: true,
+        }),
+        usage: { input_tokens: 1000, output_tokens: 500 },
+      }), { status: 200 }));
+    }) as typeof fetch;
+
+    try {
+      await createCourseFoundryAiClientServer().generateLessons({
+        outline: { modules: [{ lessons: [{ lesson_type: "text" }] }] },
+        sources: { text: "source" },
+      });
+      throw new Error("Expected invalid text output without body_markdown to fail validation");
+    } catch (error) {
+      assert(
+        String((error as Error).message).includes("text generated lessons require non-empty body_markdown fallback"),
+        "validation should reject text lessons that omit body_markdown fallback",
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+      Deno.env.delete("AI_PROVIDER");
+      Deno.env.delete("AI_PROVIDER_API_KEY");
+      Deno.env.delete("AI_MODEL");
+    }
+  });
+
+  Deno.test("server text prompt and schema accept structured reading blocks with body_markdown fallback", async () => {
+    const originalFetch = globalThis.fetch;
+    Deno.env.set("AI_PROVIDER", "openai");
+    Deno.env.set("AI_PROVIDER_API_KEY", "test-key");
+    Deno.env.set("AI_MODEL", "openai-test");
+    globalThis.fetch = (() => {
+      return Promise.resolve(new Response(JSON.stringify({
+        output_text: JSON.stringify({
+          module_title: "HR Basics",
+          lessons: [
+            {
+              lesson_index: 0,
+              module_index: 0,
+              title: "Welcome",
+              lesson_type: "text",
+              body_markdown: "Welcome to Redex. [source: section-1]",
+              reading_blocks: [
+                { id: "block-1", kind: "prose", markdown: "Welcome to Redex. [source: section-1]" },
+                {
+                  id: "block-2",
+                  kind: "inline_check",
+                  prompt: "What should you do?",
+                  options: ["Ask", "Wait"],
+                  correct_option_index: 0,
+                },
+              ],
+              status: "draft",
+            },
+          ],
+          generated_at: "2026-05-25T03:00:00.000Z",
+          is_complete: true,
+        }),
+        usage: { input_tokens: 1000, output_tokens: 500 },
+      }), { status: 200 }));
+    }) as typeof fetch;
+
+    try {
+      const result = await createCourseFoundryAiClientServer().generateLessons({
+        outline: { modules: [{ lessons: [{ lesson_type: "text" }] }] },
+        sources: { text: "source" },
+      });
+
+      assertEquals(result.prompt_version, "lesson_generation.text@v1.1");
+      assertEquals(result.output.lessons[0]?.reading_blocks?.length, 2);
+      assert(COURSE_FOUNDRY_SERVER_PROMPT_REGISTRY["lesson_generation.text"].system.includes("reading_blocks"), "text prompt should require reading_blocks");
+      assert(COURSE_FOUNDRY_SERVER_PROMPT_REGISTRY["lesson_generation.text"].system.includes("8th-grade"), "text prompt should include readability target");
+    } finally {
+      globalThis.fetch = originalFetch;
+      Deno.env.delete("AI_PROVIDER");
+      Deno.env.delete("AI_PROVIDER_API_KEY");
+      Deno.env.delete("AI_MODEL");
+    }
+  });
+
   Deno.test("server video prompts include the explicit video segment rule", () => {
     const videoPrompt = COURSE_FOUNDRY_SERVER_PROMPT_REGISTRY["lesson_generation.video"];
     const videoScriptPrompt = COURSE_FOUNDRY_SERVER_PROMPT_REGISTRY["lesson_generation.video_script"];

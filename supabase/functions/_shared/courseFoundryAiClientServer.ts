@@ -125,8 +125,8 @@ const PROMPTS: Record<PromptKey, PromptDefinition> = {
     user: "Generate a CourseOutlineDraft.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
   },
   "lesson_generation.text": {
-    id: { key: "lesson_generation.text", version: "v1" },
-    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nGenerate source-grounded lesson drafts. Keep claims tied to supplied source sections and flag unsupported content.`,
+    id: { key: "lesson_generation.text", version: "v1.1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nGenerate source-grounded text lessons with reading_blocks and body_markdown fallback. Use prose, callout, policy_quote, inline_check, collapsible, config_block, and image blocks only where useful. Keep prose near an 8th-grade reading level. Collapsible blocks must be reference-only and must not hide required steps or assessed content. Config blocks are plain copyable code with no syntax-highlighting requirement. Include image blocks only for source-backed image metadata; pending image blocks are placeholders for later ingest and must include alt text, caption, and text equivalent. Every load-bearing claim must cite source sections with [source: <section_id>] or be flagged for review.`,
     user: "Generate lessons and return GenerateLessonsOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
   },
   "lesson_generation.quiz": {
@@ -302,6 +302,102 @@ const QuizQuestionSchema = z.object({
   options: z.array(z.string()),
   correct_index: z.number().int().nonnegative().optional(),
 });
+const ReadingBlockBaseShape = {
+  id: nonEmptyTrimmedString,
+  source_section_ids: z.array(nonEmptyTrimmedString).optional(),
+};
+const ReadingProseBlockSchema = z.object({
+  ...ReadingBlockBaseShape,
+  kind: z.literal("prose"),
+  heading: z.string().optional(),
+  anchor_id: z.string().optional(),
+  markdown: nonEmptyTrimmedString,
+});
+const ReadingCalloutBlockSchema = z.object({
+  ...ReadingBlockBaseShape,
+  kind: z.literal("callout"),
+  tone: z.enum(["key_takeaway", "note"]),
+  title: z.string().optional(),
+  markdown: nonEmptyTrimmedString,
+});
+const ReadingPolicyQuoteBlockSchema = z.object({
+  ...ReadingBlockBaseShape,
+  kind: z.literal("policy_quote"),
+  quote_markdown: nonEmptyTrimmedString,
+  attribution: z.string().optional(),
+  policy_ref: z.string().optional(),
+});
+const ReadingInlineCheckBlockSchema = z.object({
+  ...ReadingBlockBaseShape,
+  kind: z.literal("inline_check"),
+  prompt: nonEmptyTrimmedString,
+  options: z.array(nonEmptyTrimmedString).min(2),
+  correct_option_index: z.number().int().nonnegative().optional(),
+  feedback_correct_markdown: z.string().optional(),
+  feedback_incorrect_markdown: z.string().optional(),
+  feedback_neutral_markdown: z.string().optional(),
+});
+const ReadingCollapsibleBlockSchema = z.object({
+  ...ReadingBlockBaseShape,
+  kind: z.literal("collapsible"),
+  intent: z.literal("reference"),
+  title: nonEmptyTrimmedString,
+  markdown: nonEmptyTrimmedString,
+  default_open: z.boolean().optional(),
+});
+const ReadingConfigBlockSchema = z.object({
+  ...ReadingBlockBaseShape,
+  kind: z.literal("config_block"),
+  title: z.string().optional(),
+  description_markdown: z.string().optional(),
+  code: nonEmptyTrimmedString,
+  copy_label: z.string().optional(),
+});
+const ReadingImageBlockSchema = z.object({
+  ...ReadingBlockBaseShape,
+  kind: z.literal("image"),
+  image_ref: z.object({
+    source_image_id: z.string().optional(),
+    storage_url: z.string().optional(),
+    alt_text: nonEmptyTrimmedString,
+    caption: nonEmptyTrimmedString,
+    status: z.enum(["pending_ingest", "ready", "failed"]).optional(),
+  }),
+  text_equivalent_markdown: nonEmptyTrimmedString,
+});
+const ReadingLessonBlockSchema = z.discriminatedUnion("kind", [
+  ReadingProseBlockSchema,
+  ReadingCalloutBlockSchema,
+  ReadingPolicyQuoteBlockSchema,
+  ReadingInlineCheckBlockSchema,
+  ReadingCollapsibleBlockSchema,
+  ReadingConfigBlockSchema,
+  ReadingImageBlockSchema,
+]);
+const ReadingBlocksSchema = z.array(ReadingLessonBlockSchema).min(1).superRefine((blocks, context) => {
+  const seenBlockIds = new Set<string>();
+
+  blocks.forEach((block, index) => {
+    if (seenBlockIds.has(block.id)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Reading block ids must be unique.",
+        path: [index, "id"],
+      });
+      return;
+    }
+
+    seenBlockIds.add(block.id);
+
+    if (block.kind === "inline_check" && block.correct_option_index !== undefined && block.correct_option_index >= block.options.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "inline_check correct_option_index must reference an option.",
+        path: [index, "correct_option_index"],
+      });
+    }
+  });
+});
 const VideoDownloadSchema = z.object({
   url: z.string(),
   label: z.string().optional(),
@@ -352,6 +448,7 @@ const GeneratedLessonContentSchema = z.object({
   title: z.string(),
   lesson_type: LessonTypeSchema,
   body_markdown: z.string().optional(),
+  reading_blocks: ReadingBlocksSchema.optional(),
   quiz_questions: z.array(QuizQuestionSchema).optional(),
   acknowledgment_text: z.string().optional(),
   ordering_steps: OrderingStepsSchema.optional(),
@@ -387,6 +484,16 @@ const GeneratedLessonContentSchema = z.object({
       path: ["ordering_steps"],
     });
   }
+
+  const hasTextBody = typeof lesson.body_markdown === "string" && lesson.body_markdown.trim().length > 0;
+
+  if (lesson.lesson_type === "text" && lesson.status !== "missing_source" && !hasTextBody) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "text generated lessons require non-empty body_markdown fallback.",
+      path: ["body_markdown"],
+    });
+  }
 });
 export const GenerateLessonsOutputSchema = z.object({
   module_title: z.string(),
@@ -419,7 +526,23 @@ export const CritiqueModuleOutputSchema = z.object({
 });
 export const RegenerateWithFixesOutputSchema = GenerateLessonsOutputSchema;
 
-const TextLessonContentSchema = z.object({ type: z.literal("text"), body_markdown: z.string(), estimated_read_minutes: z.number().optional() });
+const TextLessonContentSchema = z.object({
+  type: z.literal("text"),
+  body_markdown: z.string().optional(),
+  estimated_read_minutes: z.number().optional(),
+  blocks: ReadingBlocksSchema.optional(),
+}).superRefine((content, context) => {
+  const hasBody = typeof content.body_markdown === "string" && content.body_markdown.trim().length > 0;
+  const hasBlocks = content.blocks !== undefined && content.blocks.length > 0;
+
+  if (!hasBody && !hasBlocks) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "TextLessonContent requires body_markdown fallback or structured blocks.",
+      path: ["body_markdown"],
+    });
+  }
+});
 const ChecklistLessonContentSchema = z.object({ type: z.literal("checklist"), intro_markdown: z.string().optional(), items: z.array(z.object({ id: z.string(), label: z.string(), details_markdown: z.string().optional() })), require_all: z.boolean().optional() });
 const AcknowledgmentLessonContentSchema = z.object({ type: z.literal("acknowledgment"), statement_markdown: z.string(), required_signature: z.enum(["click", "name"]).optional(), policy_ref: z.string().optional() });
 const QuizLessonContentSchema = z.object({ type: z.literal("quiz"), questions: z.array(QuizQuestionSchema), passing_threshold: z.number().optional(), allow_retakes: z.boolean().optional() });
@@ -466,7 +589,7 @@ const OrderingLessonContentSchema = z.object({
   intro_markdown: z.string().optional(),
   steps: OrderingStepsSchema,
 });
-const LessonContentSchema = z.discriminatedUnion("type", [
+const LessonContentSchema = z.union([
   TextLessonContentSchema,
   ChecklistLessonContentSchema,
   AcknowledgmentLessonContentSchema,

@@ -13,7 +13,7 @@ const EXPECTED_PROMPT_VERSIONS = {
   source_analysis: 'v1',
   setup_question_inference: 'v1',
   outline_generation: 'v1',
-  'lesson_generation.text': 'v1',
+  'lesson_generation.text': 'v1.1',
   'lesson_generation.checklist': 'v1',
   'lesson_generation.scenario': 'v1',
   'lesson_generation.acknowledgment': 'v1',
@@ -66,6 +66,24 @@ describe('PROMPT_REGISTRY', () => {
 
   it('includes the video segment rule in the video script prompt', () => {
     expect(getPrompt('lesson_generation.video_script').system).toContain(VIDEO_SEGMENT_RULE)
+  })
+
+  it('requires text prompt v1.1 to include structured reading lesson requirements', () => {
+    const textPrompt = getPrompt('lesson_generation.text')
+
+    for (const requiredTerm of [
+      'reading_blocks',
+      'body_markdown',
+      'callout',
+      'policy_quote',
+      'inline_check',
+      'collapsible',
+      'config_block',
+      '8th-grade',
+      'reference',
+    ]) {
+      expect(textPrompt.system).toContain(requiredTerm)
+    }
   })
 
   it('requires video prompts to include transcript segment and checkpoint provenance contract', () => {

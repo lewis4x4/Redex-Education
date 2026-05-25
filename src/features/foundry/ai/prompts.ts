@@ -90,17 +90,22 @@ const PROMPT_HISTORY = {
     }),
   ],
   'lesson_generation.text': [
-    prompt('lesson_generation.text', 'v1', {
+    prompt('lesson_generation.text', 'v1.1', {
       description:
-        'Generate a source-grounded text lesson with structured blocks at approximately an 8th-grade reading level.',
+        'Generate a source-grounded reading lesson with structured reading_blocks plus legacy body_markdown fallback.',
       system: lessonSystem(
-        'Generate TextLessonContent using prose, callout, policy-quote, inline-check, collapsible, config-block, and image blocks only where useful. Maintain approximately an 8th-grade reading level without diluting cited Redex policy. Every load-bearing paragraph, answer, instruction, quote, and visual rationale must cite source sections.',
+        'Generate text lessons with reading_blocks and a flattened body_markdown fallback for rollback compatibility. Use the Slice 10.7 block taxonomy: prose, callout, policy_quote, inline_check, collapsible, config_block, and image. Maintain approximately an 8th-grade reading level without diluting cited Redex policy. Collapsible blocks must have intent=reference and must never hide required steps, obligations, or assessed content. Inline checks are non-graded practice only. Config blocks are plain copyable text/code; do not assume syntax highlighting. Use image blocks only when source image metadata exists; otherwise omit them or mark status=pending_ingest with required alt_text, caption, and text_equivalent_markdown. Every load-bearing paragraph, answer, instruction, quote, and visual rationale must cite source sections.',
       ),
       userTemplate: lessonTemplate,
       requiredVariables: lessonVariables,
       outputSchemaName: 'TextLessonContent',
       requiresCitations: true,
-      enforcedRules: ['Closed-content only', 'Approximately 8th-grade reading level'],
+      enforcedRules: [
+        'reading_blocks required when useful',
+        'body_markdown fallback required',
+        'Approximately 8th-grade reading level',
+        'Collapsibles are reference-only',
+      ],
     }),
   ],
   'lesson_generation.checklist': [

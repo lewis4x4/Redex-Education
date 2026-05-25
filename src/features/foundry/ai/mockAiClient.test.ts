@@ -113,6 +113,52 @@ describe('OrderingLessonContent AI schemas', () => {
   });
 });
 
+describe('Generated text lesson schema requirements', () => {
+  const baseGeneratedTextOutput = {
+    module_title: 'Text module',
+    lessons: [
+      {
+        lesson_index: 0,
+        module_index: 0,
+        title: 'Welcome',
+        lesson_type: 'text',
+        status: 'draft',
+      },
+    ],
+    generated_at: '2026-05-25T03:00:00.000Z',
+    is_complete: true,
+  };
+
+  it('rejects generated text lessons that include reading_blocks without body_markdown fallback', () => {
+    const parsed = GenerateLessonsOutputSchema.safeParse({
+      ...baseGeneratedTextOutput,
+      lessons: [
+        {
+          ...baseGeneratedTextOutput.lessons[0],
+          reading_blocks: [{ id: 'block-1', kind: 'prose', markdown: 'Welcome [source: section-1]' }],
+        },
+      ],
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
+  it('accepts generated text lessons with both body_markdown fallback and reading_blocks', () => {
+    const parsed = GenerateLessonsOutputSchema.safeParse({
+      ...baseGeneratedTextOutput,
+      lessons: [
+        {
+          ...baseGeneratedTextOutput.lessons[0],
+          body_markdown: 'Welcome [source: section-1]',
+          reading_blocks: [{ id: 'block-1', kind: 'prose', markdown: 'Welcome [source: section-1]' }],
+        },
+      ],
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+});
+
 describe('mockAiClient', () => {
   it('analyzes source input and validates the output shape', async () => {
     const output = await mockAiClient.analyzeSource({ sources: sourceWithPlaceholders });

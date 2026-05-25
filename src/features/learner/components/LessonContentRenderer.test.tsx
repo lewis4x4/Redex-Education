@@ -202,6 +202,326 @@ describe('LessonContentRenderer shared scaffold', () => {
     expect(screen.getByRole('heading', { name: 'Read the HR policy' })).toBeInTheDocument();
     expect(screen.getByText('4 min')).toBeInTheDocument();
     expect(screen.getByText(/What you'll be able to do:/i)).toBeInTheDocument();
+    expect(screen.getByText(/carefully/i)).toBeInTheDocument();
+  });
+});
+
+describe('LessonContentRenderer reading lessons', () => {
+  it('renders structured prose, callout, and policy quote blocks', () => {
+    render(
+      <LessonContentRenderer
+        lesson={makeAcknowledgmentLesson({
+          id: 'lesson-reading-v2',
+          title: 'Structured reading',
+          lesson_type: 'text',
+          content: {
+            type: 'text',
+            body_markdown: 'Fallback markdown remains available.',
+            blocks: [
+              {
+                id: 'prose-1',
+                kind: 'prose',
+                heading: 'Start here',
+                markdown: 'Read this **plain-language** explanation. [source: section-1]',
+              },
+              {
+                id: 'callout-1',
+                kind: 'callout',
+                tone: 'key_takeaway',
+                title: 'Remember this',
+                markdown: 'Escalate when blocked. [source: section-1]',
+              },
+              {
+                id: 'quote-1',
+                kind: 'policy_quote',
+                quote_markdown: 'Employees must follow approved escalation paths. [source: policy-1]',
+                attribution: 'HR Handbook',
+                policy_ref: 'HR-001',
+              },
+            ],
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId('reading-lesson-v2')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /start here/i })).toBeInTheDocument();
+    expect(screen.getByText(/plain-language/i)).toBeInTheDocument();
+    expect(screen.getByText('Key takeaway')).toBeInTheDocument();
+    expect(screen.getByText('Remember this')).toBeInTheDocument();
+    expect(screen.getByText('Policy quote')).toBeInTheDocument();
+    expect(screen.getByText('HR-001')).toBeInTheDocument();
+  });
+
+  it('keeps inline quick checks local and non-completing', async () => {
+    const user = userEvent.setup();
+    const onChecklistComplete = vi.fn();
+
+    render(
+      <LessonContentRenderer
+        lesson={makeAcknowledgmentLesson({
+          id: 'lesson-reading-check',
+          lesson_type: 'text',
+          content: {
+            type: 'text',
+            body_markdown: 'Fallback.',
+            blocks: [
+              {
+                id: 'check-1',
+                kind: 'inline_check',
+                prompt: 'What should you do when blocked?',
+                options: ['Escalate early', 'Wait silently'],
+                correct_option_index: 0,
+                feedback_correct_markdown: 'Correct — escalate early.',
+                feedback_incorrect_markdown: 'Not quite. Waiting silently delays help.',
+              },
+            ],
+          },
+        })}
+        onChecklistComplete={onChecklistComplete}
+      />,
+    );
+
+    const escalateButton = screen.getByRole('button', { name: /escalate early/i });
+    const waitButton = screen.getByRole('button', { name: /wait silently/i });
+
+    expect(escalateButton).toHaveAttribute('aria-pressed', 'false');
+    expect(waitButton).toHaveAttribute('aria-pressed', 'false');
+
+    await user.click(escalateButton);
+
+    expect(escalateButton).toHaveAttribute('aria-pressed', 'true');
+    expect(waitButton).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('status')).toHaveTextContent(/Correct/i);
+    expect(onChecklistComplete).not.toHaveBeenCalled();
+  });
+
+  it('resets local reading interactions when switching text lesson ids', async () => {
+    const user = userEvent.setup();
+    const firstLesson = makeAcknowledgmentLesson({
+      id: 'lesson-reading-check-1',
+      lesson_type: 'text',
+      content: {
+        type: 'text',
+        body_markdown: 'Fallback one.',
+        blocks: [
+          {
+            id: 'check-shared',
+            kind: 'inline_check',
+            prompt: 'First prompt',
+            options: ['First option', 'Second option'],
+            correct_option_index: 0,
+            feedback_correct_markdown: 'First feedback',
+          },
+        ],
+      },
+    });
+    const secondLesson = makeAcknowledgmentLesson({
+      id: 'lesson-reading-check-2',
+      lesson_type: 'text',
+      content: {
+        type: 'text',
+        body_markdown: 'Fallback two.',
+        blocks: [
+          {
+            id: 'check-shared',
+            kind: 'inline_check',
+            prompt: 'Second prompt',
+            options: ['First option', 'Second option'],
+            correct_option_index: 0,
+            feedback_correct_markdown: 'Second feedback should wait for a new click',
+          },
+        ],
+      },
+    });
+
+    const { rerender } = render(<LessonContentRenderer lesson={firstLesson} />);
+
+    await user.click(screen.getByRole('button', { name: /first option/i }));
+    expect(screen.getByText('First feedback')).toBeInTheDocument();
+
+    rerender(<LessonContentRenderer lesson={secondLesson} />);
+
+    expect(screen.getByText('Second prompt')).toBeInTheDocument();
+    expect(screen.queryByText(/Second feedback should wait/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('First feedback')).not.toBeInTheDocument();
+  });
+
+  it('renders reference-only collapsibles with accessible disclosure state', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <LessonContentRenderer
+        lesson={makeAcknowledgmentLesson({
+          id: 'lesson-reading-reference',
+          lesson_type: 'text',
+          content: {
+            type: 'text',
+            body_markdown: 'Fallback.',
+            blocks: [
+              {
+                id: 'reference-1',
+                kind: 'collapsible',
+                intent: 'reference',
+                title: 'Optional policy detail',
+                markdown: 'This reference detail is optional.',
+              },
+            ],
+          },
+        })}
+      />,
+    );
+
+    const toggle = screen.getByRole('button', { name: /optional policy detail/i });
+    const panelId = toggle.getAttribute('aria-controls');
+
+    expect(panelId).toBeTruthy();
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    const panel = document.getElementById(panelId!);
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveAttribute('hidden');
+
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(panel).not.toHaveAttribute('hidden');
+    expect(screen.getByText(/This reference detail is optional/i)).toBeInTheDocument();
+  });
+
+  it('renders copyable config blocks without requiring syntax-highlighting dependencies', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <LessonContentRenderer
+        lesson={makeAcknowledgmentLesson({
+          id: 'lesson-reading-config',
+          lesson_type: 'text',
+          content: {
+            type: 'text',
+            body_markdown: 'Fallback.',
+            blocks: [
+              {
+                id: 'config-1',
+                kind: 'config_block',
+                title: 'Example config',
+                description_markdown: 'Copy this only when directed.',
+                code: 'notify=true\nescalate_after=1d',
+                copy_label: 'Copy config',
+              },
+            ],
+          },
+        })}
+      />,
+    );
+
+    const markdownDescription = screen.getByText('Copy this only when directed.');
+    expect(markdownDescription.closest('.prose')?.className).toContain('prose-invert');
+
+    expect(screen.getByText((_, element) => element?.tagName === 'CODE' && element.textContent === 'notify=true\nescalate_after=1d')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /copy config/i }));
+    expect(screen.getByText(/Copy unavailable|Copied/i)).toBeInTheDocument();
+  });
+
+  it('renders pending image placeholders with text equivalents', () => {
+    render(
+      <LessonContentRenderer
+        lesson={makeAcknowledgmentLesson({
+          id: 'lesson-reading-image-pending',
+          lesson_type: 'text',
+          content: {
+            type: 'text',
+            body_markdown: 'Fallback.',
+            blocks: [
+              {
+                id: 'image-1',
+                kind: 'image',
+                image_ref: {
+                  alt_text: 'Benefits portal screenshot',
+                  caption: 'Benefits portal overview',
+                  status: 'pending_ingest',
+                },
+                text_equivalent_markdown: 'The screenshot will show where to find the benefits menu.',
+              },
+            ],
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Image pending ingest')).toBeInTheDocument();
+    expect(screen.getByText('Benefits portal overview')).toBeInTheDocument();
+    expect(screen.getByText(/benefits menu/i)).toBeInTheDocument();
+  });
+
+  it('renders ready image blocks lazily with alt text, caption, and text equivalent', () => {
+    render(
+      <LessonContentRenderer
+        lesson={makeAcknowledgmentLesson({
+          id: 'lesson-reading-image-ready',
+          lesson_type: 'text',
+          content: {
+            type: 'text',
+            body_markdown: 'Fallback.',
+            blocks: [
+              {
+                id: 'image-ready-1',
+                kind: 'image',
+                image_ref: {
+                  storage_url: 'https://example.com/storage/benefits.png',
+                  alt_text: 'Benefits portal screenshot',
+                  caption: 'Benefits portal overview',
+                  status: 'ready',
+                },
+                text_equivalent_markdown: 'The benefits menu appears in the left navigation.',
+              },
+            ],
+          },
+        })}
+      />,
+    );
+
+    const image = screen.getByAltText('Benefits portal screenshot');
+    expect(image).toHaveAttribute('loading', 'lazy');
+    expect(screen.getByText('Benefits portal overview')).toBeInTheDocument();
+    expect(screen.getByText(/left navigation/i)).toBeInTheDocument();
+  });
+
+  it('shows an amber unavailable panel when text content is empty', () => {
+    render(
+      <LessonContentRenderer
+        lesson={makeAcknowledgmentLesson({
+          id: 'lesson-reading-empty',
+          lesson_type: 'text',
+          content: {
+            type: 'text',
+            body_markdown: '   ',
+            blocks: [],
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Lesson content unavailable')).toBeInTheDocument();
+    expect(screen.getByText(/has no published content yet/i)).toBeInTheDocument();
+  });
+
+  it('degrades unknown reading block kinds without crashing the whole lesson', () => {
+    render(
+      <LessonContentRenderer
+        lesson={makeAcknowledgmentLesson({
+          id: 'lesson-reading-unknown-block',
+          lesson_type: 'text',
+          content: {
+            type: 'text',
+            body_markdown: 'Fallback.',
+            blocks: [{ id: 'future-1', kind: 'future_kind', markdown: 'Future content' } as never],
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText(/isn't supported in your current version/i)).toBeInTheDocument();
   });
 });
 

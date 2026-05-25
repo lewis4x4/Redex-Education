@@ -11,6 +11,35 @@ export const MOCK_GENERATED_MODULE: GeneratedModulePreview = {
       lesson_type: 'text',
       body_markdown:
         "Welcome to Redex. Your first week is about getting set up, meeting your support network, and learning where to find what you need. [source: section-welcome-to-redex] We don't expect memorization — we expect questions, notes, and early escalation when blocked. [source: section-welcome-to-redex]",
+      reading_blocks: [
+        {
+          id: 'reading-welcome-prose',
+          kind: 'prose',
+          heading: 'Your first week at Redex',
+          markdown:
+            'In week one, get set up. Meet your support network. Learn where to find help. [source: section-welcome-to-redex]',
+          source_section_ids: ['section-welcome-to-redex'],
+        },
+        {
+          id: 'reading-welcome-callout',
+          kind: 'callout',
+          tone: 'key_takeaway',
+          title: 'Ask early',
+          markdown:
+            'Ask questions early. Take notes. Escalate when blocked. [source: section-welcome-to-redex]',
+          source_section_ids: ['section-welcome-to-redex'],
+        },
+        {
+          id: 'reading-welcome-check',
+          kind: 'inline_check',
+          prompt: 'What should you do if you get blocked during onboarding?',
+          options: ['Ask questions and escalate early', 'Wait until the end of the week'],
+          correct_option_index: 0,
+          feedback_correct_markdown: 'Correct. Redex expects early escalation when you are blocked. [source: section-welcome-to-redex]',
+          feedback_incorrect_markdown: 'Try again. Waiting can slow setup; escalate early when blocked. [source: section-welcome-to-redex]',
+          source_section_ids: ['section-welcome-to-redex'],
+        },
+      ],
       status: 'ready_for_approval',
       source_refs: [{ drive_file_id: '1-3pY84GBgYxWi0C6Y_HVRE-l9R2l9is7', section_count: 1 }],
     },

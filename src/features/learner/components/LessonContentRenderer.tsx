@@ -1,6 +1,3 @@
-import ReactMarkdown from 'react-markdown';
-import rehypeSanitize from 'rehype-sanitize';
-
 import type {
   AcknowledgmentCompletion,
   ChecklistCompletion,
@@ -17,6 +14,7 @@ import { ChecklistLesson } from './lessons/ChecklistLesson';
 import { ScenarioLesson } from './lessons/ScenarioLesson';
 import { HotspotLesson } from './lessons/HotspotLesson';
 import { OrderingLesson } from './lessons/OrderingLesson';
+import { ReadingLesson } from './lessons/ReadingLesson';
 import { VideoLesson } from './lessons/VideoLesson';
 
 interface Props {
@@ -104,19 +102,12 @@ export function LessonContentRenderer({
         </LessonScaffold>
       );
 
-    case 'text': {
-      const markdownBody = content.body_markdown || 'Text lesson content would render here as rich markdown.';
-
+    case 'text':
       return (
         <LessonScaffold lesson={lesson} lessonNumber={lessonNumber} totalLessons={totalLessons} objective={objectiveForLesson(lesson)}>
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-            <div className="prose max-w-none text-slate-700">
-              <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{markdownBody}</ReactMarkdown>
-            </div>
-          </div>
+          <ReadingLesson key={lesson.id} content={content} />
         </LessonScaffold>
       );
-    }
 
     case 'quiz':
       return (

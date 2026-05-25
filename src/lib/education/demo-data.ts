@@ -294,6 +294,22 @@ export const DEMO_HR_BASICS_LESSONS: Lesson[] = [
       body_markdown:
         "Welcome to Redex. Your first week is about getting set up, meeting the people who support you, and learning where to find what you need. We don't expect memorization — we expect questions, notes, and early escalation when blocked.",
       estimated_read_minutes: 3,
+      blocks: [
+        {
+          id: 'hr-basics-reading-welcome-prose',
+          kind: 'prose',
+          heading: 'What week one is for',
+          markdown:
+            'Your first week is about getting set up, meeting the people who support you, and learning where to find what you need.',
+        },
+        {
+          id: 'hr-basics-reading-welcome-callout',
+          kind: 'callout',
+          tone: 'key_takeaway',
+          title: 'Ask early',
+          markdown: "We don't expect memorization — we expect questions, notes, and early escalation when blocked.",
+        },
+      ],
     },
   },
   {

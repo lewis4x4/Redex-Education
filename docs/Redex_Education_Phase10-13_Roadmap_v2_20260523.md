@@ -563,6 +563,11 @@ Extend `TextLessonContent` from a single `body_markdown` to a `blocks[]` model. 
 - Generated prose hits the target reading level (eval-checked).
 - Build Bible updated.
 
+### Implementation Notes (landed Slice 10.7)
+- Runtime `TextLessonContent` accepts `blocks[]` while preserving legacy `body_markdown` fallback.
+- Foundry generation emits `reading_blocks` plus `body_markdown`; `lesson_generation.text` is versioned `v1.1`.
+- The `image` reading block is a placeholder-compatible shape only. Drive image ingest, parse-source-file rewrites, and CSP changes remain Slice 10.8 work.
+
 ### Linear Ticket Title
 ```txt
 Lesson Engine: upgrade text lessons to structured reading experience

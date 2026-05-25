@@ -322,6 +322,43 @@ describe('Redex Academy learner module player', () => {
     expect(onProgressUpdate).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps structured text lessons manually completable and unlocked', async () => {
+    const user = userEvent.setup();
+    const onProgressUpdate = vi.fn();
+    const structuredTextLesson = makeLesson({
+      id: 'lesson-structured-text',
+      content: {
+        type: 'text',
+        body_markdown: 'Fallback body',
+        blocks: [
+          {
+            id: 'quick-check-1',
+            kind: 'inline_check',
+            prompt: 'Practice prompt',
+            options: ['One', 'Two'],
+            correct_option_index: 0,
+          },
+        ],
+      },
+    });
+
+    render(
+      <ModulePlayer
+        module={makeModule()}
+        lessons={[structuredTextLesson, makeLesson({ id: 'lesson-2', order_index: 1 })]}
+        onProgressUpdate={onProgressUpdate}
+      />,
+    );
+
+    expect(screen.queryByText(/complete above to continue/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /mark complete & continue/i })).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: /mark complete & continue/i }));
+
+    expect(onProgressUpdate).toHaveBeenCalledWith('lesson-structured-text', 'completed');
+    expect(screen.getByText('LESSON 2 OF 2')).toBeInTheDocument();
+  });
+
   it('fires onQuizAttempt and shows completion after a passing quiz', async () => {
     const user = userEvent.setup();
     const onProgressUpdate = vi.fn();

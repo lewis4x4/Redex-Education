@@ -105,6 +105,112 @@ const QuizQuestionSchema = z.object({
   correct_index: z.number().int().nonnegative().optional(),
 });
 
+const ReadingBlockBaseShape = {
+  id: nonEmptyTrimmedString,
+  source_section_ids: z.array(nonEmptyTrimmedString).optional(),
+};
+
+const ReadingProseBlockSchema = z.object({
+  ...ReadingBlockBaseShape,
+  kind: z.literal('prose'),
+  heading: z.string().optional(),
+  anchor_id: z.string().optional(),
+  markdown: nonEmptyTrimmedString,
+});
+
+const ReadingCalloutBlockSchema = z.object({
+  ...ReadingBlockBaseShape,
+  kind: z.literal('callout'),
+  tone: z.enum(['key_takeaway', 'note']),
+  title: z.string().optional(),
+  markdown: nonEmptyTrimmedString,
+});
+
+const ReadingPolicyQuoteBlockSchema = z.object({
+  ...ReadingBlockBaseShape,
+  kind: z.literal('policy_quote'),
+  quote_markdown: nonEmptyTrimmedString,
+  attribution: z.string().optional(),
+  policy_ref: z.string().optional(),
+});
+
+const ReadingInlineCheckBlockSchema = z.object({
+  ...ReadingBlockBaseShape,
+  kind: z.literal('inline_check'),
+  prompt: nonEmptyTrimmedString,
+  options: z.array(nonEmptyTrimmedString).min(2),
+  correct_option_index: z.number().int().nonnegative().optional(),
+  feedback_correct_markdown: z.string().optional(),
+  feedback_incorrect_markdown: z.string().optional(),
+  feedback_neutral_markdown: z.string().optional(),
+});
+
+const ReadingCollapsibleBlockSchema = z.object({
+  ...ReadingBlockBaseShape,
+  kind: z.literal('collapsible'),
+  intent: z.literal('reference'),
+  title: nonEmptyTrimmedString,
+  markdown: nonEmptyTrimmedString,
+  default_open: z.boolean().optional(),
+});
+
+const ReadingConfigBlockSchema = z.object({
+  ...ReadingBlockBaseShape,
+  kind: z.literal('config_block'),
+  title: z.string().optional(),
+  description_markdown: z.string().optional(),
+  code: nonEmptyTrimmedString,
+  copy_label: z.string().optional(),
+});
+
+const ReadingImageBlockSchema = z.object({
+  ...ReadingBlockBaseShape,
+  kind: z.literal('image'),
+  image_ref: z.object({
+    source_image_id: z.string().optional(),
+    storage_url: z.string().optional(),
+    alt_text: nonEmptyTrimmedString,
+    caption: nonEmptyTrimmedString,
+    status: z.enum(['pending_ingest', 'ready', 'failed']).optional(),
+  }),
+  text_equivalent_markdown: nonEmptyTrimmedString,
+});
+
+const ReadingLessonBlockSchema = z.discriminatedUnion('kind', [
+  ReadingProseBlockSchema,
+  ReadingCalloutBlockSchema,
+  ReadingPolicyQuoteBlockSchema,
+  ReadingInlineCheckBlockSchema,
+  ReadingCollapsibleBlockSchema,
+  ReadingConfigBlockSchema,
+  ReadingImageBlockSchema,
+]);
+
+const ReadingBlocksSchema = z.array(ReadingLessonBlockSchema).min(1).superRefine((blocks, context) => {
+  const seenBlockIds = new Set<string>();
+
+  blocks.forEach((block, index) => {
+    if (seenBlockIds.has(block.id)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Reading block ids must be unique.',
+        path: [index, 'id'],
+      });
+      return;
+    }
+
+    seenBlockIds.add(block.id);
+
+    if (block.kind === 'inline_check' && block.correct_option_index !== undefined && block.correct_option_index >= block.options.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'inline_check correct_option_index must reference an option.',
+        path: [index, 'correct_option_index'],
+      });
+    }
+  });
+});
+
 const VideoDownloadSchema = z.object({
   url: z.string(),
   label: z.string().optional(),
@@ -160,6 +266,7 @@ const GeneratedLessonContentSchema = z.object({
   title: z.string(),
   lesson_type: LessonTypeSchema,
   body_markdown: z.string().optional(),
+  reading_blocks: ReadingBlocksSchema.optional(),
   quiz_questions: z.array(QuizQuestionSchema).optional(),
   acknowledgment_text: z.string().optional(),
   ordering_steps: OrderingStepsSchema.optional(),
@@ -199,6 +306,16 @@ const GeneratedLessonContentSchema = z.object({
       code: z.ZodIssueCode.custom,
       message: 'drag_to_order generated lessons require valid ordering_steps.',
       path: ['ordering_steps'],
+    });
+  }
+
+  const hasTextBody = typeof lesson.body_markdown === 'string' && lesson.body_markdown.trim().length > 0;
+
+  if (lesson.lesson_type === 'text' && lesson.status !== 'missing_source' && !hasTextBody) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'text generated lessons require non-empty body_markdown fallback.',
+      path: ['body_markdown'],
     });
   }
 });
@@ -266,8 +383,20 @@ export const RegenerateWithFixesOutputSchema = GenerateLessonsOutputSchema satis
 
 const TextLessonContentSchema = z.object({
   type: z.literal('text'),
-  body_markdown: z.string(),
+  body_markdown: z.string().optional(),
   estimated_read_minutes: z.number().optional(),
+  blocks: ReadingBlocksSchema.optional(),
+}).superRefine((content, context) => {
+  const hasBody = typeof content.body_markdown === 'string' && content.body_markdown.trim().length > 0;
+  const hasBlocks = content.blocks !== undefined && content.blocks.length > 0;
+
+  if (!hasBody && !hasBlocks) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'TextLessonContent requires body_markdown fallback or structured blocks.',
+      path: ['body_markdown'],
+    });
+  }
 });
 const ChecklistLessonContentSchema = z.object({
   type: z.literal('checklist'),
@@ -379,7 +508,7 @@ const OrderingLessonContentSchema = z.object({
   steps: OrderingStepsSchema,
 });
 
-const LessonContentSchema = z.discriminatedUnion('type', [
+const LessonContentSchema = z.union([
   TextLessonContentSchema,
   ChecklistLessonContentSchema,
   AcknowledgmentLessonContentSchema,
