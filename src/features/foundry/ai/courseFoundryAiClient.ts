@@ -1,4 +1,5 @@
 import type {
+  CanonicalAudience,
   CourseOutlineDraft,
   GeneratedModulePreview,
   Lesson,
@@ -25,6 +26,36 @@ export interface AnalyzeSourceOutput {
 export interface LearningOutcomeInput {
   id: string;
   text: string;
+}
+
+export interface BrainstormSourcePacketInput {
+  topic: string;
+  audience_hint?: CanonicalAudience;
+}
+
+export interface BrainstormedDocument {
+  filename: string;
+  title: string;
+  authority: 'context';
+  authority_provenance: 'brainstormed';
+  status: 'draft_for_review';
+  body_markdown: string;
+  notes_for_admin?: string;
+}
+
+export interface BrainstormedPacket {
+  suggested_module_slug: string;
+  suggested_module_title: string;
+  summary: string;
+  library_topic_slug: string;
+  module_folder_slug: string;
+  estimated_cost_cents: number;
+  documents: BrainstormedDocument[];
+  manifest_markdown: string;
+  unresolved_questions: string[];
+  sme_review_checklist: string[];
+  module_basics: ModuleBasicsDraft;
+  setup_answers: Omit<SetupAnswers, 'updated_at'>;
 }
 
 export interface GenerateOutlineInput {
@@ -92,6 +123,7 @@ export interface RegenerateSectionOutput {
  *     any provider key client-side.
  */
 export interface CourseFoundryAiClient {
+  brainstormSourcePacket(input: BrainstormSourcePacketInput): Promise<BrainstormedPacket>;
   analyzeSource(input: AnalyzeSourceInput): Promise<AnalyzeSourceOutput>;
   generateOutline(input: GenerateOutlineInput): Promise<GenerateOutlineOutput>;
   generateLessons(input: GenerateLessonsInput): Promise<GenerateLessonsOutput>;

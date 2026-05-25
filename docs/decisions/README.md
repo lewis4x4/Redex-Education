@@ -25,6 +25,8 @@ Architecture Decision Records capture the **why** behind significant choices. Ea
 | [017](./017-redex-schema-isolation.md) | Redex schema isolation (`redex` Postgres schema) | Accepted | Slice 8.5 |
 | [018](./018-phase3-4-backend-governance-boundaries.md) | Phase 3/4 backend governance boundaries (lease/retry, enqueue, profile-first role authority, source binding replacement) | Accepted | Phase 3+4 |
 | [019](./019-phase5-ci-governance-gates.md) | Phase 5 CI governance gates (prod guard + edge coverage + RLS smoke harness) | Accepted | Phase 5 |
+| [020](./020-automated-module-packet-intake-proposals.md) | Automated module packet intake uses proposals, not auto-promotion | Accepted | Option B |
+| [021](./021-drive-intake-trigger-model.md) | Drive intake trigger model: queued polling first, push notifications deferred | Accepted | Option B |
 | [000](./000-template.md) | ADR template | Template | N/A |
 
 ## How to add a new ADR

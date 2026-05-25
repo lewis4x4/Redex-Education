@@ -15,6 +15,7 @@ import { fetchSourceFiles, fetchSourceFileVersions, fetchSourceSections } from '
 import { formatAudienceForAi } from '@/features/foundry/lib/audienceFormat';
 import type {
   AnalyzeSourceOutput,
+  BrainstormedPacket,
   CourseFoundryAiClient,
   CritiqueModuleOutput,
   GenerateAssessmentOutput,
@@ -399,6 +400,10 @@ async function submitGenerationJob<T>({
 }
 
 export const realAiClient: CourseFoundryAiClient = {
+  brainstormSourcePacket(): Promise<BrainstormedPacket> {
+    return Promise.reject(new Error('Real module packet brainstorming is not deployed yet. Use mock mode or the future packet-intake edge function.'));
+  },
+
   analyzeSource(input): Promise<AnalyzeSourceOutput> {
     return submitGenerationJob({
       operation: 'analyzeSource',

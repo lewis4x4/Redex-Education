@@ -930,6 +930,7 @@ export interface SourceSection {
 }
 
 export type SourceAuthorityLevel = 'authoritative' | 'supporting' | 'context';
+export type SourceAuthorityProvenance = 'brainstormed' | 'human_authored' | 'imported';
 
 export interface SourceFile {
   id: UUID;
@@ -938,6 +939,8 @@ export interface SourceFile {
   title: string;
   mime_type: string;
   authority: SourceAuthorityLevel;
+  /** Whether the source was imported, human-authored, or brainstormed by AI. */
+  authority_provenance?: SourceAuthorityProvenance;
   /** How the authority value was resolved at ingest time. */
   authority_source: 'frontmatter' | 'meta_md' | 'default';
   topic?: string;
@@ -989,6 +992,7 @@ export interface ModuleSourceBinding {
  * Publish-state lifecycle for a module version (Slice 7.2 — module versioning).
  */
 export type FoundryDraftStage =
+  | 'topic'
   | 'basics'
   | 'source'
   | 'questions'

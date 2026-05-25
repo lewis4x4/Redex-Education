@@ -1,6 +1,7 @@
 import { useLocation } from 'react-router-dom'
 
 import type { FoundryDraftStage } from '@/lib/education'
+import { isFoundryTopicEntryEnabled } from '@/features/foundry/lib/featureFlags'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
 
 type StepStatus = 'current' | 'completed' | 'upcoming' | 'failed'
@@ -10,7 +11,7 @@ type StepDefinition = {
   label: string
 }
 
-const STEPS: StepDefinition[] = [
+const BASE_STEPS: StepDefinition[] = [
   { key: 'basics', label: 'Basics' },
   { key: 'source', label: 'Source' },
   { key: 'questions', label: 'Questions' },
@@ -22,6 +23,7 @@ const STEPS: StepDefinition[] = [
 ]
 
 const ROUTE_TO_STAGE: Record<string, FoundryDraftStage> = {
+  '/admin/foundry/topic': 'topic',
   '/admin/foundry/start': 'basics',
   '/admin/foundry/source': 'source',
   '/admin/foundry/library': 'source',
@@ -38,9 +40,14 @@ function stageFromRoute(pathname: string): FoundryDraftStage {
   return ROUTE_TO_STAGE[pathname] ?? 'basics'
 }
 
-function statusForStep(step: StepDefinition, currentStage: FoundryDraftStage, hasPublishBlockers: boolean): StepStatus {
-  const currentIndex = STEPS.findIndex((item) => item.key === currentStage)
-  const stepIndex = STEPS.findIndex((item) => item.key === step.key)
+function statusForStep(
+  steps: StepDefinition[],
+  step: StepDefinition,
+  currentStage: FoundryDraftStage,
+  hasPublishBlockers: boolean,
+): StepStatus {
+  const currentIndex = steps.findIndex((item) => item.key === currentStage)
+  const stepIndex = steps.findIndex((item) => item.key === step.key)
 
   if (step.key === 'published' && currentStage === 'published' && hasPublishBlockers) {
     return 'failed'
@@ -73,14 +80,15 @@ export function FoundryStepper() {
   const getPublishBlockers = useFoundryDraftStore((state) => state.getPublishBlockers)
 
   const routeStage = stageFromRoute(location.pathname)
-  const currentStage = metadataStage ?? routeStage
+  const steps = isFoundryTopicEntryEnabled() ? [{ key: 'topic' as const, label: 'Packet' }, ...BASE_STEPS] : BASE_STEPS
+  const currentStage = metadataStage === 'topic' && !isFoundryTopicEntryEnabled() ? routeStage : metadataStage ?? routeStage
   const hasPublishBlockers = getPublishBlockers().length > 0
 
   return (
     <nav aria-label="Foundry progress" role="navigation" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <ol className="flex flex-wrap items-center gap-3">
-        {STEPS.map((step) => {
-          const status = statusForStep(step, currentStage, hasPublishBlockers)
+        {steps.map((step) => {
+          const status = statusForStep(steps, step, currentStage, hasPublishBlockers)
           const isCurrent = status === 'current'
 
           return (

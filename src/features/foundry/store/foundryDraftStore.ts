@@ -22,6 +22,7 @@ import { inferModuleState } from '@/features/publishing/lib/moduleStates';
 import { useModuleVersionsStore } from '@/features/publishing/store/moduleVersionsStore';
 import { usePublishedModulesStore } from '@/features/publishing/store/publishedModulesStore';
 import type { SetupAnswersInput } from '../schemas/foundrySchemas';
+import type { BrainstormedPacket } from '@/features/foundry/ai/courseFoundryAiClient';
 import type { ModuleBasicsDraft, ModuleBasicsFormValues } from '../types';
 import type { AuditLog, FoundryDraftMetadata, LearningOutcome, ModuleVersion, UUID } from '@/lib/education';
 
@@ -314,6 +315,30 @@ function hydrateFromDraftMetadata(snapshot: DraftMetadataSnapshot, item: Foundry
 
 export type FoundryPublishStatus = 'draft' | 'ready_to_publish' | 'published';
 
+export type PacketDraftStatus = 'drafting' | 'reviewing' | 'accepted' | 'discarded' | 'failed';
+
+export interface PacketDraftIntakeStatus {
+  status: 'queued' | 'uploading_to_drive' | 'drive_uploaded' | 'registering' | 'registered' | 'upload_failed' | 'registration_failed' | 'sync_failed';
+  proposal_id: string;
+  job_id: string;
+  proposal_status: string;
+  job_status: string;
+  last_error_message?: string;
+  drive_folder_id?: string;
+  library_drive_folder_id?: string;
+  module_drive_folder_id?: string;
+  manifest_drive_file_id?: string;
+  files?: Array<{ filename?: string; drive_file_id?: string }>;
+}
+
+export interface PacketDraftState {
+  topic: string;
+  status: PacketDraftStatus;
+  packet?: BrainstormedPacket;
+  last_error_message?: string;
+  intake_status?: PacketDraftIntakeStatus;
+}
+
 const resetPublishState = {
   publishStatus: 'draft' as FoundryPublishStatus,
   publishedAt: null,
@@ -324,6 +349,10 @@ interface FoundryDraftState {
   currentDraft: ModuleBasicsDraft | null;
   /** Last async Supabase write failure; mock mode never sets this. */
   lastWriteError: WriteError | null;
+  /** Topic-to-packet proposal state for automated module intake. */
+  packetDraft: PacketDraftState | null;
+  setPacketDraft: (packetDraft: PacketDraftState | null) => void;
+  clearPacketDraft: () => void;
   clearLastWriteError: () => void;
   persistDraftStage: (stage: FoundryDraftStage, actor?: ActorInfo) => Promise<ModuleVersion | null>;
   /** Save form values as the draft (sets updated_at) */
@@ -417,6 +446,9 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
     (set, get) => ({
       currentDraft: null,
       lastWriteError: null,
+      packetDraft: null,
+      setPacketDraft: (packetDraft) => set({ packetDraft }),
+      clearPacketDraft: () => set({ packetDraft: null }),
       clearLastWriteError: () => set({ lastWriteError: null }),
       persistDraftStage: async (stage, actor) => {
         if (!shouldPersistToSupabase()) {
@@ -540,11 +572,12 @@ export const useFoundryDraftStore = create<FoundryDraftState>()(
           }, actor);
         }
       },
-      clearDraft: () => set({ currentDraft: null, lastWriteError: null, ...resetPublishState }),
+        clearDraft: () => set({ currentDraft: null, packetDraft: null, lastWriteError: null, ...resetPublishState }),
       resetPublishStatus: () => set(resetPublishState),
       resetFoundryDraft: () =>
         set({
           currentDraft: null,
+          packetDraft: null,
           lastWriteError: null,
           sourceMaterial: null,
           setupAnswers: null,

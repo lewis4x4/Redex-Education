@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import type {
   AnalyzeSourceOutput,
+  BrainstormedPacket,
   CritiqueModuleOutput,
   GenerateAssessmentOutput,
   GenerateLessonsOutput,
@@ -45,6 +46,10 @@ const CritiqueIssueCategorySchema = z.enum([
   'needs_admin_approval',
 ]);
 
+const nonEmptyTrimmedString = z.string().trim().min(1);
+const safeSlugString = z.string().trim().regex(/^[a-z0-9][a-z0-9-]*$/u, 'Use lowercase kebab-case with no path separators.');
+const safeMarkdownFilename = z.string().trim().regex(/^[a-z0-9][a-z0-9_-]*\.md$/u, 'Use a safe lowercase markdown filename.');
+
 export const AnalyzeSourceOutputSchema = z.object({
   topic: z.string(),
   authority: z.enum(['authoritative', 'supporting', 'context']),
@@ -52,6 +57,81 @@ export const AnalyzeSourceOutputSchema = z.object({
   has_placeholders: z.boolean(),
   missing_required_topics: z.array(z.string()),
 }) satisfies z.ZodType<AnalyzeSourceOutput>;
+
+const PacketLearningOutcomeSchema = z.object({
+  id: nonEmptyTrimmedString,
+  text: z.string().trim().min(8).max(180),
+});
+
+export const BrainstormedPacketSchema = z.object({
+  suggested_module_slug: safeSlugString,
+  suggested_module_title: nonEmptyTrimmedString,
+  summary: nonEmptyTrimmedString,
+  library_topic_slug: safeSlugString,
+  module_folder_slug: safeSlugString,
+  estimated_cost_cents: z.number().int().nonnegative(),
+  documents: z.array(z.object({
+    filename: safeMarkdownFilename,
+    title: nonEmptyTrimmedString,
+    authority: z.literal('context'),
+    authority_provenance: z.literal('brainstormed'),
+    status: z.literal('draft_for_review'),
+    body_markdown: nonEmptyTrimmedString,
+    notes_for_admin: z.string().optional(),
+  })).min(3).max(6),
+  manifest_markdown: nonEmptyTrimmedString,
+  unresolved_questions: z.array(z.string()),
+  sme_review_checklist: z.array(z.string()).min(1),
+  module_basics: z.object({
+    id: z.string().optional(),
+    module_id: z.string().optional(),
+    version_number: z.number().optional(),
+    source_binder_version: z.string().optional(),
+    assessment_version: z.string().optional(),
+    persisted_course_id: z.string().optional(),
+    persisted_module_id: z.string().optional(),
+    title: nonEmptyTrimmedString,
+    parent_course_id: nonEmptyTrimmedString,
+    audience_archetype: z.enum([
+      'new_hire',
+      'all_employees',
+      'field_team',
+      'managers',
+      'customer_support',
+      'sales',
+      'operations',
+      'compliance_officers',
+      'foundry_authors',
+      'leadership',
+    ]).optional(),
+    audience_refinement: z.string().optional(),
+    completion_required: z.enum(['required', 'recommended', 'optional']).optional(),
+    training_type: z.enum([
+      'hr',
+      'operational',
+      'safety',
+      'compliance',
+      'customer_specific',
+      'role_specific',
+      'general_informational',
+    ]),
+    learning_outcomes: z.array(PacketLearningOutcomeSchema).optional(),
+    audience: z.string().optional(),
+    criticality: z.enum(['required', 'optional']).optional(),
+    estimated_minutes: z.number().int().min(5).max(300),
+    updated_at: nonEmptyTrimmedString,
+  }),
+  setup_answers: z.object({
+    criticality: z.enum(['informational', 'basic_knowledge', 'operational', 'compliance_high_risk']),
+    assessment_style: z.enum(['no_assessment', 'light_quiz', 'standard_quiz', 'strict_quiz', 'scenario_based', 'acknowledgment_only']),
+    audience_notes: nonEmptyTrimmedString,
+    experience_notes: z.string(),
+    estimated_minutes: z.number().int().min(5).max(300),
+    source_control: z.enum(['strict', 'flexible']),
+    requires_admin_approval: z.boolean(),
+    requires_safety_review: z.boolean(),
+  }),
+}) satisfies z.ZodType<BrainstormedPacket>;
 
 const CourseOutlineLessonSchema = z.object({
   title: z.string(),
@@ -71,8 +151,6 @@ export const GenerateOutlineOutputSchema = z.object({
   modules: z.array(CourseOutlineModuleSchema),
   missing_source_notes: z.array(z.string()).optional(),
 }) satisfies z.ZodType<GenerateOutlineOutput>;
-
-const nonEmptyTrimmedString = z.string().trim().min(1);
 
 const OrderingStepSchema = z.object({
   id: nonEmptyTrimmedString,

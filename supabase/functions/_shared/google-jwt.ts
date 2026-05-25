@@ -1,4 +1,5 @@
-const DRIVE_READONLY_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
+export const DRIVE_READONLY_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
+export const DRIVE_FILE_WRITE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const TOKEN_AUDIENCE = "https://oauth2.googleapis.com/token";
 const JWT_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:jwt-bearer";
 const TOKEN_CACHE_TTL_MS = 50 * 60 * 1000;
@@ -108,12 +109,13 @@ async function importPrivateKey(privateKeyPem: string): Promise<CryptoKey> {
 
 async function signJwtAssertion(
   serviceAccount: Required<GoogleServiceAccount>,
+  scope: string,
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: "RS256", typ: "JWT" };
   const payload = {
     iss: serviceAccount.client_email,
-    scope: DRIVE_READONLY_SCOPE,
+    scope,
     aud: TOKEN_AUDIENCE,
     exp: now + 3600,
     iat: now,
@@ -131,21 +133,39 @@ async function signJwtAssertion(
   return `${unsignedJwt}.${bytesToBase64Url(new Uint8Array(signature))}`;
 }
 
+export interface DriveAccessTokenOptions {
+  /** OAuth scopes to request. Defaults to the existing readonly Drive sync scope. */
+  scopes?: string | string[];
+}
+
+function normalizeScopes(scopes: string | string[] | undefined): string {
+  if (Array.isArray(scopes)) {
+    return scopes.map((scope) => scope.trim()).filter(Boolean).join(" ");
+  }
+
+  return scopes?.trim() || DRIVE_READONLY_SCOPE;
+}
+
 /**
  * Returns a Google Drive OAuth access token for the configured service account.
  *
  * Supabase Edge Functions run on Deno, so this intentionally avoids Google SDKs:
  * PKCS8 PEM -> WebCrypto importKey -> RS256 JWT signature -> OAuth token exchange.
+ * Existing callers get the readonly scope by default; write paths must opt in.
  */
-export async function getDriveAccessToken(): Promise<string> {
+export async function getDriveAccessToken(
+  options: DriveAccessTokenOptions = {},
+): Promise<string> {
   const serviceAccount = getServiceAccount();
-  const cached = tokenCache.get(serviceAccount.client_email);
+  const scope = normalizeScopes(options.scopes);
+  const cacheKey = `${serviceAccount.client_email}:${scope}`;
+  const cached = tokenCache.get(cacheKey);
 
   if (cached && cached.expiresAtMs > Date.now()) {
     return cached.accessToken;
   }
 
-  const assertion = await signJwtAssertion(serviceAccount);
+  const assertion = await signJwtAssertion(serviceAccount, scope);
   const response = await fetch(TOKEN_AUDIENCE, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -170,7 +190,7 @@ export async function getDriveAccessToken(): Promise<string> {
     );
   }
 
-  tokenCache.set(serviceAccount.client_email, {
+  tokenCache.set(cacheKey, {
     accessToken: tokenBody.access_token,
     expiresAtMs: Date.now() + TOKEN_CACHE_TTL_MS,
   });

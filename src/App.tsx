@@ -9,6 +9,7 @@ import { RouteLoadingFallback } from '@/components/layout/RouteLoadingFallback'
 import { LearnerWelcomePage } from '@/features/learner/pages/LearnerWelcomePage'
 import { useAssignmentStore } from '@/features/assignments/store/assignmentStore'
 import { useAssessmentAttemptStore } from '@/features/progress/store/assessmentAttemptStore'
+import { isFoundryTopicEntryEnabled } from '@/features/foundry/lib/featureFlags'
 import { useAuth } from '@/hooks/useAuth'
 import { useEducation } from '@/hooks/useEducation'
 import { useProfile } from '@/hooks/useProfile'
@@ -69,6 +70,10 @@ const SourceImpactReviewPage = lazy(() =>
 
 const FoundryStartPage = lazy(() =>
   import('@/features/foundry/pages/FoundryStartPage').then((m) => ({ default: m.FoundryStartPage })),
+)
+
+const TopicEntryPage = lazy(() =>
+  import('@/features/foundry/pages/TopicEntryPage').then((m) => ({ default: m.TopicEntryPage })),
 )
 
 const FoundryQuestionsPage = lazy(() =>
@@ -345,6 +350,22 @@ function AuthCallbackRoute() {
   )
 }
 
+function TopicEntryRoute() {
+  if (!isFoundryTopicEntryEnabled()) {
+    return <NotFoundRoute />
+  }
+
+  return (
+    <AppShell breadcrumb="Foundry › New module packet">
+      <AuthGate requiredRole={['admin', 'foundry_author']}>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <TopicEntryPage />
+        </Suspense>
+      </AuthGate>
+    </AppShell>
+  )
+}
+
 function FoundryStartRoute() {
   return (
     <AppShell breadcrumb="Foundry › New module">
@@ -517,6 +538,7 @@ export default function App() {
       <Route path="/admin/source-impact" element={<SourceImpactReviewRoute />} />
       <Route path="/admin/modules/:moduleId/versions" element={<ModuleVersionHistoryRoute />} />
       <Route path="/manager" element={<ManagerRoute />} />
+      <Route path="/admin/foundry/topic" element={<TopicEntryRoute />} />
       <Route path="/admin/foundry/start" element={<FoundryStartRoute />} />
       <Route path="/admin/foundry/source" element={<FoundrySourceRoute />} />
       <Route path="/admin/foundry/questions" element={<FoundryQuestionsRoute />} />

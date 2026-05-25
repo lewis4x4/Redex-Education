@@ -59,10 +59,10 @@ jobs:
           fi
 
       - name: Deno edge checks
-        run: deno check supabase/functions/_shared/sourceBindingsWriter.ts supabase/functions/_shared/courseFoundryAiClientServer.ts supabase/functions/generation-worker/index.ts supabase/functions/submit-generation-job/index.ts supabase/functions/drive-sync/index.ts
+        run: deno check supabase/functions/_shared/sourceBindingsWriter.ts supabase/functions/_shared/courseFoundryAiClientServer.ts supabase/functions/_shared/driveWrite.ts supabase/functions/generation-worker/index.ts supabase/functions/submit-generation-job/index.ts supabase/functions/drive-sync/index.ts supabase/functions/submit-module-intake-proposal/index.ts supabase/functions/process-drive-sync-jobs/index.ts
 
       - name: Deno edge tests
-        run: deno test --allow-env --allow-net=esm.sh --allow-read=supabase/functions supabase/functions/_shared/courseFoundryAiClientServer.test.ts supabase/functions/_shared/sourceBindingsWriter.test.ts supabase/functions/generation-worker/index.test.ts supabase/functions/submit-generation-job/index.test.ts supabase/functions/drive-sync/index.test.ts
+        run: npm run test:edge
 
       - name: RLS smoke harness
         run: npm run rls:smoke

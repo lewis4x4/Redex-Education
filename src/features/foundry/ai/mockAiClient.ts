@@ -13,6 +13,7 @@ import type {
 
 import {
   AnalyzeSourceOutputSchema,
+  BrainstormedPacketSchema,
   CritiqueModuleOutputSchema,
   GenerateAssessmentOutputSchema,
   GenerateLessonsOutputSchema,
@@ -21,7 +22,7 @@ import {
   RegenerateWithFixesOutputSchema,
   validateAiOutput,
 } from './aiSchemas';
-import type { AnalyzeSourceInput, CourseFoundryAiClient } from './courseFoundryAiClient';
+import type { AnalyzeSourceInput, BrainstormSourcePacketInput, CourseFoundryAiClient } from './courseFoundryAiClient';
 
 function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -29,6 +30,102 @@ function cloneJson<T>(value: T): T {
 
 function isSourceFileList(sources: AnalyzeSourceInput['sources']): sources is SourceFile[] {
   return Array.isArray(sources);
+}
+
+function slugifyPacketValue(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'untitled-module';
+}
+
+function titleCasePacketValue(value: string): string {
+  return value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ') || 'Untitled Module';
+}
+
+function mockBrainstormedPacket(input: BrainstormSourcePacketInput) {
+  const topicTitle = titleCasePacketValue(input.topic);
+  const topicSlug = slugifyPacketValue(input.topic);
+  const now = new Date().toISOString();
+  const filenamePrefix = `redexacademy_${topicSlug.replace(/-/g, '_')}`;
+
+  return {
+    suggested_module_slug: topicSlug,
+    suggested_module_title: topicTitle,
+    summary: `${topicTitle} is a brainstormed starter packet. Treat it as context until an SME reviews the technical claims.`,
+    library_topic_slug: topicSlug,
+    module_folder_slug: `operations-${topicSlug}`,
+    estimated_cost_cents: 18,
+    documents: [
+      {
+        filename: `${filenamePrefix}_reference_brief_v1.md`,
+        title: `${topicTitle} Reference Brief`,
+        authority: 'context' as const,
+        authority_provenance: 'brainstormed' as const,
+        status: 'draft_for_review' as const,
+        body_markdown: `---\ntitle: ${topicTitle} Reference Brief\nauthority: context\nauthority_provenance: brainstormed\nstatus: draft_for_review\n---\n\n# ${topicTitle} Reference Brief\n\nThis draft captures the core concepts the module may need to teach. Replace or promote it only after Redex SME review.\n\n## Key concepts\n\n- Define the terms and tools involved in ${topicTitle}.\n- Identify safety or quality checks that should be verified by a lead.\n- List external standards or manufacturer documents that should become authoritative sources.`,
+        notes_for_admin: 'Starter reference only; review against authoritative Redex and vendor sources.',
+      },
+      {
+        filename: `${filenamePrefix}_module_build_plan_v1.md`,
+        title: `${topicTitle} Module Build Plan`,
+        authority: 'context' as const,
+        authority_provenance: 'brainstormed' as const,
+        status: 'draft_for_review' as const,
+        body_markdown: `---\ntitle: ${topicTitle} Module Build Plan\nauthority: context\nauthority_provenance: brainstormed\nstatus: draft_for_review\n---\n\n# ${topicTitle} Module Build Plan\n\n## Audience\n\n${input.audience_hint ?? 'field_team'} learners who need a concise Redex-ready module.\n\n## Proposed lesson outline\n\n1. Why this topic matters at Redex.\n2. Tools, terminology, and safety checks.\n3. Procedure or decision flow.\n4. Practical verification and review.`,
+        notes_for_admin: 'Use this to shape the module; do not treat it as technical authority.',
+      },
+      {
+        filename: `${filenamePrefix}_sme_review_checklist_v1.md`,
+        title: `${topicTitle} SME Review Checklist`,
+        authority: 'context' as const,
+        authority_provenance: 'brainstormed' as const,
+        status: 'draft_for_review' as const,
+        body_markdown: `---\ntitle: ${topicTitle} SME Review Checklist\nauthority: context\nauthority_provenance: brainstormed\nstatus: draft_for_review\n---\n\n# ${topicTitle} SME Review Checklist\n\n- Confirm every procedure step is Redex-approved.\n- Replace generic wording with Redex-specific practice.\n- Add authoritative docs, photos, diagrams, or field examples.\n- Identify anything that requires safety, compliance, or manager sign-off.`,
+        notes_for_admin: 'Checklist for promotion from brainstormed context to reviewed source.',
+      },
+    ],
+    manifest_markdown: `---\nmodule_slug: ${topicSlug}\nmodule_title: ${topicTitle}\nauthority: context\nauthority_provenance: brainstormed\nstatus: draft_for_review\n---\n\n# ${topicTitle}\n\nThis manifest is advisory. Supabase remains the system of record and Drive IDs are filled by the Redex intake backend after upload.\n\n- filename_ref: ${filenamePrefix}_reference_brief_v1.md note: brainstormed context source\n- filename_ref: ${filenamePrefix}_module_build_plan_v1.md note: module planning context\n- filename_ref: ${filenamePrefix}_sme_review_checklist_v1.md note: SME review checklist\n`,
+    unresolved_questions: [
+      'Which Redex SME must approve the final technical source?',
+      'Which Redex SOP, vendor document, photo, or diagram should replace this brainstormed context?',
+    ],
+    sme_review_checklist: [
+      'Confirm no brainstormed claim is promoted without a reviewed source.',
+      'Mark authoritative materials explicitly before generation.',
+      'Confirm whether the module requires safety review or practical sign-off.',
+    ],
+    module_basics: {
+      title: topicTitle,
+      parent_course_id: 'standalone',
+      audience_archetype: input.audience_hint ?? 'field_team',
+      audience_refinement: 'Generated from automated packet intake; confirm before generation.',
+      completion_required: 'required' as const,
+      training_type: 'operational' as const,
+      learning_outcomes: [
+        { id: `${topicSlug}-outcome-1`, text: `Explain the purpose and Redex relevance of ${topicTitle}.` },
+        { id: `${topicSlug}-outcome-2`, text: `Identify the reviewed source material required before publishing ${topicTitle}.` },
+      ],
+      estimated_minutes: 15,
+      updated_at: now,
+    },
+    setup_answers: {
+      criticality: 'operational' as const,
+      assessment_style: 'standard_quiz' as const,
+      audience_notes: `Primary audience: ${input.audience_hint ?? 'field_team'}. Confirm exact role scope before generation.`,
+      experience_notes: 'Use Redex-specific examples once authoritative source material is attached.',
+      estimated_minutes: 15,
+      source_control: 'strict' as const,
+      requires_admin_approval: true,
+      requires_safety_review: true,
+    },
+  };
 }
 
 function analyzeSourceInput(input: AnalyzeSourceInput) {
@@ -199,6 +296,10 @@ export const mockLessonSourceBindings = MOCK_LESSON_SOURCE_BINDINGS;
 export const mockInitialLessonReviews = MOCK_LESSON_REVIEWS;
 
 export const mockAiClient: CourseFoundryAiClient = {
+  async brainstormSourcePacket(input) {
+    return validateAiOutput(BrainstormedPacketSchema, mockBrainstormedPacket(input));
+  },
+
   async analyzeSource(input) {
     return validateAiOutput(AnalyzeSourceOutputSchema, analyzeSourceInput(input));
   },

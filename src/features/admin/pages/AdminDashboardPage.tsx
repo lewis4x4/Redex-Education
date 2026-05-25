@@ -6,6 +6,7 @@ import { AssignmentsEntryCard } from '@/features/admin/components/AssignmentsEnt
 import { CourseStatusList } from '@/features/admin/components/CourseStatusList'
 import { FoundryEntryCard } from '@/features/admin/components/FoundryEntryCard'
 import { Button } from '@/components/ui/button'
+import { isFoundryTopicEntryEnabled } from '@/features/foundry/lib/featureFlags'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
 import { useAdminSummary } from '@/hooks/useAdminSummary'
 import { useAuth } from '@/hooks/useAuth'
@@ -124,7 +125,11 @@ export function AdminDashboardPage() {
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <FoundryEntryCard onStart={() => navigate('/admin/foundry/start')} isDisabled={false} />
+        <FoundryEntryCard
+          onStart={() => navigate('/admin/foundry/start')}
+          onPacketStart={isFoundryTopicEntryEnabled() ? () => navigate('/admin/foundry/topic') : undefined}
+          isDisabled={false}
+        />
         <AssignmentsEntryCard onStart={() => navigate('/admin/assignments')} isDisabled={false} />
         <section className="rounded-2xl border border-redex-red/20 bg-redex-red/[0.04] p-6 shadow-sm md:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
