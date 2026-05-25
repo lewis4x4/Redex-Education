@@ -140,9 +140,9 @@ export function CritiqueIssueCard({
               variant="outline"
               size="sm"
               disabled
-              title="Coming in Slice 3.4 — side-by-side review"
+              title="Manual editing is coming soon."
               onClick={onEditManually}
-              aria-label="Edit manually (coming in Slice 3.4 — side-by-side review)"
+              aria-label="Edit manually (coming soon)"
             >
               Edit manually
             </Button>

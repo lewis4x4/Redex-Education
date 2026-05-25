@@ -53,6 +53,28 @@ describe('EducationContext Supabase writes', () => {
     expect(result.current.getLessonStatus('stale')).toBe('not_started')
   })
 
+  it('rejects non-demo supabase catalog ids instead of mixing with demo catalog', async () => {
+    getEnrollmentsForUserMock.mockResolvedValueOnce([
+      {
+        id: 'real-enrollment-custom',
+        user_id: 'user-real',
+        course_id: 'course-custom-001',
+        status: 'active',
+        started_at: '2026-05-23T00:00:00.000Z',
+        progress_percentage: 0,
+      },
+    ])
+
+    const { EducationProvider } = await import('@/contexts/EducationContext')
+    const { useEducation } = await import('@/hooks/useEducation')
+    const { result } = renderHook(() => useEducation(), { wrapper: wrapperFactory(EducationProvider) })
+
+    await waitFor(() => {
+      expect(result.current.lastWriteError?.action).toBe('loadProgressForUser')
+    })
+    expect(result.current.getMyEnrollments()).toEqual([])
+  })
+
   it('persists lesson progress to Supabase with the signed-in user enrollment', async () => {
     const { EducationProvider } = await import('@/contexts/EducationContext')
     const { useEducation } = await import('@/hooks/useEducation')
@@ -77,4 +99,40 @@ describe('EducationContext Supabase writes', () => {
     expect(getEnrollmentsForUserMock).toHaveBeenCalledWith('user-real')
   })
 
+  it('rolls back optimistic progress and reports write error when Supabase write fails', async () => {
+    upsertLessonProgressMock.mockRejectedValue(new Error('RLS rejected'))
+
+    const { EducationProvider } = await import('@/contexts/EducationContext')
+    const { useEducation } = await import('@/hooks/useEducation')
+    const { result } = renderHook(() => useEducation(), { wrapper: wrapperFactory(EducationProvider) })
+
+    await waitFor(() => expect(result.current.currentEnrollment?.id).toBe('real-enrollment-hr-basics'))
+
+    act(() => {
+      result.current.recordLessonProgress(DEMO_HR_BASICS_LESSONS[0]!.id, 'completed', 30)
+    })
+
+    expect(result.current.getLessonStatus(DEMO_HR_BASICS_LESSONS[0]!.id)).toBe('completed')
+
+    await waitFor(() => {
+      expect(result.current.lastWriteError?.action).toBe('upsertLessonProgress')
+    })
+
+    await waitFor(() => {
+      expect(result.current.getLessonStatus(DEMO_HR_BASICS_LESSONS[0]!.id)).toBe('not_started')
+    })
+  })
+
+  it('fails loudly for mock-auth + supabase mode without a real user id', async () => {
+    vi.stubEnv('VITE_MOCK_AUTH', 'true')
+
+    const { EducationProvider } = await import('@/contexts/EducationContext')
+    const { useEducation } = await import('@/hooks/useEducation')
+    const renderWithoutUser = () =>
+      renderHook(() => useEducation(), {
+        wrapper: ({ children }) => <EducationProvider>{children}</EducationProvider>,
+      })
+
+    expect(renderWithoutUser).toThrow(/Invalid auth\/data mode/i)
+  })
 })

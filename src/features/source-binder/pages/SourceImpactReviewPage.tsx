@@ -32,6 +32,8 @@ function findDiffs(event: SourceChangeEvent | undefined) {
   )
 }
 
+const SOURCE_IMPACT_DEMO_MODE = true
+
 export function SourceImpactReviewPage() {
   const events = useSourceChangeEventsStore((state) => state.events)
   const markEventResolved = useSourceChangeEventsStore((state) => state.markEventResolved)
@@ -50,6 +52,9 @@ export function SourceImpactReviewPage() {
   const diffs = findDiffs(selectedEvent)
 
   const handleSync = async () => {
+    if (SOURCE_IMPACT_DEMO_MODE) {
+      return
+    }
     setSyncing(true)
 
     try {
@@ -63,6 +68,9 @@ export function SourceImpactReviewPage() {
   }
 
   const handleRegenerate = async (versionId: string, lessonIds: string[]) => {
+    if (SOURCE_IMPACT_DEMO_MODE) {
+      return
+    }
     await delay(MOCK_DRIVE_SYNC_DELAY_MS)
 
     if (!selectedEvent) {
@@ -111,15 +119,24 @@ export function SourceImpactReviewPage() {
         </p>
       </header>
 
+      <Card className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[2px] text-amber-800">Demo data only</p>
+          <p className="text-sm text-amber-900">
+            Source Impact Review currently shows seeded mock data and does not run live Drive sync or live regeneration actions.
+          </p>
+        </div>
+      </Card>
+
       <Card className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
             <h2 className="text-lg font-semibold tracking-tight text-slate-900 md:text-xl">Sync from Drive</h2>
             <p className="text-sm text-slate-600">
-              Mock sync checks tracked source revisions and flags affected published versions without changing their published state.
+Demo sync previews sample source-change impact for walkthrough purposes only.
             </p>
           </div>
-          <Button type="button" variant="brand" disabled={syncing} onClick={() => void handleSync()}>
+          <Button type="button" variant="brand" disabled={syncing || SOURCE_IMPACT_DEMO_MODE} onClick={() => void handleSync()}>
             {syncing ? 'Syncing…' : 'Sync from Drive'}
           </Button>
         </div>
@@ -152,7 +169,10 @@ export function SourceImpactReviewPage() {
           <p className="text-xs font-semibold uppercase tracking-[2px] text-slate-500">Impact</p>
           <h2 className="text-xl font-semibold text-slate-900">Affected modules</h2>
         </div>
-        <AffectedModulesPanel affected={affected} onRegenerate={(versionId, lessonIds) => handleRegenerate(versionId, lessonIds)} />
+        <AffectedModulesPanel
+          affected={affected}
+          onRegenerate={SOURCE_IMPACT_DEMO_MODE ? undefined : (versionId, lessonIds) => handleRegenerate(versionId, lessonIds)}
+        />
       </section>
     </section>
   )

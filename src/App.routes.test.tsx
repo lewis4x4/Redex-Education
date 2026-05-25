@@ -177,6 +177,36 @@ describe('Redex Education routes', () => {
     expect(screen.getByText(/No lessons in this module yet/i)).toBeInTheDocument()
   })
 
+  it('protects /learn/player by redirecting unauthenticated users to sign-in', async () => {
+    useAuthMock.mockReturnValue({
+      loading: false,
+      session: null,
+      user: null,
+      role: null,
+      refreshSession: vi.fn(),
+      signOut: vi.fn(),
+    } as never)
+
+    renderAt('/learn/player')
+
+    expect(await screen.findByRole('heading', { name: /Sign in to Redex Education/i })).toBeInTheDocument()
+  })
+
+  it('protects /learn/player/:moduleId by redirecting unauthenticated users to sign-in', async () => {
+    useAuthMock.mockReturnValue({
+      loading: false,
+      session: null,
+      user: null,
+      role: null,
+      refreshSession: vi.fn(),
+      signOut: vi.fn(),
+    } as never)
+
+    renderAt('/learn/player/hr-basics-mod-001')
+
+    expect(await screen.findByRole('heading', { name: /Sign in to Redex Education/i })).toBeInTheDocument()
+  })
+
   it('persists quiz attempts from the module player route with enrollment and answers', async () => {
     const user = userEvent.setup()
 
@@ -452,12 +482,12 @@ describe('Redex Education routes', () => {
     expect(await screen.findByRole('heading', { name: 'Module basics' })).toBeInTheDocument()
   })
 
-  it('renders SourceBinderInputPage at /admin/foundry/source', async () => {
+  it('redirects /admin/foundry/source to /admin/foundry/start when basics prereq is missing', async () => {
     vi.stubEnv('VITE_MOCK_AUTH', 'true')
 
     renderAt('/admin/foundry/source')
 
-    expect(await screen.findByRole('heading', { name: 'Source material' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Module basics' })).toBeInTheDocument()
   })
 
   it('renders SourceLibraryPage at /admin/foundry/library', async () => {

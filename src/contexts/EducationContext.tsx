@@ -33,6 +33,9 @@ import {
 
 const LS_KEY = 'redex-education-progress-v1';
 const ALL_DEMO_LESSONS = [...DEMO_LESSONS, ...DEMO_HR_BASICS_LESSONS];
+const DEMO_COURSE_IDS = new Set([DEMO_ORIENTATION_COURSE.id, DEMO_HR_BASICS_COURSE.id]);
+const DEMO_MODULE_IDS = new Set(DEMO_MODULES.map((module) => module.id));
+const DEMO_LESSON_IDS = new Set(ALL_DEMO_LESSONS.map((lesson) => lesson.id));
 
 function getDemoEnrollmentForLesson(lessonId: UUID): Enrollment {
   const lesson = ALL_DEMO_LESSONS.find((candidate) => candidate.id === lessonId);
@@ -108,6 +111,11 @@ interface EducationProviderProps {
 
 export function EducationProvider({ children, userId = null }: EducationProviderProps) {
   const dataSource = getDataSource();
+  const mockAuthEnabled = import.meta.env.VITE_MOCK_AUTH === 'true';
+
+  if (dataSource === 'supabase' && mockAuthEnabled && !userId) {
+    throw new Error('[EducationContext] Invalid auth/data mode: VITE_MOCK_AUTH=true cannot be combined with VITE_DATA_SOURCE=supabase without a real authenticated user.');
+  }
   const [lessonProgress, setLessonProgress] = useState<Record<string, LessonProgress>>(() => restoreLessonProgress());
   const [realEnrollments, setRealEnrollments] = useState<Enrollment[]>([]);
   const [lastWriteError, setLastWriteError] = useState<WriteError | null>(null);
@@ -139,6 +147,27 @@ export function EducationProvider({ children, userId = null }: EducationProvider
     ])
       .then(([enrollments, progressRows]) => {
         if (cancelled) {
+          return;
+        }
+
+        const unknownEnrollmentCourseIds = enrollments
+          .map((enrollment) => enrollment.course_id)
+          .filter((courseId) => !DEMO_COURSE_IDS.has(courseId));
+        const unknownProgressLessonIds = progressRows
+          .map((progress) => progress.lesson_id)
+          .filter((lessonId) => !DEMO_LESSON_IDS.has(lessonId));
+
+        if (unknownEnrollmentCourseIds.length > 0 || unknownProgressLessonIds.length > 0) {
+          setRealEnrollments([]);
+          setLessonProgress({});
+          setLastWriteError(
+            toWriteError(
+              'loadProgressForUser',
+              new Error(
+                `Supabase learner data includes non-demo catalog ids (courses: ${unknownEnrollmentCourseIds.join(', ') || 'none'}; lessons: ${unknownProgressLessonIds.join(', ') || 'none'}). Real mode is constrained to demo catalog ids in this build.`,
+              ),
+            ),
+          );
           return;
         }
 
@@ -202,6 +231,26 @@ export function EducationProvider({ children, userId = null }: EducationProvider
           ? realEnrollments.find((candidate) => candidate.course_id === module?.course_id) ?? realEnrollments[0]
           : getDemoEnrollmentForLesson(lessonId);
 
+      if (dataSource === 'supabase' && !lesson) {
+        setLastWriteError(
+          toWriteError(
+            'recordLessonProgress',
+            new Error(`Cannot record progress for unknown lesson id "${lessonId}" in supabase mode.`),
+          ),
+        );
+        return;
+      }
+
+      if (dataSource === 'supabase' && module && !DEMO_COURSE_IDS.has(module.course_id)) {
+        setLastWriteError(
+          toWriteError(
+            'recordLessonProgress',
+            new Error(`Cannot record progress for unsupported course id "${module.course_id}" in supabase mode.`),
+          ),
+        );
+        return;
+      }
+
       if (!enrollment) {
         setLastWriteError(toWriteError('recordLessonProgress', new Error('No enrollment found for the signed-in user.')));
         return;
@@ -244,7 +293,31 @@ export function EducationProvider({ children, userId = null }: EducationProvider
             }),
           )
           .then(() => setLastWriteError(null))
-          .catch((error: unknown) => setLastWriteError(toWriteError('upsertLessonProgress', error)));
+          .catch((error: unknown) => {
+            setLessonProgress((prev) => {
+              if (!existingSnapshot) {
+                const next = { ...prev };
+                delete next[lessonId];
+                return next;
+              }
+
+              return {
+                ...prev,
+                [lessonId]: existingSnapshot,
+              };
+            });
+
+            if (userId) {
+              void supabaseDataProvider
+                .getProgressForUser(userId)
+                .then((progressRows) => {
+                  setLessonProgress(Object.fromEntries(progressRows.map((progress) => [progress.lesson_id, progress])));
+                })
+                .catch(() => undefined);
+            }
+
+            setLastWriteError(toWriteError('upsertLessonProgress', error));
+          });
 
         const isAcknowledgmentLesson = lesson?.lesson_type === 'acknowledgment' || lessonId.includes('acknowledgment');
         if (status === 'completed' && isAcknowledgmentLesson) {
@@ -262,7 +335,7 @@ export function EducationProvider({ children, userId = null }: EducationProvider
         }
       }
     },
-    [dataSource, lessonProgress, realEnrollments]
+    [dataSource, lessonProgress, realEnrollments, userId]
   );
 
   const completeLesson = useCallback(
@@ -323,6 +396,10 @@ export function EducationProvider({ children, userId = null }: EducationProvider
   }, [currentEnrollment, dataSource, orientationEnrollment, realEnrollments]);
 
   const getCourse = useCallback((courseId: UUID): Course | undefined => {
+    if (dataSource === 'supabase' && !DEMO_COURSE_IDS.has(courseId)) {
+      return undefined;
+    }
+
     if (courseId === DEMO_ORIENTATION_COURSE.id) {
       return DEMO_ORIENTATION_COURSE;
     }
@@ -332,15 +409,23 @@ export function EducationProvider({ children, userId = null }: EducationProvider
     }
 
     return undefined;
-  }, []);
+  }, [dataSource]);
 
   const getModule = useCallback((moduleId: UUID): Module | undefined => {
+    if (dataSource === 'supabase' && !DEMO_MODULE_IDS.has(moduleId)) {
+      return undefined;
+    }
+
     return DEMO_MODULES.find((m) => m.id === moduleId);
-  }, []);
+  }, [dataSource]);
 
   const getLessonsForModule = useCallback((moduleId: UUID): Lesson[] => {
+    if (dataSource === 'supabase' && !DEMO_MODULE_IDS.has(moduleId)) {
+      return [];
+    }
+
     return ALL_DEMO_LESSONS.filter((l) => l.module_id === moduleId);
-  }, []);
+  }, [dataSource]);
 
   const getDemoCourse = useCallback(() => DEMO_ORIENTATION_COURSE, []);
   const getDemoModule = useCallback(() => DEMO_MODULES[0], []);

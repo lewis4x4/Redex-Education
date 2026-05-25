@@ -42,18 +42,30 @@ jobs:
           VITE_SUPABASE_ANON_KEY: 'ci-dummy-anon-key'
           VITE_MOCK_AUTH: 'false'
 
-      - name: Build
+      - name: Build (safe real-mode env)
         run: npm run build
         env:
           VITE_SUPABASE_URL: 'https://example.invalid'
           VITE_SUPABASE_ANON_KEY: 'ci-dummy-anon-key'
           VITE_MOCK_AUTH: 'false'
+          VITE_DATA_SOURCE: 'supabase'
+          VITE_AI_MODE: 'real'
+
+      - name: Build guard blocks production mock auth
+        run: |
+          if NETLIFY=true VITE_SUPABASE_URL='https://example.invalid' VITE_SUPABASE_ANON_KEY='ci-dummy-anon-key' VITE_DATA_SOURCE='supabase' VITE_AI_MODE='real' VITE_MOCK_AUTH='true' npm run build; then
+            echo "Expected production build guard failure when VITE_MOCK_AUTH=true"
+            exit 1
+          fi
 
       - name: Deno edge checks
-        run: deno check supabase/functions/_shared/sourceBindingsWriter.ts supabase/functions/_shared/courseFoundryAiClientServer.ts supabase/functions/generation-worker/index.ts
+        run: deno check supabase/functions/_shared/sourceBindingsWriter.ts supabase/functions/_shared/courseFoundryAiClientServer.ts supabase/functions/generation-worker/index.ts supabase/functions/submit-generation-job/index.ts supabase/functions/drive-sync/index.ts
 
       - name: Deno edge tests
-        run: deno test --allow-env --allow-net=esm.sh --allow-read=supabase/functions/generation-worker/index.ts supabase/functions/_shared/courseFoundryAiClientServer.test.ts supabase/functions/_shared/sourceBindingsWriter.test.ts supabase/functions/generation-worker/index.test.ts
+        run: deno test --allow-env --allow-net=esm.sh --allow-read=supabase/functions supabase/functions/_shared/courseFoundryAiClientServer.test.ts supabase/functions/_shared/sourceBindingsWriter.test.ts supabase/functions/generation-worker/index.test.ts supabase/functions/submit-generation-job/index.test.ts supabase/functions/drive-sync/index.test.ts
+
+      - name: RLS smoke harness
+        run: npm run rls:smoke
 
       - name: Eval harness
         run: npm run eval

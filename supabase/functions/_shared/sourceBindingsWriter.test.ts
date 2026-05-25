@@ -14,6 +14,11 @@ const maybeVitestDescribe = (globalThis as unknown as {
   describe?: { skip?: (name: string, fn: () => void) => void };
 }).describe;
 
+const MODULE_ID = "module-1";
+const MODULE_VERSION_ID = "00000000-0000-4000-8000-000000000001";
+const JOB_ID = "00000000-0000-4000-8000-000000000010";
+const LEASE_TOKEN = "00000000-0000-4000-8000-000000000011";
+
 if (maybeVitestDescribe?.skip) {
   maybeVitestDescribe.skip("Deno-only source binding writer tests", () => {});
 }
@@ -79,10 +84,11 @@ if (typeof Deno !== "undefined") {
   ];
 
   Deno.test("computeBindingPlan writes one section binding for a cited claim", () => {
-    const plan = computeBindingPlan({ moduleId: "module-1", generatedModule: baseModule, sourceSections });
+    const plan = computeBindingPlan({ moduleId: MODULE_ID, moduleVersionId: MODULE_VERSION_ID, generatedModule: baseModule, sourceSections });
 
     assertEquals(plan.bindings.length, 1);
     assertEquals(plan.bindings[0]?.source_section_id, "section-1");
+    assertEquals(plan.bindings[0]?.module_version_id, MODULE_VERSION_ID);
     assertEquals(plan.unsupportedClaims.length, 0);
   });
 
@@ -91,7 +97,7 @@ if (typeof Deno !== "undefined") {
       ...baseModule,
       lessons: [{ ...baseModule.lessons[0], body_markdown: "HR ownership differs. [source: section-2, section-3]" }],
     };
-    const plan = computeBindingPlan({ moduleId: "module-1", generatedModule: module, sourceSections });
+    const plan = computeBindingPlan({ moduleId: MODULE_ID, moduleVersionId: MODULE_VERSION_ID, generatedModule: module, sourceSections });
 
     assertEquals(plan.flaggedConflicts.length, 1);
     assertEquals(plan.bindings.every((binding) => binding.flagged_for_review), true);
@@ -103,7 +109,7 @@ if (typeof Deno !== "undefined") {
       ...baseModule,
       lessons: [{ ...baseModule.lessons[0], body_markdown: "People Ops owns HR questions. [source: section-1, section-4]" }],
     };
-    const plan = computeBindingPlan({ moduleId: "module-1", generatedModule: module, sourceSections });
+    const plan = computeBindingPlan({ moduleId: MODULE_ID, moduleVersionId: MODULE_VERSION_ID, generatedModule: module, sourceSections });
 
     assertEquals(plan.bindings.length, 1);
     assertEquals(plan.bindings[0]?.source_section_id, "section-1");
@@ -121,29 +127,61 @@ if (typeof Deno !== "undefined") {
     assertEquals(result.unsupportedClaims[0]?.reason, "missing_citation");
   });
 
-  Deno.test("writeSourceBindings upserts planned rows", async () => {
-    const upserts: unknown[] = [];
+  Deno.test("writeSourceBindings replaces stale rows through transactional RPC", async () => {
+    const rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
     const supabase = {
-      from(table: string) {
+      rpc(name: string, args: Record<string, unknown>) {
+        rpcCalls.push({ name, args });
+        return Promise.resolve({ data: 1, error: null });
+      },
+    };
+
+    const result = await writeSourceBindings({
+      supabase: supabase as never,
+      moduleId: MODULE_ID,
+      moduleVersionId: MODULE_VERSION_ID,
+      generatedModule: baseModule,
+      sourceSections,
+      jobLease: { jobId: JOB_ID, leaseToken: LEASE_TOKEN, expectedStage: "source_binding" },
+    });
+
+    assertEquals(result.writtenCount, 1);
+    assertEquals(rpcCalls.length, 1);
+    assertEquals(rpcCalls[0]?.name, "replace_module_source_bindings");
+    assertEquals(rpcCalls[0]?.args.p_module_id, MODULE_ID);
+    assertEquals(rpcCalls[0]?.args.p_module_version_id, MODULE_VERSION_ID);
+    assertEquals(rpcCalls[0]?.args.p_job_id, JOB_ID);
+    assertEquals(rpcCalls[0]?.args.p_lease_token, LEASE_TOKEN);
+    assertEquals(rpcCalls[0]?.args.p_expected_stage, "source_binding");
+    assert(JSON.stringify(rpcCalls[0]?.args.p_bindings).includes("section-1"), "RPC payload should include cited section id");
+    assert(JSON.stringify(rpcCalls[0]?.args.p_bindings).includes(MODULE_VERSION_ID), "RPC payload should include module_version_id");
+  });
+
+  Deno.test("writeSourceBindings can skip pruning for assessment-specific bindings", async () => {
+    let deleteCalled = false;
+    const supabase = {
+      from(_table: string) {
         return {
-          upsert(rows: unknown[]) {
-            assertEquals(table, "module_source_bindings");
-            upserts.push(...rows);
+          delete() {
+            deleteCalled = true;
+            return { eq: () => Promise.resolve({ error: null }) };
+          },
+          upsert(_rows: unknown[]) {
             return Promise.resolve({ error: null });
           },
         };
       },
     };
 
-    const result = await writeSourceBindings({
+    await writeSourceBindings({
       supabase: supabase as never,
-      moduleId: "module-1",
+      moduleId: MODULE_ID,
+      moduleVersionId: MODULE_VERSION_ID,
       generatedModule: baseModule,
       sourceSections,
+      replaceExisting: false,
     });
 
-    assertEquals(result.writtenCount, 1);
-    assertEquals(upserts.length, 1);
-    assert(JSON.stringify(upserts[0]).includes("section-1"), "upsert should include cited section id");
+    assertEquals(deleteCalled, false);
   });
 }

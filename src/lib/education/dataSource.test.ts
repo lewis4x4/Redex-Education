@@ -17,8 +17,8 @@ describe('getDataSource', () => {
     expect(getDataSource()).toBe('supabase')
   })
 
-  it('falls back to mock for unknown values', () => {
+  it('throws for unknown values', () => {
     vi.stubEnv('VITE_DATA_SOURCE', 'demo')
-    expect(getDataSource()).toBe('mock')
+    expect(() => getDataSource()).toThrow(/Unsupported VITE_DATA_SOURCE value/i)
   })
 })

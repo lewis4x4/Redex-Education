@@ -7,6 +7,7 @@ export type BindingKind = "whole_file" | "section";
 
 export interface ClaimBinding {
   module_id: string;
+  module_version_id: string;
   source_file_id: string;
   source_file_version_id: string;
   source_section_id: string | null;
@@ -85,6 +86,12 @@ export interface BindingPlan {
   unsupportedClaims: UnsupportedClaimReport[];
   flaggedConflicts: ConflictReport[];
   placeholderSectionIds: string[];
+}
+
+export interface SourceBindingJobLease {
+  jobId: string;
+  leaseToken: string;
+  expectedStage: string;
 }
 
 export interface SourceBindingWriteResult {
@@ -218,6 +225,7 @@ function sameTopAuthorityConflict(sections: ResolvedSourceSection[]): ResolvedSo
 
 export function computeBindingPlan(params: {
   moduleId: string;
+  moduleVersionId: string;
   generatedModule: GeneratedModulePreview;
   sourceSections: ResolvedSourceSection[];
 }): BindingPlan {
@@ -276,9 +284,10 @@ export function computeBindingPlan(params: {
     }
 
     for (const section of writableSections) {
-      const key = `${params.moduleId}:${section.source_file_id}:${section.id}`;
+      const key = `${params.moduleVersionId}:${section.source_file_id}:${section.id}`;
       bindings.set(key, {
         module_id: params.moduleId,
+        module_version_id: params.moduleVersionId,
         source_file_id: section.source_file_id,
         source_file_version_id: section.source_file_version_id,
         source_section_id: section.id,
@@ -444,36 +453,85 @@ async function resolveSourceSections(
   });
 }
 
+async function assertActiveJobLease(supabase: RedexSupabaseClient, jobLease: SourceBindingJobLease): Promise<void> {
+  const { data, error } = await supabase
+    .from("generation_jobs")
+    .select("id")
+    .eq("id", jobLease.jobId)
+    .eq("lease_token", jobLease.leaseToken)
+    .eq("status", "running")
+    .eq("current_stage", jobLease.expectedStage)
+    .gt("lease_expires_at", new Date().toISOString())
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to verify source binding job lease: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new Error("Source binding job lease is no longer active.");
+  }
+}
+
 export async function writeSourceBindings(params: {
   supabase: RedexSupabaseClient;
   moduleId: string;
+  moduleVersionId: string;
   generatedModule: GeneratedModulePreview;
   sourceSections: SourceSection[];
+  replaceExisting?: boolean;
+  jobLease?: SourceBindingJobLease;
 }): Promise<SourceBindingWriteResult> {
   const { claims } = extractCitedClaims(params.generatedModule);
   const citedSectionIds = unique(claims.flatMap((claim) => claim.section_ids));
   const sourceSections = await resolveSourceSections(params.supabase, citedSectionIds, params.sourceSections);
   const plan = computeBindingPlan({
     moduleId: params.moduleId,
+    moduleVersionId: params.moduleVersionId,
     generatedModule: params.generatedModule,
     sourceSections,
   });
 
-  if (plan.bindings.length > 0) {
+  const bindingRows = plan.bindings.map((binding) => ({
+    module_id: binding.module_id,
+    module_version_id: binding.module_version_id,
+    source_file_id: binding.source_file_id,
+    source_file_version_id: binding.source_file_version_id,
+    source_section_id: binding.source_section_id,
+    binding_kind: binding.binding_kind,
+    flagged_for_review: binding.flagged_for_review,
+    flag_reason: binding.flag_reason,
+  }));
+  let writtenCount = plan.bindings.length;
+
+  if (params.replaceExisting ?? true) {
+    const rpcArgs: Record<string, unknown> = {
+      p_module_id: params.moduleId,
+      p_module_version_id: params.moduleVersionId,
+      p_bindings: bindingRows,
+    };
+
+    if (params.jobLease) {
+      rpcArgs.p_job_id = params.jobLease.jobId;
+      rpcArgs.p_lease_token = params.jobLease.leaseToken;
+      rpcArgs.p_expected_stage = params.jobLease.expectedStage;
+    }
+
+    const { data, error } = await params.supabase.rpc("replace_module_source_bindings", rpcArgs);
+
+    if (error) {
+      throw new Error(`Failed to replace source bindings: ${error.message}`);
+    }
+
+    writtenCount = typeof data === "number" ? data : plan.bindings.length;
+  } else if (bindingRows.length > 0) {
+    if (params.jobLease) {
+      await assertActiveJobLease(params.supabase, params.jobLease);
+    }
+
     const { error } = await params.supabase
       .from("module_source_bindings")
-      .upsert(
-        plan.bindings.map((binding) => ({
-          module_id: binding.module_id,
-          source_file_id: binding.source_file_id,
-          source_file_version_id: binding.source_file_version_id,
-          source_section_id: binding.source_section_id,
-          binding_kind: binding.binding_kind,
-          flagged_for_review: binding.flagged_for_review,
-          flag_reason: binding.flag_reason,
-        })),
-        { onConflict: "module_id,source_file_id,source_section_id" },
-      );
+      .upsert(bindingRows, { onConflict: "module_version_id,source_file_id,source_section_id" });
 
     if (error) {
       throw new Error(`Failed to write source bindings: ${error.message}`);
@@ -481,7 +539,7 @@ export async function writeSourceBindings(params: {
   }
 
   return {
-    writtenCount: plan.bindings.length,
+    writtenCount,
     flaggedConflicts: plan.flaggedConflicts,
     unsupportedClaims: plan.unsupportedClaims,
     placeholderSectionIds: plan.placeholderSectionIds,

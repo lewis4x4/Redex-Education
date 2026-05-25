@@ -208,45 +208,47 @@ function LearnerModuleRoute() {
 
   return (
     <AppShell breadcrumb="Academy › Module" playerMode>
-      <Suspense fallback={<RouteLoadingFallback />}>
-        <ModulePlayer
-          key={routeModule.id}
-          module={routeModule}
-          lessons={moduleLessons}
-          completedLessonIds={completedLessonIds}
-          onProgressUpdate={(lessonId: string, status: ProgressStatus) => {
-            education.recordLessonProgress(lessonId, status)
+      <AuthGate>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <ModulePlayer
+            key={routeModule.id}
+            module={routeModule}
+            lessons={moduleLessons}
+            completedLessonIds={completedLessonIds}
+            onProgressUpdate={(lessonId: string, status: ProgressStatus) => {
+              education.recordLessonProgress(lessonId, status)
 
-            const isCompletingModule =
-              status === 'completed' &&
-              moduleLessons.length > 0 &&
-              moduleLessons.every((lesson) => completedLessonIdSet.has(lesson.id) || lesson.id === lessonId)
+              const isCompletingModule =
+                status === 'completed' &&
+                moduleLessons.length > 0 &&
+                moduleLessons.every((lesson) => completedLessonIdSet.has(lesson.id) || lesson.id === lessonId)
 
-            if (isCompletingModule) {
+              if (isCompletingModule) {
+                completeActiveAssignment()
+              }
+            }}
+            onQuizAttempt={(lessonId, attempt) => {
+              if (!moduleEnrollment) {
+                return
+              }
+
+              recordAttempt({
+                enrollment_id: moduleEnrollment.id,
+                lesson_id: lessonId,
+                score_percent: attempt.score,
+                passed: attempt.passed,
+                answers: attempt.answers,
+                actor_user_id: moduleEnrollment.user_id,
+              })
+            }}
+            onCompleteModule={() => {
               completeActiveAssignment()
-            }
-          }}
-          onQuizAttempt={(lessonId, attempt) => {
-            if (!moduleEnrollment) {
-              return
-            }
-
-            recordAttempt({
-              enrollment_id: moduleEnrollment.id,
-              lesson_id: lessonId,
-              score_percent: attempt.score,
-              passed: attempt.passed,
-              answers: attempt.answers,
-              actor_user_id: moduleEnrollment.user_id,
-            })
-          }}
-          onCompleteModule={() => {
-            completeActiveAssignment()
-            navigate('/learn')
-          }}
-          onExit={() => navigate('/learn')}
-        />
-      </Suspense>
+              navigate('/learn')
+            }}
+            onExit={() => navigate('/learn')}
+          />
+        </Suspense>
+      </AuthGate>
     </AppShell>
   )
 }

@@ -187,6 +187,7 @@ VITE_AI_MODE=real
 | `npm test` | Run Vitest once (619+ passing mock-mode baseline) |
 | `npm run test:watch` | Vitest watch mode |
 | `npm run test:coverage` | V8 coverage report |
+| `npm run rls:smoke` | CI-friendly RLS/policy smoke harness (offline plan + optional linked-project execution command) |
 
 ## 5) Environment variables
 
@@ -200,6 +201,41 @@ VITE_AI_MODE=real
 | `VITE_MOCK_AUTH_ROLE` | Defaults to `admin` | Mock-mode role used by AuthGate required-role checks (`admin`, `foundry_author`, `manager`, or `learner`) |
 
 See [`.env.example`](./.env.example) for the template. `npm run build` runs the production guard; when `NODE_ENV=production` or `NETLIFY=true`, it rejects mock auth, mock/unset data source, and mock/unset AI mode.
+
+### Production build guard smoke checks
+
+```bash
+# Negative path (must fail): production + mock auth
+NETLIFY=true VITE_MOCK_AUTH=true VITE_DATA_SOURCE=supabase VITE_AI_MODE=real npm run build
+
+# Positive path (must pass): production-like real-mode env with dummy public Supabase vars
+NETLIFY=true VITE_SUPABASE_URL=https://example.invalid VITE_SUPABASE_ANON_KEY=ci-dummy-anon-key VITE_MOCK_AUTH=false VITE_DATA_SOURCE=supabase VITE_AI_MODE=real npm run build
+```
+
+### RLS/policy smoke harness
+
+`npm run rls:smoke` validates the local smoke SQL scaffold and prints the exact linked-project Supabase CLI command for real execution:
+
+```bash
+supabase db query --linked --file supabase/tests/rls_smoke.sql
+```
+
+This keeps standard CI lightweight while preserving a repeatable operator command for role/policy checks. Run it after applying migrations because it asserts the live schema and grants.
+
+### Backend release manual gates
+
+Before production deploy, run and capture evidence for these operator checks:
+
+1. **Assignment actor nullability precheck** — migration `20260524190000_phase3_4_backend_hardening.sql` intentionally fails if historical assignments have no actor. Remediate before `supabase db push`:
+
+   ```sql
+   select id, module_version_id
+   from redex.assignments
+   where assigned_by is null;
+   ```
+
+2. **Live RLS smoke execution** — CI validates the scaffold only. A release operator must run the linked-project command above and attach the output to release notes before production cutover.
+3. **Generation job recovery visibility** — expired `running` jobs are conservatively marked `failed` with `last_failure_class = 'manual_recovery_required'` by `redex.fail_stale_generation_jobs(...)` / the worker. Operators must review those rows before retrying to avoid duplicate provider work.
 
 ## Source Library setup (Slice 2.4)
 

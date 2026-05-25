@@ -6,8 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '@/App'
 import { MOCK_GENERATED_MODULE } from '@/features/foundry/data/mockGeneratedModule'
 import { MOCK_GENERATED_OUTLINE } from '@/features/foundry/data/mockGeneratedOutline'
-import { MOCK_LESSON_REVIEWS } from '@/features/foundry/data/mockLessonReviews'
-import { MOCK_SELF_CRITIQUE } from '@/features/foundry/data/mockSelfCritique'
+import type { LessonReviewItem, SelfCritiqueReport } from '@/lib/education'
 import { useAuth } from '@/hooks/useAuth'
 import { useEducation, useMyProgress } from '@/hooks/useEducation'
 
@@ -46,6 +45,57 @@ function createStorageMock(): Storage {
     setItem(key: string, value: string) {
       store.set(key, String(value))
     },
+  }
+}
+
+function buildFlowLessonReviews(): LessonReviewItem[] {
+  return [
+    {
+      lesson_index: 0,
+      module_index: 0,
+      lesson_title: 'Welcome to Redex',
+      confidence: 'high',
+      has_unsupported_claim: false,
+      status: 'approved',
+      source_excerpts: [],
+    },
+    {
+      lesson_index: 1,
+      module_index: 0,
+      lesson_title: 'Who to Contact for HR Help',
+      confidence: 'high',
+      has_unsupported_claim: false,
+      status: 'approved',
+      source_excerpts: [],
+    },
+    {
+      lesson_index: 2,
+      module_index: 0,
+      lesson_title: 'Payroll and Timekeeping Basics',
+      confidence: 'unsupported',
+      has_unsupported_claim: true,
+      unsupported_note: 'Unsupported claim fixture for publish-blocker assertion.',
+      status: 'pending',
+      source_excerpts: [],
+    },
+    {
+      lesson_index: 3,
+      module_index: 0,
+      lesson_title: 'First-Week Expectations',
+      confidence: 'medium',
+      has_unsupported_claim: false,
+      status: 'pending',
+      source_excerpts: [],
+    },
+  ]
+}
+
+function buildNonBlockingCritique(): SelfCritiqueReport {
+  return {
+    module_title: 'HR Basics at Redex',
+    generated_at: '2026-05-24T00:00:00.000Z',
+    blocks_publish: false,
+    issues: [],
   }
 }
 
@@ -164,27 +214,26 @@ describe('Foundry admin end-to-end route flow', () => {
     await waitFor(() => expect(screen.getByTestId('location-path')).toHaveTextContent('/admin/foundry/critique'))
 
     act(() => {
-      useFoundryDraftStore.getState().setCritique({
-        ...MOCK_SELF_CRITIQUE,
-        blocks_publish: false,
-        issues: MOCK_SELF_CRITIQUE.issues.map((issue) => ({ ...issue, ignored: true })),
-      })
+      useFoundryDraftStore.getState().setCritique(buildNonBlockingCritique())
     })
 
     await user.click(await screen.findByRole('button', { name: 'Continue → Side-by-side review' }))
     await waitFor(() => expect(screen.getByTestId('location-path')).toHaveTextContent('/admin/foundry/sidebyside'))
 
-    act(() => {
-      useFoundryDraftStore.getState().setLessonReviews(MOCK_LESSON_REVIEWS)
-    })
-
     await user.click(await screen.findByRole('button', { name: 'Continue → Resolve blockers' }))
     await waitFor(() => expect(screen.getByTestId('location-path')).toHaveTextContent('/admin/foundry/blockers'))
 
-    expect(await screen.findByRole('button', { name: 'Publish module' })).toBeDisabled()
+    // Seed the blocker after the blockers page is mounted so this assertion is
+    // hermetic under full-suite parallel execution and independent of any
+    // side-by-side page async fixture hydration timing.
+    act(() => {
+      useFoundryDraftStore.getState().setLessonReviews(buildFlowLessonReviews())
+    })
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Publish module' })).toBeDisabled())
 
     act(() => {
-      for (const review of MOCK_LESSON_REVIEWS) {
+      for (const review of useFoundryDraftStore.getState().lessonReviews) {
         useFoundryDraftStore.getState().approveLessonReview(review.lesson_index, review.module_index)
       }
     })

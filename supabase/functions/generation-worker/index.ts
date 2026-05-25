@@ -57,6 +57,13 @@ interface GenerationJobRow {
   output_payload: Record<string, unknown> | null;
   last_error_message: string | null;
   last_error_stage: string | null;
+  lease_token: string | null;
+  locked_at: string | null;
+  lease_expires_at: string | null;
+  next_run_at: string | null;
+  max_attempts: number | null;
+  last_failure_class: string | null;
+  worker_id: string | null;
 }
 
 class EdgeFunctionError extends Error {
@@ -116,9 +123,38 @@ function baseInput(job: GenerationJobRow): Record<string, unknown> {
   return isRecord(envelope.input) ? envelope.input : envelope;
 }
 
+function stringField(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
+}
+
+function moduleVersionIdFor(job: GenerationJobRow): string {
+  const input = baseInput(job);
+  const envelope = inputEnvelope(job);
+  const moduleVersionId =
+    stringField(input, "moduleVersionId") ??
+    stringField(input, "module_version_id") ??
+    stringField(envelope, "moduleVersionId") ??
+    stringField(envelope, "module_version_id");
+
+  if (!moduleVersionId || !isUuid(moduleVersionId)) {
+    throw new EdgeFunctionError(
+      "missing_module_version_id",
+      "Source binding writes require an explicit UUID moduleVersionId/module_version_id.",
+      400,
+    );
+  }
+
+  return moduleVersionId;
+}
+
 function relevantStages(job: GenerationJobRow): StageName[] {
-  if (job.job_type === "section") {
-    return ["parse", "generate_lessons", "source_binding", "self_critique", "assemble"];
+  if (job.job_type === "section" || operationFor(job) === "regenerateSection") {
+    return ["generate_lessons", "assemble"];
   }
 
   switch (operationFor(job)) {
@@ -135,7 +171,7 @@ function relevantStages(job: GenerationJobRow): StageName[] {
     case "regenerateWithFixes":
       return ["generate_lessons", "source_binding", "self_critique", "assemble"];
     case "regenerateSection":
-      return ["parse", "generate_lessons", "source_binding", "self_critique", "assemble"];
+      return ["generate_lessons", "assemble"];
     default:
       return [...STAGES];
   }
@@ -208,6 +244,115 @@ function errorMessage(error: unknown): string {
   }
 
   return error instanceof Error ? error.message : String(error);
+}
+
+function errorName(error: unknown): string {
+  return error instanceof Error ? error.name : "Error";
+}
+
+function failureClass(error: unknown): string {
+  if (error instanceof ProviderNotConfiguredError) {
+    return "configuration";
+  }
+
+  if (error instanceof EdgeFunctionError) {
+    return error.status >= 500 ? "infrastructure" : "nonretryable";
+  }
+
+  const message = errorMessage(error);
+  if (/AI provider request failed \((429|5\d\d)\)/i.test(message)) {
+    return "provider_transient";
+  }
+
+  if (/fetch|network|timeout|temporar|rate limit/i.test(message)) {
+    return "transient";
+  }
+
+  if (/validation failed|non-JSON|did not include/i.test(message) || errorName(error) === "AiProviderError") {
+    return "provider_output";
+  }
+
+  return "unknown";
+}
+
+function isRetryableFailure(error: unknown): boolean {
+  // Until provider request IDs/idempotency metadata are persisted per stage, only
+  // retry failures known to be pre-provider infrastructure failures. Ambiguous
+  // provider/network/unknown failures are terminal/manual-recovery to avoid
+  // duplicate model work and duplicate provider cost.
+  return failureClass(error) === "infrastructure";
+}
+
+function retryDelayMs(attemptCount: number): number {
+  const boundedAttempt = Math.max(1, Math.min(attemptCount, 6));
+  return Math.min(60 * 60 * 1000, 30_000 * 2 ** (boundedAttempt - 1));
+}
+
+function nextRetryAt(attemptCount: number): string {
+  return new Date(Date.now() + retryDelayMs(attemptCount)).toISOString();
+}
+
+function jobLeaseFor(job: GenerationJobRow, expectedStage: StageName): {
+  jobId: string;
+  leaseToken: string;
+  expectedStage: StageName;
+} {
+  if (!job.lease_token) {
+    throw new EdgeFunctionError("missing_lease_token", "Source binding writes require an active job lease.", 409);
+  }
+
+  return {
+    jobId: job.id,
+    leaseToken: job.lease_token,
+    expectedStage,
+  };
+}
+
+function clearLeaseFields(): Record<string, null> {
+  return {
+    lease_token: null,
+    locked_at: null,
+    lease_expires_at: null,
+    worker_id: null,
+  };
+}
+
+async function failStaleGenerationJobs(supabase: RedexSupabaseClient, workerId: string): Promise<void> {
+  const { error } = await supabase.rpc("fail_stale_generation_jobs", { p_worker_id: workerId });
+
+  if (error) {
+    throw new EdgeFunctionError("stale_job_recovery_failed", error.message, 500);
+  }
+}
+
+async function updateLeasedJob(
+  supabase: RedexSupabaseClient,
+  job: GenerationJobRow,
+  payload: Record<string, unknown>,
+  expectedStage?: string | null,
+): Promise<void> {
+  let query = supabase
+    .from("generation_jobs")
+    .update(payload)
+    .eq("id", job.id);
+
+  if (job.lease_token) {
+    query = query.eq("lease_token", job.lease_token).eq("status", "running");
+  }
+
+  if (expectedStage !== undefined) {
+    query = expectedStage === null ? query.is("current_stage", null) : query.eq("current_stage", expectedStage);
+  }
+
+  const { data, error } = await query.select("id").maybeSingle();
+
+  if (error) {
+    throw new EdgeFunctionError("db_write_failed", error.message, 500);
+  }
+
+  if (!data) {
+    throw new EdgeFunctionError("lease_lost", "Generation job lease changed before worker update completed.", 409);
+  }
 }
 
 function stageOutputKey(stage: StageName): string {
@@ -476,8 +621,10 @@ async function runSourceBindingStage(
   const result = await writeSourceBindings({
     supabase,
     moduleId: job.module_id,
+    moduleVersionId: moduleVersionIdFor(job),
     generatedModule,
     sourceSections: sourceSectionsFromValue(input.sources ?? input.sourceSections ?? input.source_sections ?? {}),
+    jobLease: jobLeaseFor(job, "source_binding"),
   });
   const sectionById = new Map(result.resolvedSourceSections.map((section) => [section.id, section]));
   const entailmentResults: Array<Record<string, unknown>> = [];
@@ -603,8 +750,11 @@ async function runAiStage(job: GenerationJobRow, stage: StageName, supabase: Red
       const assessmentBinding = await writeSourceBindings({
         supabase,
         moduleId: job.module_id,
+        moduleVersionId: moduleVersionIdFor(job),
         generatedModule: assessmentModule,
         sourceSections: sourceSectionsFromValue(input.sources ?? input.sourceSections ?? input.source_sections ?? {}),
+        replaceExisting: false,
+        jobLease: jobLeaseFor(job, "generate_assessments"),
       });
 
       return {
@@ -659,8 +809,10 @@ Deno.serve(async (request) => {
     const serviceRoleKey = getRequiredEnv("SUPABASE_SERVICE_ROLE_KEY");
     assertServiceRoleCaller(request, serviceRoleKey);
     const supabase = createClient(supabaseUrl, serviceRoleKey, { db: { schema: "redex" } });
+    const workerId = `generation-worker:${crypto.randomUUID()}`;
+    await failStaleGenerationJobs(supabase, workerId);
     const { data: claimedRows, error: claimError } = await supabase
-      .rpc("claim_next_generation_job");
+      .rpc("claim_next_generation_job", { p_worker_id: workerId });
 
     if (claimError) {
       throw new EdgeFunctionError("db_claim_failed", claimError.message, 500);
@@ -679,24 +831,19 @@ Deno.serve(async (request) => {
 
     if (!stage) {
       const actualCost = sumCosts(costBreakdown);
-      const { error: succeedError } = await supabase
-        .from("generation_jobs")
-        .update({
-          status: "succeeded",
-          current_stage: null,
-          stage_map: stageMap,
-          output_payload: { ...outputs, final: finalOutput(job, outputs) },
-          actual_cost_cents: actualCost,
-          cost_breakdown: costBreakdown,
-          completed_at: new Date().toISOString(),
-          last_error_message: null,
-          last_error_stage: null,
-        })
-        .eq("id", job.id);
-
-      if (succeedError) {
-        throw new EdgeFunctionError("db_write_failed", succeedError.message, 500);
-      }
+      await updateLeasedJob(supabase, job, {
+        status: "succeeded",
+        current_stage: null,
+        stage_map: stageMap,
+        output_payload: { ...outputs, final: finalOutput(job, outputs) },
+        actual_cost_cents: actualCost,
+        cost_breakdown: costBreakdown,
+        completed_at: new Date().toISOString(),
+        last_error_message: null,
+        last_error_stage: null,
+        last_failure_class: null,
+        ...clearLeaseFields(),
+      });
 
       return jsonResponse({ status: "ok", claimed: true, job_id: job.id, completed: true });
     }
@@ -709,18 +856,11 @@ Deno.serve(async (request) => {
       error: undefined,
     };
 
-    const { error: runningError } = await supabase
-      .from("generation_jobs")
-      .update({
-        status: "running",
-        current_stage: stage,
-        stage_map: stageMap,
-      })
-      .eq("id", job.id);
-
-    if (runningError) {
-      throw new EdgeFunctionError("db_write_failed", runningError.message, 500);
-    }
+    await updateLeasedJob(supabase, job, {
+      status: "running",
+      current_stage: stage,
+      stage_map: stageMap,
+    });
 
     try {
       const result = await runAiStage(job, stage, supabase);
@@ -760,16 +900,13 @@ Deno.serve(async (request) => {
         // never double-claimed as long-running `running` rows.
         updatePayload.status = "queued";
         updatePayload.current_stage = nextStage({ ...job, output_payload: nextOutputs }, stageMap);
+        updatePayload.next_run_at = new Date().toISOString();
       }
 
-      const { error: updateError } = await supabase
-        .from("generation_jobs")
-        .update(updatePayload)
-        .eq("id", job.id);
+      updatePayload.last_failure_class = null;
+      Object.assign(updatePayload, clearLeaseFields());
 
-      if (updateError) {
-        throw new EdgeFunctionError("db_write_failed", updateError.message, 500);
-      }
+      await updateLeasedJob(supabase, job, updatePayload, stage);
 
       return jsonResponse({
         status: "ok",
@@ -780,37 +917,40 @@ Deno.serve(async (request) => {
       });
     } catch (stageError) {
       const message = errorMessage(stageError);
+      const classification = failureClass(stageError);
+      const maxAttempts = job.max_attempts ?? 3;
+      const shouldRetry = isRetryableFailure(stageError) && job.attempt_count < maxAttempts;
       stageMap[stage] = {
         ...stageMap[stage],
-        status: "failed",
+        status: shouldRetry ? "pending" : "failed",
         failed_at: new Date().toISOString(),
         error: message,
       };
 
-      const { error: updateFailedError } = await supabase
-        .from("generation_jobs")
-        .update({
-          status: "failed",
-          current_stage: stage,
-          stage_map: stageMap,
-          last_error_message: message,
-          last_error_stage: stage,
-          actual_cost_cents: sumCosts(costBreakdown),
-          cost_breakdown: costBreakdown,
-        })
-        .eq("id", job.id);
-
-      if (updateFailedError) {
-        throw new EdgeFunctionError("db_write_failed", updateFailedError.message, 500);
-      }
+      await updateLeasedJob(supabase, job, {
+        status: shouldRetry ? "queued" : "failed",
+        current_stage: stage,
+        stage_map: stageMap,
+        last_error_message: message,
+        last_error_stage: stage,
+        last_failure_class: classification,
+        actual_cost_cents: sumCosts(costBreakdown),
+        cost_breakdown: costBreakdown,
+        next_run_at: shouldRetry ? nextRetryAt(job.attempt_count) : job.next_run_at,
+        completed_at: shouldRetry ? null : new Date().toISOString(),
+        ...clearLeaseFields(),
+      }, stage);
 
       return jsonResponse({
         status: "error",
-        code: stageError instanceof ProviderNotConfiguredError ? "provider_not_configured" : "stage_failed",
+        code: stageError instanceof ProviderNotConfiguredError ? "provider_not_configured" : shouldRetry ? "stage_retry_scheduled" : "stage_failed",
         job_id: job.id,
         stage,
+        retrying: shouldRetry,
+        next_run_at: shouldRetry ? nextRetryAt(job.attempt_count) : null,
+        failure_class: classification,
         message,
-      }, 200);
+      }, shouldRetry ? 503 : 500);
     }
   } catch (error) {
     const status = error instanceof EdgeFunctionError ? error.status : 500;

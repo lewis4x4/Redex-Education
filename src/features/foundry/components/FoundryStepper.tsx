@@ -30,7 +30,7 @@ const ROUTE_TO_STAGE: Record<string, FoundryDraftStage> = {
   '/admin/foundry/preview': 'preview',
   '/admin/foundry/critique': 'critique',
   '/admin/foundry/sidebyside': 'sidebyside',
-  '/admin/foundry/blockers': 'published',
+  '/admin/foundry/blockers': 'sidebyside',
   '/admin/foundry/published': 'published',
 }
 

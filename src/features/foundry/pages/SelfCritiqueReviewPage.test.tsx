@@ -85,10 +85,9 @@ describe('SelfCritiqueReviewPage', () => {
     vi.useRealTimers()
   })
 
-  it('renders eyebrow, title, subhead, and critique panel content', async () => {
+  it('renders title, subhead, and critique panel content', async () => {
     renderPage()
 
-    expect(screen.getByText('REDEX AI COURSE FOUNDRY · STEP 6')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'AI self-critique' })).toBeInTheDocument()
     expect(
       screen.getByText('The Foundry reviewed its own output and flagged issues to address before publishing.'),

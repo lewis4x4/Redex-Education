@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card'
 import { GeneratedLessonPreview } from '@/features/foundry/components/GeneratedLessonPreview'
 import { GenerationStatusBadge } from '@/features/foundry/components/GenerationStatusBadge'
 import { getCourseFoundryAiClient } from '@/features/foundry/ai'
-import { DEFAULT_AI_OUTLINE, DEFAULT_AI_SOURCE_MATERIAL } from '@/features/foundry/ai/pageInputDefaults'
+import { useDraftRedirect } from '@/features/foundry/hooks/useDraftRedirect'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
 import { useActorInfo } from '@/hooks/useActorInfo'
 import type { LessonGenerationStatus } from '@/lib/education'
@@ -34,15 +34,22 @@ export function ModuleGenerationPreviewPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const actor = useActorInfo()
 
+  useDraftRedirect('preview')
+
   const handleGenerateModule = async () => {
     setIsGenerating(true)
     setGenerationError(null)
 
     try {
       setSelectedLessonIndex(0)
+      if (outline === null || sourceMaterial === null) {
+        setGenerationError('Foundry draft context is missing. Return to Start to rebuild this module draft.')
+        return
+      }
+
       const generatedPreview = await getCourseFoundryAiClient().generateLessons({
-        outline: outline ?? DEFAULT_AI_OUTLINE,
-        sources: sourceMaterial ?? DEFAULT_AI_SOURCE_MATERIAL,
+        outline,
+        sources: sourceMaterial,
         learning_outcomes: currentDraft?.learning_outcomes,
       })
       useFoundryDraftStore.getState().setGeneratedModule(generatedPreview, actor)
@@ -100,7 +107,7 @@ export function ModuleGenerationPreviewPage() {
     <section className="max-w-7xl mx-auto space-y-6 md:space-y-8">
       <header className="space-y-4">
         <div className="space-y-2">
-          <p className="text-sm font-semibold uppercase tracking-[3px] text-redex-red">REDEX AI COURSE FOUNDRY · STEP 5</p>
+          <p className="text-sm font-semibold uppercase tracking-[3px] text-redex-red">REDEX AI COURSE FOUNDRY</p>
           <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">Review generated module</h1>
           <p className="text-[15px] text-slate-600 leading-[1.45]">
             The Foundry has drafted every lesson and assessment from your approved outline + source library. Review each
@@ -121,7 +128,7 @@ export function ModuleGenerationPreviewPage() {
 
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="brand" onClick={() => void handleGenerateModule()} disabled={isGenerating}>
-          {isGenerating ? 'Generating module…' : '✨ Generate Full Module in One Click (Preview Mode)'}
+          {isGenerating ? 'Generating module…' : 'Generate all lessons'}
         </Button>
       </div>
 
@@ -145,7 +152,7 @@ export function ModuleGenerationPreviewPage() {
             <p className="text-2xl leading-none text-slate-400">↑</p>
             <h2 className="text-lg font-semibold tracking-tight">No generated module yet</h2>
             <p className="text-[15px] text-slate-600 leading-[1.45]">
-              Click the Magic Button above to generate all lessons in preview mode.
+              Generate above to draft every lesson from your approved outline.
             </p>
           </div>
         </Card>

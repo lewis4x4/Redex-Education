@@ -1,8 +1,9 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getDriveAccessToken } from "../_shared/google-jwt.ts";
 
 const DRIVE_API_BASE_URL = "https://www.googleapis.com/drive/v3";
 const FOLDER_MIME_TYPE = "application/vnd.google-apps.folder";
+type RedexSupabaseClient = SupabaseClient<any, "public", "redex", any, any>;
 
 // CORS: by default echoes the requesting origin and only allows POST/OPTIONS.
 // Tighten further by setting REDEX_ALLOWED_ORIGINS env to a comma-separated list of
@@ -166,14 +167,14 @@ async function requireFoundryAuthor(
   request: Request,
   supabaseUrl: string,
   supabaseServiceRoleKey: string,
-): Promise<{ jwt: string; supabase: ReturnType<typeof createClient> }> {
+): Promise<{ jwt: string; supabase: RedexSupabaseClient }> {
   const jwt = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
 
   if (!jwt) {
     throw new EdgeFunctionError("auth_required", "Authorization header required.", 401);
   }
 
-  const callerClient = createClient(supabaseUrl, supabaseServiceRoleKey, { db: { schema: "redex" } });
+  const callerClient = createClient(supabaseUrl, supabaseServiceRoleKey, { db: { schema: "redex" } }) as RedexSupabaseClient;
   const { data: { user }, error: authError } = await callerClient.auth.getUser(jwt);
 
   if (authError || !user) {
@@ -300,18 +301,6 @@ async function walkDriveFolder(
   return discovered;
 }
 
-function invokeParsersInBackground(promises: Promise<unknown>[]): void {
-  const waitUntil = (globalThis as unknown as {
-    EdgeRuntime?: { waitUntil?: (promise: Promise<unknown>) => void };
-  })
-    .EdgeRuntime?.waitUntil;
-  const allInvocations = Promise.allSettled(promises).then(() => undefined);
-
-  if (waitUntil) {
-    waitUntil(allInvocations);
-  }
-}
-
 Deno.serve(async (request) => {
   const corsConfigError = configureAllowedOrigins("drive-sync");
   if (corsConfigError) {
@@ -407,30 +396,46 @@ Deno.serve(async (request) => {
       throw new EdgeFunctionError("db_write_failed", upsertError.message, 500);
     }
 
-    const parseInvocations = (upsertedFiles ?? []).map((file) =>
-      supabase.functions.invoke("parse-source-file", {
+    const parseInvocations = (upsertedFiles ?? []).map((file) => ({
+      file,
+      invocation: supabase.functions.invoke("parse-source-file", {
         body: { source_file_id: file.id, drive_file_id: file.drive_file_id },
         headers: { Authorization: `Bearer ${jwt}` },
-      }).catch((error) => {
-        console.error(
-          "parse-source-file invocation failed",
-          file.drive_file_id,
-          error,
-        );
-      })
+      }),
+    }));
+    const parserResults = await Promise.allSettled(
+      parseInvocations.map((item) => item.invocation),
     );
+    const parserErrors = parserResults.flatMap((result, index) => {
+      const file = parseInvocations[index]?.file;
+      if (!file) {
+        return [];
+      }
 
-    invokeParsersInBackground(parseInvocations);
+      if (result.status === "rejected") {
+        const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
+        console.error("parse-source-file invocation failed", file.drive_file_id, message);
+        return [{ drive_file_id: file.drive_file_id, message }];
+      }
 
+      if (result.value.error) {
+        console.error("parse-source-file returned an error", file.drive_file_id, result.value.error.message);
+        return [{ drive_file_id: file.drive_file_id, message: result.value.error.message }];
+      }
+
+      return [];
+    });
+
+    const failedDriveFileIds = new Set(parserErrors.map((error) => error.drive_file_id));
     const files: SourceFileSummary[] = (upsertedFiles ?? []).map((file) => ({
       drive_file_id: file.drive_file_id,
       title: file.title,
       authority: file.authority,
-      processing_status: file.processing_status,
+      processing_status: failedDriveFileIds.has(file.drive_file_id) ? "failed" : file.processing_status,
     }));
 
     return jsonResponse(request, {
-      status: "ok",
+      status: parserErrors.length > 0 ? "partial_error" : "ok",
       summary: {
         files_seen: driveFiles.length,
         files_inserted: driveFiles.filter((file) =>
@@ -439,8 +444,9 @@ Deno.serve(async (request) => {
         files_updated: driveFiles.filter((file) =>
           existingIds.has(file.id)
         ).length,
-        files_failed: 0,
+        files_failed: parserErrors.length,
       },
+      parser_errors: parserErrors,
       files,
     });
   } catch (error) {

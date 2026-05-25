@@ -147,7 +147,7 @@ export function SelfCritiqueReviewPage() {
           report={critique}
           onIgnoreIssue={ignoreIssue}
           onUnignoreIssue={unignoreIssue}
-          onEditIssue={() => toast.info('Manual editing in Slice 3.4')}
+          onEditIssue={() => toast.info('Manual editing is coming soon.')}
           onRegenerateAll={async () => {
             try {
               const selectedFixes = critique.issues.filter((issue) => !issue.ignored).map((issue) => issue.id)

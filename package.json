@@ -14,6 +14,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "eval": "vitest run src/features/foundry/ai/evals --reporter=verbose",
+    "rls:smoke": "node ./scripts/rls-smoke.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },
