@@ -45,7 +45,7 @@ async function importRealAiClient(
   options?: {
     selectedLibraryFileIds?: string[];
     sourceLibraryMocks?: {
-      fetchSourceFiles?: () => Promise<Array<{ id: string; title: string }>>;
+      fetchSourceFiles?: () => Promise<Array<{ id: string; drive_file_id: string; title: string }>>;
       fetchSourceFileVersions?: () => Promise<Array<{ id: string }>>;
       fetchSourceSections?: () => Promise<Array<{ id: string; level: 2; heading: string; body: string; position_index: number; has_placeholders: boolean }>>;
     };
@@ -321,9 +321,9 @@ describe('realAiClient', () => {
       },
     ]);
     const { realAiClient } = await importRealAiClient(supabase.supabase, {
-      selectedLibraryFileIds: ['file-1'],
+      selectedLibraryFileIds: ['drive-file-1'],
       sourceLibraryMocks: {
-        fetchSourceFiles: async () => [{ id: 'file-1', title: 'HR doc' }],
+        fetchSourceFiles: async () => [{ id: 'source-row-1', drive_file_id: 'drive-file-1', title: 'HR doc' }],
         fetchSourceFileVersions: async () => [{ id: 'version-1' }],
         fetchSourceSections: async () => [
           { id: 'section-1', level: 2, heading: 'Policy', body: 'Use PTO system.', position_index: 0, has_placeholders: false },

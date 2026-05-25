@@ -13,14 +13,15 @@ export function FoundryQuestionsPage() {
   const navigate = useNavigate()
   const currentDraft = useFoundryDraftStore((state) => state.currentDraft)
   const sourceMaterial = useFoundryDraftStore((state) => state.sourceMaterial)
+  const selectedLibraryFileIds = useFoundryDraftStore((state) => state.selectedLibraryFileIds)
   const setupAnswers = useFoundryDraftStore((state) => state.setupAnswers)
 
   useEffect(() => {
     // Builder-I hook pending: replace this inline prerequisite redirect with useDraftRedirect('source').
-    if (currentDraft === null || sourceMaterial === null) {
+    if (currentDraft === null || (sourceMaterial === null && selectedLibraryFileIds.length === 0)) {
       navigate('/admin/foundry/source', { replace: true })
     }
-  }, [currentDraft, sourceMaterial, navigate])
+  }, [currentDraft, sourceMaterial, selectedLibraryFileIds.length, navigate])
 
   const handleSubmit = (values: SetupAnswersInput) => {
     useFoundryDraftStore.getState().setSetupAnswers(values)

@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card'
 import { GeneratedLessonPreview } from '@/features/foundry/components/GeneratedLessonPreview'
 import { GenerationStatusBadge } from '@/features/foundry/components/GenerationStatusBadge'
 import { getCourseFoundryAiClient } from '@/features/foundry/ai'
+import { DEFAULT_AI_SOURCE_MATERIAL } from '@/features/foundry/ai/pageInputDefaults'
 import { useDraftRedirect } from '@/features/foundry/hooks/useDraftRedirect'
 import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore'
 import { useActorInfo } from '@/hooks/useActorInfo'
@@ -26,6 +27,7 @@ export function ModuleGenerationPreviewPage() {
   const generatedModule = useFoundryDraftStore((state) => state.generatedModule)
   const outline = useFoundryDraftStore((state) => state.outline)
   const sourceMaterial = useFoundryDraftStore((state) => state.sourceMaterial)
+  const selectedLibraryFileIds = useFoundryDraftStore((state) => state.selectedLibraryFileIds)
   const currentDraft = useFoundryDraftStore((state) => state.currentDraft)
   const updateLessonStatus = useFoundryDraftStore((state) => state.updateLessonStatus)
   const setLessonReviews = useFoundryDraftStore((state) => state.setLessonReviews)
@@ -42,14 +44,14 @@ export function ModuleGenerationPreviewPage() {
 
     try {
       setSelectedLessonIndex(0)
-      if (outline === null || sourceMaterial === null) {
+      if (outline === null || (sourceMaterial === null && selectedLibraryFileIds.length === 0)) {
         setGenerationError('Foundry draft context is missing. Return to Start to rebuild this module draft.')
         return
       }
 
       const generatedPreview = await getCourseFoundryAiClient().generateLessons({
         outline,
-        sources: sourceMaterial,
+        sources: sourceMaterial ?? DEFAULT_AI_SOURCE_MATERIAL,
         learning_outcomes: currentDraft?.learning_outcomes,
       })
       useFoundryDraftStore.getState().setGeneratedModule(generatedPreview, actor)

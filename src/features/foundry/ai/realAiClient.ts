@@ -85,7 +85,7 @@ async function resolveLibraryBackedSource(source: SourceMaterial): Promise<Sourc
   }
 
   const sourceFiles = await fetchSourceFiles();
-  const selectedFiles = sourceFiles.filter((file) => selectedLibraryFileIds.includes(file.id));
+  const selectedFiles = sourceFiles.filter((file) => selectedLibraryFileIds.includes(file.drive_file_id));
   const allSections = [] as SourceMaterial['sections'];
 
   for (const file of selectedFiles) {

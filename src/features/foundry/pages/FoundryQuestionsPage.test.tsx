@@ -96,6 +96,18 @@ describe('FoundryQuestionsPage', () => {
     expect(screen.getByRole('form', { name: /setup questions wizard/i })).toBeInTheDocument()
   })
 
+  it('allows setup questions when only Source Library files are selected', async () => {
+    act(() => {
+      useFoundryDraftStore.getState().clearSourceMaterial()
+      useFoundryDraftStore.getState().toggleLibraryFile('drive-file-1')
+    })
+
+    renderWithRoutes()
+
+    expect(await screen.findByRole('heading', { name: 'Generation guidance' })).toBeInTheDocument()
+    expect(screen.queryByText('Back to source')).not.toBeInTheDocument()
+  })
+
   it('submits wizard values, writes setupAnswers to store, shows toast, and navigates to outline', async () => {
     const user = userEvent.setup()
     renderWithRoutes()

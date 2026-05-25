@@ -3,6 +3,12 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
+const useSourceLibraryMock = vi.hoisted(() => vi.fn())
+
+vi.mock('@/features/source-binder/lib/useSourceLibrary', () => ({
+  useSourceLibrary: useSourceLibraryMock,
+}))
+
 function createStorageMock(): Storage {
   const store = new Map<string, string>()
 
@@ -38,6 +44,13 @@ describe('SourceBinderInputPage', () => {
     Object.defineProperty(globalThis, 'localStorage', {
       configurable: true,
       value: createStorageMock(),
+    })
+
+    useSourceLibraryMock.mockReturnValue({
+      files: [],
+      loading: false,
+      error: null,
+      refresh: vi.fn(),
     })
 
     ;({ useFoundryDraftStore } = await import('@/features/foundry/store/foundryDraftStore'))
@@ -107,6 +120,38 @@ describe('SourceBinderInputPage', () => {
     expect(screen.getByRole('textbox', { name: /markdown source/i })).toHaveValue('# Uploaded\nBody text')
     expect(screen.getByRole('heading', { name: 'Uploaded' })).toBeInTheDocument()
     expect(screen.getByText('Body text')).toBeInTheDocument()
+  })
+
+  it('shows selected Source Library files as saved source material', () => {
+    useSourceLibraryMock.mockReturnValue({
+      files: [
+        {
+          id: 'source-row-1',
+          drive_file_id: 'drive-file-1',
+          drive_path: '_library/operations/cat6-termination/module-build-plan.docx',
+          title: 'Cat6 termination module build plan',
+          mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          authority: 'context',
+          topic: 'cat6-termination',
+          processing_status: 'processed',
+          created_at: '2026-05-25T00:00:00.000Z',
+          updated_at: '2026-05-25T00:00:00.000Z',
+        },
+      ],
+      loading: false,
+      error: null,
+      refresh: vi.fn(),
+    })
+
+    act(() => {
+      useFoundryDraftStore.getState().toggleLibraryFile('drive-file-1')
+    })
+
+    renderWithRoutes()
+
+    expect(screen.getByRole('heading', { name: 'Source Library selection saved' })).toBeInTheDocument()
+    expect(screen.getByText('Cat6 termination module build plan')).toBeInTheDocument()
+    expect(screen.getByText(/These files will be used as the generation source/i)).toBeInTheDocument()
   })
 
   it('renders enabled continue button to setup questions', () => {

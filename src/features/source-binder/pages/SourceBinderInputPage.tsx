@@ -8,6 +8,7 @@ import { useFoundryDraftStore } from '@/features/foundry/store/foundryDraftStore
 import { SourcePastePanel, type SourceType } from '@/features/source-binder/components/SourcePastePanel'
 import { SourcePreviewPanel } from '@/features/source-binder/components/SourcePreviewPanel'
 import { SourceUploadDropzone } from '@/features/source-binder/components/SourceUploadDropzone'
+import { useSourceLibrary } from '@/features/source-binder/lib/useSourceLibrary'
 import { parseMarkdownSections } from '@/features/source-binder/utils/markdownSections'
 import { useActorInfo } from '@/hooks/useActorInfo'
 
@@ -15,16 +16,19 @@ export function SourceBinderInputPage() {
   const navigate = useNavigate()
   const currentDraft = useFoundryDraftStore((state) => state.currentDraft)
   const sourceMaterial = useFoundryDraftStore((state) => state.sourceMaterial)
+  const selectedLibraryFileIds = useFoundryDraftStore((state) => state.selectedLibraryFileIds)
   const setSourceMaterial = useFoundryDraftStore((state) => state.setSourceMaterial)
   const clearSourceMaterial = useFoundryDraftStore((state) => state.clearSourceMaterial)
+  const clearLibrarySelection = useFoundryDraftStore((state) => state.clearLibrarySelection)
   const actor = useActorInfo()
+  const { files: libraryFiles } = useSourceLibrary()
 
   useEffect(() => {
     // Builder-I hook pending: replace this inline prerequisite redirect with useDraftRedirect('basics').
-    if (currentDraft === null && sourceMaterial === null) {
+    if (currentDraft === null && sourceMaterial === null && selectedLibraryFileIds.length === 0) {
       navigate('/admin/foundry/start', { replace: true })
     }
-  }, [currentDraft, sourceMaterial, navigate])
+  }, [currentDraft, sourceMaterial, selectedLibraryFileIds.length, navigate])
 
   const [sourceId] = useState(() => sourceMaterial?.id ?? `source-${Date.now()}`)
   const [title, setTitle] = useState(sourceMaterial?.title ?? '')
@@ -33,6 +37,14 @@ export function SourceBinderInputPage() {
   const [lastUpload, setLastUpload] = useState<{ filename: string } | null>(null)
 
   const sections = useMemo(() => parseMarkdownSections(rawText), [rawText])
+  const selectedLibraryFiles = useMemo(
+    () => libraryFiles.filter((file) => selectedLibraryFileIds.includes(file.drive_file_id)),
+    [libraryFiles, selectedLibraryFileIds],
+  )
+  const unresolvedSelectedLibraryIds = useMemo(
+    () => selectedLibraryFileIds.filter((selectedId) => !selectedLibraryFiles.some((file) => file.drive_file_id === selectedId)),
+    [selectedLibraryFileIds, selectedLibraryFiles],
+  )
 
   const syncMaterial = (nextTitle: string, nextType: SourceType, nextRawText: string) => {
     setSourceMaterial(
@@ -70,13 +82,15 @@ export function SourceBinderInputPage() {
     }
 
     clearSourceMaterial()
+    clearLibrarySelection()
     setTitle('')
     setType('markdown')
     setRawText('')
     setLastUpload(null)
   }
 
-  const hasOrphanedSourceState = sourceMaterial === null && currentDraft === null
+  const hasLibrarySelection = selectedLibraryFileIds.length > 0
+  const hasOrphanedSourceState = sourceMaterial === null && currentDraft === null && !hasLibrarySelection
 
   return (
     <section className="max-w-6xl mx-auto space-y-6 md:space-y-8">
@@ -103,6 +117,44 @@ export function SourceBinderInputPage() {
           </Button>
         </div>
       </Card>
+
+      {hasLibrarySelection ? (
+        <Card className="rounded-2xl border border-redex-red/25 bg-redex-red/5 p-5 shadow-sm" aria-label="Selected Source Library files">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <h2 className="text-lg font-semibold tracking-tight text-slate-900">Source Library selection saved</h2>
+                <p className="text-sm leading-[1.45] text-slate-600">
+                  {selectedLibraryFileIds.length} Drive file{selectedLibraryFileIds.length === 1 ? '' : 's'} selected for this module.
+                  These files will be used as the generation source even when the paste box is empty.
+                </p>
+              </div>
+              <ul className="space-y-2">
+                {selectedLibraryFiles.map((file) => (
+                  <li key={file.drive_file_id} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                    <span className="font-medium text-slate-900">{file.title}</span>
+                    {file.drive_path ? <span className="mt-1 block text-xs text-slate-500">{file.drive_path}</span> : null}
+                  </li>
+                ))}
+                {unresolvedSelectedLibraryIds.map((selectedId) => (
+                  <li key={selectedId} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                    <span className="font-medium text-slate-900">Selected Drive file</span>
+                    <span className="mt-1 block break-all text-xs text-slate-500">{selectedId}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => navigate('/admin/foundry/library')}>
+                Change selection
+              </Button>
+              <Button type="button" variant="outline" onClick={clearLibrarySelection}>
+                Clear selected files
+              </Button>
+            </div>
+          </div>
+        </Card>
+      ) : null}
 
       {hasOrphanedSourceState ? (
         <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 space-y-4">

@@ -31,6 +31,7 @@ export function OutlineReviewPage() {
   const outlineStatus = useFoundryDraftStore((state) => state.outline_status)
   const currentDraft = useFoundryDraftStore((state) => state.currentDraft)
   const sourceMaterial = useFoundryDraftStore((state) => state.sourceMaterial)
+  const selectedLibraryFileIds = useFoundryDraftStore((state) => state.selectedLibraryFileIds)
   const setupAnswers = useFoundryDraftStore((state) => state.setupAnswers)
   const setOutline = useFoundryDraftStore((state) => state.setOutline)
   const approveOutline = useFoundryDraftStore((state) => state.approveOutline)
@@ -41,10 +42,10 @@ export function OutlineReviewPage() {
 
   useEffect(() => {
     // Builder-I hook pending: replace this inline prerequisite redirect with useDraftRedirect('questions').
-    if (currentDraft === null || sourceMaterial === null || setupAnswers === null) {
+    if (currentDraft === null || (sourceMaterial === null && selectedLibraryFileIds.length === 0) || setupAnswers === null) {
       navigate('/admin/foundry/questions', { replace: true })
     }
-  }, [currentDraft, sourceMaterial, setupAnswers, navigate])
+  }, [currentDraft, sourceMaterial, selectedLibraryFileIds.length, setupAnswers, navigate])
 
   const generateOutline = () =>
     getCourseFoundryAiClient().generateOutline({
