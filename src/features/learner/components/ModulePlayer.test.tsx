@@ -2,28 +2,125 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ModulePlayer } from './ModulePlayer';
-import type { Criticality, Lesson, LessonType, Module } from '@/lib/education';
+import type {
+  AcknowledgmentCompletion,
+  ChecklistCompletion,
+  Criticality,
+  OrderingCompletion,
+  ScenarioCompletion,
+  VideoCheckpointProgress,
+  Lesson,
+  LessonType,
+  Module,
+} from '@/lib/education';
 
 vi.mock('./LessonContentRenderer', () => ({
   LessonContentRenderer: ({
     lesson,
     onAcknowledge,
+    onChecklistComplete,
     onQuizComplete,
+    onScenarioComplete,
+    onOrderingComplete,
+    onVideoCheckpointProgress,
   }: {
     lesson: Lesson;
-    onAcknowledge?: () => void;
+    onAcknowledge?: (completion: AcknowledgmentCompletion) => void;
+    onChecklistComplete?: (completion: ChecklistCompletion) => void;
     onQuizComplete?: (score: number, passed: boolean, answers: Record<string, number>) => void;
+    onScenarioComplete?: (completion: ScenarioCompletion) => void;
+    onOrderingComplete?: (completion: OrderingCompletion) => void;
+    onVideoCheckpointProgress?: (progress: VideoCheckpointProgress) => void;
   }) => (
     <div data-testid="lesson-content-renderer">
       Rendering {lesson.id}
       {lesson.content.type === 'acknowledgment' && (
-        <button type="button" onClick={onAcknowledge}>Acknowledge lesson</button>
+        <button
+          type="button"
+          onClick={() =>
+            onAcknowledge?.({
+              lesson_id: lesson.id,
+              signature_method: 'click',
+              acknowledged_at: '2026-05-25T01:00:00.000Z',
+            })
+          }
+        >
+          Acknowledge lesson
+        </button>
+      )}
+      {lesson.content.type === 'checklist' && (
+        <button
+          type="button"
+          onClick={() =>
+            onChecklistComplete?.({
+              lesson_id: lesson.id,
+              checked_item_ids: ['item-1'],
+              completed_at: '2026-05-25T01:00:00.000Z',
+              require_all: true,
+            })
+          }
+        >
+          Complete checklist lesson
+        </button>
       )}
       {lesson.content.type === 'quiz' && (
         <>
           <button type="button" onClick={() => onQuizComplete?.(100, true, { Q1: 0, Q2: 1 })}>Complete quiz pass</button>
           <button type="button" onClick={() => onQuizComplete?.(50, false, { Q1: 1, Q2: 1 })}>Complete quiz fail</button>
         </>
+      )}
+      {lesson.content.type === 'scenario' && (
+        <button
+          type="button"
+          onClick={() =>
+            onScenarioComplete?.({
+              lesson_id: lesson.id,
+              completed_at: '2026-05-25T01:00:00.000Z',
+              selected_choice_ids: { 'step-1': 'choice-1' },
+              visited_step_ids: ['step-1'],
+            })
+          }
+        >
+          Complete scenario lesson
+        </button>
+      )}
+      {lesson.content.type === 'drag_to_order' && (
+        <button
+          type="button"
+          onClick={() =>
+            onOrderingComplete?.({
+              lesson_id: lesson.id,
+              completed_at: '2026-05-25T01:00:00.000Z',
+              ordered_step_ids: ['step-1', 'step-2'],
+              attempt_count: 2,
+            })
+          }
+        >
+          Complete ordering lesson
+        </button>
+      )}
+      {lesson.content.type === 'video' && (
+        <button
+          type="button"
+          onClick={() =>
+            onVideoCheckpointProgress?.({
+              lesson_id: lesson.id,
+              answered_checkpoint_ids: ['checkpoint-1'],
+              required_checkpoint_ids: ['checkpoint-1'],
+              all_required_answered: true,
+              completions: [
+                {
+                  checkpoint_id: 'checkpoint-1',
+                  answered_at: '2026-05-25T01:00:00.000Z',
+                  selected_option_index: 0,
+                  correct: true,
+                },
+              ],
+            })
+          }
+        >
+          Complete video checkpoints
+        </button>
       )}
     </div>
   ),
@@ -350,6 +447,426 @@ describe('Redex Academy learner module player', () => {
     expect(onProgressUpdate).toHaveBeenCalledWith('lesson-ack', 'completed');
     expect(screen.getByText('LESSON 2 OF 2')).toBeInTheDocument();
     expect(screen.getAllByText('Next Lesson')).toHaveLength(2);
+  });
+
+  it('prevents footer bypass for acknowledgment until renderer callback completes lesson', async () => {
+    const user = userEvent.setup();
+    const onProgressUpdate = vi.fn();
+
+    const acknowledgmentLesson = makeLesson({
+      id: 'lesson-ack',
+      title: 'Required Acknowledgment',
+      content: {
+        type: 'acknowledgment',
+        statement_markdown: 'I understand policy.',
+        required_signature: 'click',
+      },
+    });
+    const nextLesson = makeLesson({ id: 'lesson-next', title: 'Next Lesson', order_index: 1 });
+
+    render(
+      <ModulePlayer
+        module={makeModule()}
+        lessons={[acknowledgmentLesson, nextLesson]}
+        onProgressUpdate={onProgressUpdate}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /complete above to continue/i })).toBeDisabled();
+    expect(screen.getByText(/Complete the acknowledgment above to continue./i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /acknowledge lesson/i }));
+
+    expect(onProgressUpdate).toHaveBeenCalledWith('lesson-ack', 'completed');
+    expect(screen.getByText('LESSON 2 OF 2')).toBeInTheDocument();
+  });
+
+  it('prevents footer bypass for checklist until renderer callback completes lesson', async () => {
+    const user = userEvent.setup();
+    const onProgressUpdate = vi.fn();
+
+    const checklistLesson = makeLesson({
+      id: 'lesson-checklist',
+      title: 'Checklist',
+      content: {
+        type: 'checklist',
+        intro_markdown: 'Do all steps',
+        require_all: true,
+        items: [{ id: 'item-1', label: 'First step' }],
+      },
+    });
+    const nextLesson = makeLesson({ id: 'lesson-next', title: 'Next Lesson', order_index: 1 });
+
+    render(
+      <ModulePlayer
+        module={makeModule()}
+        lessons={[checklistLesson, nextLesson]}
+        onProgressUpdate={onProgressUpdate}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /complete above to continue/i })).toBeDisabled();
+    expect(screen.getByText(/Complete the checklist above to continue./i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /complete checklist lesson/i }));
+
+    expect(onProgressUpdate).toHaveBeenCalledWith('lesson-checklist', 'completed');
+    expect(screen.getByText('LESSON 2 OF 2')).toBeInTheDocument();
+  });
+
+  it('prevents footer bypass for scenario until renderer callback completes lesson', async () => {
+    const user = userEvent.setup();
+    const onProgressUpdate = vi.fn();
+
+    const scenarioLesson = makeLesson({
+      id: 'lesson-scenario',
+      title: 'Scenario Lesson',
+      content: {
+        type: 'scenario',
+        intro_markdown: 'Intro',
+        steps: [{ id: 'step-1', prompt_markdown: 'Prompt', choices: [{ id: 'choice-1', label: 'Choice' }] }],
+      },
+    });
+    const nextLesson = makeLesson({ id: 'lesson-next', title: 'Next Lesson', order_index: 1 });
+
+    render(
+      <ModulePlayer
+        module={makeModule()}
+        lessons={[scenarioLesson, nextLesson]}
+        onProgressUpdate={onProgressUpdate}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /complete scenario to continue/i })).toBeDisabled();
+    expect(screen.getByText(/Complete the scenario above to continue./i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /complete scenario lesson/i }));
+
+    expect(onProgressUpdate).toHaveBeenCalledWith('lesson-scenario', 'completed');
+    expect(screen.getByText('LESSON 2 OF 2')).toBeInTheDocument();
+  });
+
+  it('keeps video lessons without checkpoints manually completable', async () => {
+    const user = userEvent.setup();
+    const onProgressUpdate = vi.fn();
+
+    const videoLesson = makeLesson({
+      id: 'lesson-video-open',
+      title: 'Open Video Lesson',
+      content: {
+        type: 'video',
+        video_url: 'https://example.com/video.mp4',
+      },
+    });
+    const nextLesson = makeLesson({ id: 'lesson-next', title: 'Next Lesson', order_index: 1 });
+
+    render(<ModulePlayer module={makeModule()} lessons={[videoLesson, nextLesson]} onProgressUpdate={onProgressUpdate} />);
+
+    expect(screen.queryByText(/Answer the video checkpoints above to continue./i)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /mark complete & continue/i }));
+
+    expect(onProgressUpdate).toHaveBeenCalledWith('lesson-video-open', 'completed');
+    expect(screen.getByText('LESSON 2 OF 2')).toBeInTheDocument();
+  });
+
+  it('does not dead-end unavailable or unreachable video checkpoints behind the inline lock', () => {
+    const unavailableVideoLesson = makeLesson({
+      id: 'lesson-video-unavailable',
+      title: 'Unavailable Video Lesson',
+      content: {
+        type: 'video',
+        video_url: '',
+        duration_seconds: 30,
+        checkpoints: [{ id: 'checkpoint-1', at_seconds: 10, question: 'Unreachable?', required: true }],
+      },
+    });
+
+    const { rerender } = render(<ModulePlayer module={makeModule()} lessons={[unavailableVideoLesson]} />);
+
+    expect(screen.queryByText(/Answer the video checkpoints above to continue./i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /complete module/i })).toBeEnabled();
+
+    const beyondDurationVideoLesson = makeLesson({
+      id: 'lesson-video-beyond-duration',
+      title: 'Beyond Duration Video Lesson',
+      content: {
+        type: 'video',
+        video_url: 'https://example.com/video.mp4',
+        duration_seconds: 30,
+        checkpoints: [{ id: 'checkpoint-1', at_seconds: 45, question: 'Unreachable?', required: true }],
+      },
+    });
+
+    rerender(<ModulePlayer module={makeModule()} lessons={[beyondDurationVideoLesson]} />);
+
+    expect(screen.queryByText(/Answer the video checkpoints above to continue./i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /complete module/i })).toBeEnabled();
+
+    const invalidCorrectnessRequiredVideoLesson = makeLesson({
+      id: 'lesson-video-invalid-correctness-required',
+      title: 'Invalid Correctness Required Video Lesson',
+      content: {
+        type: 'video',
+        video_url: 'https://example.com/video.mp4',
+        duration_seconds: 30,
+        checkpoints: [
+          {
+            id: 'checkpoint-1',
+            at_seconds: 10,
+            question: 'Malformed correctness-required checkpoint?',
+            options: ['Only option'],
+            correct_index: 4,
+            required: true,
+            must_answer_correctly: true,
+          },
+        ],
+      },
+    });
+
+    rerender(<ModulePlayer module={makeModule()} lessons={[invalidCorrectnessRequiredVideoLesson]} />);
+
+    expect(screen.queryByText(/Answer the video checkpoints above to continue./i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /complete module/i })).toBeEnabled();
+  });
+
+  it('prevents footer bypass for video until required checkpoint progress is complete', async () => {
+    const user = userEvent.setup();
+    const onProgressUpdate = vi.fn();
+
+    const videoLesson = makeLesson({
+      id: 'lesson-video-gated',
+      title: 'Gated Video Lesson',
+      content: {
+        type: 'video',
+        video_url: 'https://example.com/video.mp4',
+        checkpoints: [
+          {
+            id: 'checkpoint-1',
+            at_seconds: 15,
+            question: 'What is required?',
+            options: ['Answer'],
+            required: true,
+          },
+        ],
+      },
+    });
+    const nextLesson = makeLesson({ id: 'lesson-next', title: 'Next Lesson', order_index: 1 });
+
+    render(<ModulePlayer module={makeModule()} lessons={[videoLesson, nextLesson]} onProgressUpdate={onProgressUpdate} />);
+
+    expect(screen.getByRole('button', { name: /answer checkpoints to continue/i })).toBeDisabled();
+    expect(screen.getByText(/Answer the video checkpoints above to continue./i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /complete video checkpoints/i }));
+
+    expect(onProgressUpdate).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /mark complete & continue/i })).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: /mark complete & continue/i }));
+
+    expect(onProgressUpdate).toHaveBeenCalledWith('lesson-video-gated', 'completed');
+    expect(screen.getByText('LESSON 2 OF 2')).toBeInTheDocument();
+  });
+
+  it('does not lock completed video lessons with required checkpoints', () => {
+    const videoLesson = makeLesson({
+      id: 'lesson-video-complete',
+      title: 'Completed Video Lesson',
+      content: {
+        type: 'video',
+        video_url: 'https://example.com/video.mp4',
+        checkpoints: [
+          {
+            id: 'checkpoint-1',
+            at_seconds: 15,
+            question: 'What is required?',
+            required: true,
+          },
+        ],
+      },
+    });
+    const nextLesson = makeLesson({ id: 'lesson-next', title: 'Next Lesson', order_index: 1 });
+
+    render(
+      <ModulePlayer
+        module={makeModule()}
+        lessons={[videoLesson, nextLesson]}
+        completedLessonIds={['lesson-video-complete']}
+        initialLessonId="lesson-video-complete"
+      />,
+    );
+
+    expect(screen.queryByText(/Answer the video checkpoints above to continue./i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /mark complete & continue/i })).toBeEnabled();
+  });
+
+  it('prevents footer bypass for ordering until renderer callback completes lesson', async () => {
+    const user = userEvent.setup();
+    const onProgressUpdate = vi.fn();
+
+    const orderingLesson = makeLesson({
+      id: 'lesson-ordering',
+      title: 'Ordering Lesson',
+      content: {
+        type: 'drag_to_order',
+        intro_markdown: 'Order these steps',
+        steps: [
+          { id: 'step-1', label: 'First step' },
+          { id: 'step-2', label: 'Second step' },
+        ],
+      },
+    });
+    const nextLesson = makeLesson({ id: 'lesson-next', title: 'Next Lesson', order_index: 1 });
+
+    render(
+      <ModulePlayer
+        module={makeModule()}
+        lessons={[orderingLesson, nextLesson]}
+        onProgressUpdate={onProgressUpdate}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /complete sequence to continue/i })).toBeDisabled();
+    expect(screen.getByText(/Complete the sequence above to continue./i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /complete ordering lesson/i }));
+
+    expect(onProgressUpdate).toHaveBeenCalledWith('lesson-ordering', 'completed');
+    expect(screen.getByText('LESSON 2 OF 2')).toBeInTheDocument();
+  });
+
+  it('does not dead-end malformed ordering content behind the inline lock', () => {
+    const orderingLesson = makeLesson({
+      id: 'lesson-ordering-empty',
+      title: 'Empty Ordering Lesson',
+      content: {
+        type: 'drag_to_order',
+        intro_markdown: 'Order these steps',
+        steps: [],
+      },
+    });
+
+    render(<ModulePlayer module={makeModule()} lessons={[orderingLesson]} />);
+
+    expect(screen.queryByText(/Complete the sequence above to continue./i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /complete module/i })).toBeEnabled();
+  });
+
+  it('forwards ordering completion metadata through side-channel callback', async () => {
+    const user = userEvent.setup();
+    const onOrderingComplete = vi.fn();
+
+    const orderingLesson = makeLesson({
+      id: 'lesson-ordering',
+      content: {
+        type: 'drag_to_order',
+        intro_markdown: 'Order these steps',
+        steps: [
+          { id: 'step-1', label: 'First step' },
+          { id: 'step-2', label: 'Second step' },
+        ],
+      },
+    });
+
+    render(
+      <ModulePlayer
+        module={makeModule()}
+        lessons={[orderingLesson]}
+        onOrderingComplete={onOrderingComplete}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /complete ordering lesson/i }));
+
+    expect(onOrderingComplete).toHaveBeenCalledWith({
+      lesson_id: 'lesson-ordering',
+      completed_at: '2026-05-25T01:00:00.000Z',
+      ordered_step_ids: ['step-1', 'step-2'],
+      attempt_count: 2,
+    });
+  });
+
+  it('forwards scenario completion metadata through side-channel callback', async () => {
+    const user = userEvent.setup();
+    const onScenarioComplete = vi.fn();
+
+    const scenarioLesson = makeLesson({
+      id: 'lesson-scenario',
+      content: {
+        type: 'scenario',
+        intro_markdown: 'Intro',
+        steps: [{ id: 'step-1', prompt_markdown: 'Prompt', choices: [{ id: 'choice-1', label: 'Choice' }] }],
+      },
+    });
+
+    render(
+      <ModulePlayer
+        module={makeModule()}
+        lessons={[scenarioLesson]}
+        onScenarioComplete={onScenarioComplete}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /complete scenario lesson/i }));
+
+    expect(onScenarioComplete).toHaveBeenCalledWith({
+      lesson_id: 'lesson-scenario',
+      completed_at: '2026-05-25T01:00:00.000Z',
+      selected_choice_ids: { 'step-1': 'choice-1' },
+      visited_step_ids: ['step-1'],
+    });
+  });
+
+  it('forwards acknowledgment/checklist completion metadata through side-channel callbacks', async () => {
+    const user = userEvent.setup();
+    const onAcknowledgmentComplete = vi.fn();
+    const onChecklistComplete = vi.fn();
+
+    const acknowledgmentLesson = makeLesson({
+      id: 'lesson-ack',
+      content: {
+        type: 'acknowledgment',
+        statement_markdown: 'Acknowledge',
+        required_signature: 'click',
+      },
+    });
+
+    const checklistLesson = makeLesson({
+      id: 'lesson-checklist',
+      order_index: 1,
+      content: {
+        type: 'checklist',
+        intro_markdown: 'Checklist',
+        require_all: true,
+        items: [{ id: 'item-1', label: 'Step one' }],
+      },
+    });
+
+    render(
+      <ModulePlayer
+        module={makeModule()}
+        lessons={[acknowledgmentLesson, checklistLesson]}
+        onAcknowledgmentComplete={onAcknowledgmentComplete}
+        onChecklistComplete={onChecklistComplete}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /acknowledge lesson/i }));
+
+    expect(onAcknowledgmentComplete).toHaveBeenCalledWith({
+      lesson_id: 'lesson-ack',
+      signature_method: 'click',
+      acknowledged_at: '2026-05-25T01:00:00.000Z',
+    });
+
+    await user.click(screen.getByRole('button', { name: /complete checklist lesson/i }));
+
+    expect(onChecklistComplete).toHaveBeenCalledWith({
+      lesson_id: 'lesson-checklist',
+      checked_item_ids: ['item-1'],
+      completed_at: '2026-05-25T01:00:00.000Z',
+      require_all: true,
+    });
   });
 
   it('shows completion inline after the final lesson and calls onCompleteModule from Back to dashboard', async () => {

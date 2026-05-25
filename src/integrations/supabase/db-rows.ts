@@ -96,6 +96,9 @@ export type ModuleSourceBindingRow = Tables extends {
   ? R
   : never
 
+/** Row shape for the `media_assets` table. */
+export type MediaAssetRow = Tables extends { media_assets: { Row: infer R } } ? R : never
+
 /** Row shape for the `module_versions` table. */
 export type ModuleVersionRow = Tables extends { module_versions: { Row: infer R } } ? R : never
 

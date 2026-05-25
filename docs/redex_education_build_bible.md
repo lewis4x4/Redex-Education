@@ -174,20 +174,20 @@ Redex Education
 
 ## Phase
 
-**Phase 8 — Supabase Integration (in progress).** Evidence: the completed-work log below records Phase 7 complete, Slice 8.1 complete, and Slice 8.2 complete; the Slice 8.2 entry was committed at `da7ddce`.
+**Phase 10 — Lesson Experience Engine (started).** Part 1 backend/AI finish-line work has been completed and deployed through the hardened Supabase generation path; the active build has moved into Phase 10's learner lesson-engine slices.
 
 ## Current Slice
 
-**Slice 9.2 — Docs & Build Bible Reconciliation (in progress).** Last completed slice: **Slice 8.2 — Database Schema Migration Draft** at commit `da7ddce`.
+**Slice 10.6 — Video Player + Checkpoints + Transcript Capture + HeyGen Media Stage (completed locally).** Slice 10.6 implementation items 1–7 are complete and verified locally; this update records Item 9 documentation status.
 
 ## Current Status
 
-Honest current state as of 2026-05-23:
+Honest current state as of 2026-05-25:
 
-- **Roadmap Phases 0–7** — fully complete. The completed-work log below records the mock vertical through Phase 7: learner flow, Course Foundry prototype surfaces, Drive Source Library scaffolding, assignments, manager visibility, publishing/versioning, source-impact review, and audit log.
-- **Roadmap Phase 8** — partially complete. **Slice 8.1** (Supabase environment/client verification) and **Slice 8.2** (database schema migration draft) are complete; **Slices 8.3–8.6** remain outstanding per v2 Part 1 (`docs/Redex_Education_Phase10-13_Roadmap_v2_20260523.md`).
-- **Current verification baseline** — `npm test` reports **426 passing, 1 skipped, 86 test files** in the Slice 8.2 completed-work entry below; Slice 9.2 must preserve that count because it changes docs only.
-- **Forward gate** — v2 Part 1 is the hard gate before Phase 10+: Slices 8.3–8.6, AI Slices A–D, and Slice 9.1 must be accepted before Phase 10 starts (`docs/Redex_Education_Phase10-13_Roadmap_v2_20260523.md`).
+- **Roadmap Phases 0–9 / Part 1 finish-line** — functionally complete enough to begin Phase 10: Supabase reads/writes, role/RLS hardening, AI prompt/service abstractions, secure staged generation, source bindings, cost telemetry, section regeneration, eval harness, deployment gates, and live Supabase smoke checks have landed.
+- **Production deployment baseline** — commit `4dc1937` was pushed to `main`; GitHub CI passed; Netlify deploy completed; Supabase migration `20260524190000_phase3_4_backend_hardening.sql` was applied; all Edge Functions were deployed.
+- **Current verification baseline** — Slice 10.6 workstream verification is green: focused learner/player and backend suites plus full gates (`npm test`, `npm run typecheck`, `npm run lint`, `npm run build`) completed by the orchestrator; `git diff --check` clean.
+- **Active forward slice** — Slice 10.6 is complete locally: `video` lessons now render through a shared Redex video player with checkpoint gating, transcript/chapter navigation, and resume/deep-link support. Backend media pipeline contracts (media submit/poll/transcript ingest) and transcript persistence landed behind env-gated rollout controls.
 
 ---
 
@@ -235,7 +235,7 @@ This Build Bible should not replace the roadmap. The roadmap explains what to bu
 
 ## Current Work
 
-Pilot-gate prep continues. **Module Management UI** is complete: dashboard rows link to module version history, Draft rows can resume into Foundry, and version-history cards now archive versions with inline confirmation. The next active item is the real end-to-end AI-generation smoke test against the HR content Brian uploaded to Drive `_library/`. v2 Part 1 close-out remains the hard Finish-Line gate before Phase 10+ (`docs/Redex_Education_Phase10-13_Roadmap_v2_20260523.md`).
+Phase 10 lesson-engine work is active. Slices 10.1–10.6 are complete locally: shared scaffold + renderer contract, guided checklist + upgraded acknowledgment, branching scenario renderer integration, hotspot diagram lesson rendering, drag-to-order sequence practice, and video lesson/player + transcript/checkpoint flow. `ModulePlayer` footer progression is gated for quiz/acknowledgment/checklist/scenario/drag-to-order and required-video-checkpoint lessons.
 
 ---
 
@@ -299,7 +299,7 @@ The "After Slice 0.1" gap list was stale — app shell, learner screens, and the
 - **Drive Source Library not built** — no Google Drive integration; the new Slice 2.4 covers it and is the next build target.
 - **Foundry/source-binder data model not migrated** — `source_files`, `source_file_versions`, `source_sections`, `module_source_bindings`, `module_versions`, `source_change_events`, and `profiles` (roles) all still needed (roadmap Slice 8.2).
 - **No `profiles`/role table** — blocks admin-only RLS on every Foundry table.
-- **`LessonContentRenderer` is partial** — only 3 of 6 lesson types implemented (checklist, acknowledgment, scenario are stubs).
+- **`LessonContentRenderer` is still partial** — real renderers now exist for text, quiz, checklist, acknowledgment, scenario, hotspot_diagram, drag_to_order, and video. Remaining placeholder lesson renderers are coach, assignment, and reflection_prompt.
 - **Nexa Bold brand font absent** — specified in the brand guide but not in the repo; the typographic identity is unshipped.
 - **No AI integration** — mock AI client/interface not yet built.
 - **No real Redex source material** — only sample/placeholder content until HR provides approved markdown.
@@ -344,9 +344,10 @@ All Course Foundry prompts are individually versioned. Generated artifacts must 
 | `lesson_generation.scenario` | `v1` | Produce branching scenarios with worked examples, one decision per screen, feedback, and outcomes. |
 | `lesson_generation.acknowledgment` | `v1` | Produce policy acknowledgment content with statement markdown and signature requirements. |
 | `lesson_generation.quiz` | `v1` | Produce quiz lesson content covering recognition, free-recall, sequencing, and confidence-rated item families. |
-| `lesson_generation.video_script` | `v1` | Produce video scripts with semantic 60–120 second segments, checkpoints, and `derived_from_section_ids`. |
-| `lesson_generation.hotspot_diagram` | `v1` | Produce Phase 10.4 hotspot diagram annotations; schema may be stubbed until that slice lands. |
-| `lesson_generation.drag_to_order` | `v1` | Produce Phase 10.5 ordered procedure steps; schema may be stubbed until that slice lands. |
+| `lesson_generation.video` | `v1.1` | Produce structured `VideoLessonContent` (chapters, transcript segments, checkpoints, provenance fields) aligned with Slice 10.6 learner/backend contracts. |
+| `lesson_generation.video_script` | `v1.1` | Produce video scripts with semantic 60–120 second segments, checkpoints, and `derived_from_section_ids`. |
+| `lesson_generation.hotspot_diagram` | `v1` | Produce Phase 10.4 hotspot diagram annotations; learner renderer is live locally, with Foundry generation behavior continuing under Slice 10.9 governance. |
+| `lesson_generation.drag_to_order` | `v1` | Produce Phase 10.5 ordered procedure steps backed by `OrderingLessonContent`; learner renderer is live locally, with Foundry generation behavior continuing under Slice 10.9 governance. |
 | `lesson_generation.practical` | `v1` | Produce Phase 11.1 practical lessons with observation checklists; schema may be stubbed until that slice lands. |
 | `assessment_generation` | `v1` | Produce competency-tagged Slice 11.2 item-bank schema-shape items. |
 | `self_critique` | `v1` | Review generated content for source support and pedagogical quality issues. |
@@ -4645,4 +4646,76 @@ The following must be applied to the linked Supabase project for the new feature
 3. **Edge function** `supabase/functions/generation-worker/` — modified to assemble Drive-library source when `sourceMaterial` is empty and `selectedLibraryFileIds` is set. Redeploy via `supabase functions deploy generation-worker`.
 
 **Next**: The live AI-generation smoke test against Brian's Drive `_library/` HR content is now genuinely unblocked. Every audit-identified blocker is fixed, every mock leak is eliminated, and the workflow now asks the right questions (learning outcomes, structured audience, sane criticality scale) and uses them everywhere they need to be used.
+
+---
+
+## 2026-05-25 — Slice 10.1: Exhaustive Lesson Renderer & Shared Lesson Scaffold
+
+**Status**: ✅ Completed locally.
+
+**Why this was next**: The Phase 10 roadmap starts the Lesson Experience Engine with Slice 10.1 before deeper renderer work. Part 1 backend/AI hardening is now deployed, so the next smallest build step is the learner-side renderer contract that later Phase 10 slices build on.
+
+**Files added**:
+- `src/features/learner/components/LessonScaffold.tsx` — shared lesson shell with lesson-type eyebrow, lesson position, estimated time, title, and one-line learner objective.
+
+**Files modified**:
+- `src/features/learner/components/LessonContentRenderer.tsx` — refactored to an exhaustive `switch` over every `LessonContent` variant. Existing `text`, `quiz`, `video`, and `acknowledgment` behavior now renders inside `LessonScaffold`; `checklist`, `scenario`, `coach`, `assignment`, and `reflection_prompt` render explicit branded "Renderer coming soon" states instead of falling through to a generic gray fallback.
+- `src/features/learner/components/ModulePlayer.tsx` — passes `lessonNumber` and `totalLessons` into `LessonContentRenderer`.
+- `src/features/learner/components/LessonContentRenderer.test.tsx` — added scaffold coverage and branded coming-soon coverage while preserving acknowledgment behavior tests.
+- `docs/redex_education_build_bible.md` — updated current status and recorded this slice.
+
+**Verification**:
+- ✅ `npm run typecheck`
+- ✅ `npm run lint`
+- ✅ `npm test -- --run src/features/learner/components/LessonContentRenderer.test.tsx src/features/learner/components/ModulePlayer.test.tsx` — 20 tests passed.
+
+**Acceptance criteria**:
+- ✅ `LessonContentRenderer` now exhaustively switches on `LessonContent`.
+- ✅ Every variant renders inside `LessonScaffold`.
+- ✅ Unimplemented Phase 10 lesson types now render explicit branded coming-soon states.
+- ✅ ModulePlayer supplies lesson position for "Lesson X of Y".
+
+**Next**: Slice 10.2 — replace the checklist and acknowledgment placeholder/base renderer with dedicated Phase 10 renderers: guided checklist cards with expandable details and an upgraded acknowledgment artifact with typed-name signature support.
+
+---
+
+## 2026-05-25 — Slice 10.6: Video Player + Checkpoints + Transcript Capture + HeyGen Async Media Stage
+
+**Status**: ✅ Implementation complete locally (Items 1–7 complete/verified by orchestrator); this entry is Item 9 documentation close-out.
+
+**Key files/contracts landed**:
+- Learner/domain contracts:
+  - `src/types/training.ts`
+  - `src/features/learner/components/LessonContentRenderer.tsx`
+  - `src/features/learner/components/ModulePlayer.tsx`
+  - `src/features/learner/components/lessons/VideoLesson.tsx`
+  - `src/features/learner/components/video/RedexVideoPlayer.tsx`
+- Foundry prompt/schema contract sync:
+  - `src/features/foundry/ai/aiSchemas.ts`
+  - `src/features/foundry/ai/prompts.ts`
+  - `supabase/functions/_shared/courseFoundryAiClientServer.ts`
+- Backend media/transcript pipeline:
+  - `supabase/migrations/20260525100000_media_assets_and_video_transcripts.sql`
+  - `supabase/functions/generation-worker/index.ts`
+  - `supabase/functions/_shared/heygenMedia.ts`
+  - `supabase/functions/heygen-submit/index.ts`
+  - `supabase/functions/heygen-poll/index.ts`
+  - `supabase/functions/transcript-ingest/index.ts`
+  - `supabase/functions/submit-generation-job/index.ts`
+
+**Verification evidence (orchestrator-reported)**:
+- Focused learner, prompt/schema, DB, and backend media-stage tests: passing.
+- Full verification gates: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build` passing.
+- Diff hygiene: `git diff --check` clean.
+
+**Env-gated backend rollout notes**:
+- Media stages are kill-switched unless `REDEX_ENABLE_HEYGEN_MEDIA_STAGE=true`.
+- HeyGen operations require `HEYGEN_API_KEY`.
+- Successful media poll storage requires `REDEX_MEDIA_BUCKET`.
+- Worker media stages are scoped to `renderVideoLesson` operation (`media_submit -> media_poll -> transcript_ingest -> assemble`) and do not alter default non-video generation flow.
+
+**Remaining operational/deploy notes**:
+1. Apply migration `20260525100000_media_assets_and_video_transcripts.sql` to target environments.
+2. Deploy/redeploy updated Edge Functions (`generation-worker`, `submit-generation-job`, `heygen-submit`, `heygen-poll`, `transcript-ingest`).
+3. Keep media stages disabled in environments without HeyGen + storage secrets; enable only when ready for live avatar-video generation.
 

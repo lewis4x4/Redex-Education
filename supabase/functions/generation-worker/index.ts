@@ -5,6 +5,21 @@ import {
   type CostedAiResult,
 } from "../_shared/courseFoundryAiClientServer.ts";
 import {
+  buildHeyGenCreateVideoRequest,
+  buildMediaStoragePath,
+  downloadHeyGenMedia,
+  getHeyGenVideo,
+  HeyGenMediaError,
+  submitHeyGenVideo,
+  type HeyGenVideoDetail,
+} from "../_shared/heygenMedia.ts";
+import {
+  ingestVideoTranscript,
+  TranscriptIngestError,
+  validateTranscriptSegments,
+  type VideoTranscriptSegmentInput,
+} from "../_shared/videoTranscriptIngest.ts";
+import {
   writeSourceBindings,
   type CitedClaim,
   type GeneratedModulePreview,
@@ -22,6 +37,9 @@ const STAGES = [
   "source_binding",
   "generate_assessments",
   "self_critique",
+  "media_submit",
+  "media_poll",
+  "transcript_ingest",
   "assemble",
 ] as const;
 
@@ -74,6 +92,38 @@ class EdgeFunctionError extends Error {
   ) {
     super(message);
   }
+}
+
+class HeyGenNotConfiguredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "HeyGenNotConfiguredError";
+  }
+}
+
+class MediaStagePendingError extends Error {
+  constructor(
+    message: string,
+    public output: Record<string, unknown>,
+    public nextRunAt: string,
+  ) {
+    super(message);
+    this.name = "MediaStagePendingError";
+  }
+}
+
+interface RenderVideoLessonInput {
+  moduleVersionId: string;
+  lessonId?: string;
+  lessonIndex?: number;
+  lessonTitle: string;
+  approvedScriptMarkdown: string;
+  avatarId: string;
+  voiceId?: string;
+  video: {
+    transcript_segments: VideoTranscriptSegmentInput[];
+    duration_seconds?: number;
+  };
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -153,10 +203,6 @@ function moduleVersionIdFor(job: GenerationJobRow): string {
 }
 
 function relevantStages(job: GenerationJobRow): StageName[] {
-  if (job.job_type === "section" || operationFor(job) === "regenerateSection") {
-    return ["generate_lessons", "assemble"];
-  }
-
   switch (operationFor(job)) {
     case "analyzeSource":
       return ["parse", "assemble"];
@@ -170,11 +216,25 @@ function relevantStages(job: GenerationJobRow): StageName[] {
       return ["self_critique", "assemble"];
     case "regenerateWithFixes":
       return ["generate_lessons", "source_binding", "self_critique", "assemble"];
+    case "renderVideoLesson":
+      return ["media_submit", "media_poll", "transcript_ingest", "assemble"];
     case "regenerateSection":
       return ["generate_lessons", "assemble"];
-    default:
-      return [...STAGES];
   }
+
+  if (job.job_type === "section") {
+    return ["generate_lessons", "assemble"];
+  }
+
+  return [
+    "parse",
+    "outline",
+    "generate_lessons",
+    "source_binding",
+    "generate_assessments",
+    "self_critique",
+    "assemble",
+  ];
 }
 
 function ensureStageMap(job: GenerationJobRow): StageMap {
@@ -251,11 +311,15 @@ function errorName(error: unknown): string {
 }
 
 function failureClass(error: unknown): string {
-  if (error instanceof ProviderNotConfiguredError) {
+  if (error instanceof ProviderNotConfiguredError || error instanceof HeyGenNotConfiguredError) {
     return "configuration";
   }
 
-  if (error instanceof EdgeFunctionError) {
+  if (error instanceof HeyGenMediaError) {
+    return error.retryable ? "provider_transient" : "provider_output";
+  }
+
+  if (error instanceof EdgeFunctionError || error instanceof TranscriptIngestError) {
     return error.status >= 500 ? "infrastructure" : "nonretryable";
   }
 
@@ -389,6 +453,8 @@ function finalOutput(job: GenerationJobRow, outputs: Record<string, unknown>): u
       return outputs.self_critique;
     case "regenerateWithFixes":
       return generatedModule;
+    case "renderVideoLesson":
+      return outputs.transcript_ingest ?? outputs.media_poll ?? outputs.media_submit ?? null;
     case "regenerateSection":
       return generatedModule;
     default:
@@ -693,6 +759,314 @@ async function runSourceBindingStage(
   };
 }
 
+function requireHeyGenMediaStageEnabled(): void {
+  if (Deno.env.get("REDEX_ENABLE_HEYGEN_MEDIA_STAGE") !== "true") {
+    throw new HeyGenNotConfiguredError("REDEX_ENABLE_HEYGEN_MEDIA_STAGE must be set to 'true' before HeyGen media stages can run.");
+  }
+}
+
+function requireEnvValue(name: string): string {
+  const value = Deno.env.get(name)?.trim();
+
+  if (!value) {
+    throw new HeyGenNotConfiguredError(`${name} is required before HeyGen media stages can run.`);
+  }
+
+  return value;
+}
+
+function nonNegativeIntegerField(record: Record<string, unknown>, key: string): number | undefined {
+  const value = record[key];
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : undefined;
+}
+
+function requiredString(record: Record<string, unknown>, key: string, code: string): string {
+  const value = stringField(record, key);
+
+  if (!value) {
+    throw new EdgeFunctionError(code, `${key} is required for renderVideoLesson.`, 400);
+  }
+
+  return value;
+}
+
+function validateRenderTranscriptSegments(value: unknown): VideoTranscriptSegmentInput[] {
+  try {
+    return validateTranscriptSegments(value);
+  } catch (error) {
+    if (error instanceof TranscriptIngestError) {
+      throw new EdgeFunctionError(error.code, error.message.replace("Transcript ingest", "renderVideoLesson"), error.status);
+    }
+
+    throw error;
+  }
+}
+
+function renderVideoLessonInput(job: GenerationJobRow): RenderVideoLessonInput {
+  const input = baseInput(job);
+  const video = isRecord(input.video) ? input.video : {};
+  const moduleVersionId = requiredString(input, "moduleVersionId", "missing_module_version_id");
+
+  if (!isUuid(moduleVersionId)) {
+    throw new EdgeFunctionError("invalid_module_version_id", "moduleVersionId must be a UUID for renderVideoLesson.", 400);
+  }
+
+  const lessonId = stringField(input, "lessonId");
+  const lessonIndex = nonNegativeIntegerField(input, "lessonIndex");
+
+  if (!lessonId && lessonIndex === undefined) {
+    throw new EdgeFunctionError("missing_lesson_target", "renderVideoLesson requires lessonId or lessonIndex.", 400);
+  }
+
+  if (lessonId && !isUuid(lessonId)) {
+    throw new EdgeFunctionError("invalid_lesson_id", "lessonId must be a UUID when provided.", 400);
+  }
+
+  return {
+    moduleVersionId,
+    lessonId,
+    lessonIndex,
+    lessonTitle: requiredString(input, "lessonTitle", "missing_lesson_title"),
+    approvedScriptMarkdown: requiredString(input, "approvedScriptMarkdown", "missing_approved_script"),
+    avatarId: requiredString(input, "avatarId", "missing_avatar_id"),
+    voiceId: stringField(input, "voiceId"),
+    video: {
+      transcript_segments: validateRenderTranscriptSegments(video.transcript_segments),
+      duration_seconds: typeof video.duration_seconds === "number" && video.duration_seconds >= 0 ? video.duration_seconds : undefined,
+    },
+  };
+}
+
+function mediaAssetStatusFor(status: HeyGenVideoDetail["status"]): string {
+  switch (status) {
+    case "succeeded":
+      return "succeeded";
+    case "failed":
+      return "failed";
+    case "cancelled":
+      return "cancelled";
+    case "pending":
+      return "submitted";
+    case "processing":
+    case "unknown":
+      return "rendering";
+  }
+}
+
+async function createMediaAsset(
+  supabase: RedexSupabaseClient,
+  job: GenerationJobRow,
+  input: RenderVideoLessonInput,
+): Promise<{ id: string; render_attempt_count: number }> {
+  const { data, error } = await supabase
+    .from("media_assets")
+    .insert({
+      module_id: job.module_id,
+      module_version_id: input.moduleVersionId,
+      training_lesson_id: input.lessonId ?? null,
+      lesson_index: input.lessonIndex ?? null,
+      lesson_title: input.lessonTitle,
+      provider: "heygen",
+      avatar_id: input.avatarId,
+      status: "queued",
+      render_attempt_count: 1,
+    })
+    .select("id,render_attempt_count")
+    .single();
+
+  if (error || !data) {
+    throw new EdgeFunctionError("media_asset_write_failed", error?.message ?? "Could not create media asset.", 500);
+  }
+
+  return data as { id: string; render_attempt_count: number };
+}
+
+async function updateMediaAsset(
+  supabase: RedexSupabaseClient,
+  mediaAssetId: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("media_assets")
+    .update(payload)
+    .eq("id", mediaAssetId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new EdgeFunctionError("media_asset_write_failed", error.message, 500);
+  }
+
+  if (!data) {
+    throw new EdgeFunctionError("media_asset_not_found", "Media asset was not found for update.", 500);
+  }
+}
+
+function recordOutput(value: unknown, stage: string): Record<string, unknown> {
+  if (!isRecord(value)) {
+    throw new EdgeFunctionError(`missing_${stage}_output`, `${stage} output is required before this media stage can run.`, 500);
+  }
+
+  return value;
+}
+
+function stringOutput(value: Record<string, unknown>, key: string, stage: string): string {
+  const output = stringField(value, key);
+
+  if (!output) {
+    throw new EdgeFunctionError(`missing_${key}`, `${stage} output must include ${key}.`, 500);
+  }
+
+  return output;
+}
+
+async function runMediaSubmitStage(job: GenerationJobRow, supabase: RedexSupabaseClient): Promise<CostedAiResult<unknown>> {
+  requireHeyGenMediaStageEnabled();
+  const heygenApiKey = requireEnvValue("HEYGEN_API_KEY");
+  const input = renderVideoLessonInput(job);
+  const mediaAsset = await createMediaAsset(supabase, job, input);
+  const request = buildHeyGenCreateVideoRequest({
+    avatarId: input.avatarId,
+    voiceId: input.voiceId,
+    script: input.approvedScriptMarkdown,
+    title: input.lessonTitle,
+    callbackId: job.id,
+  });
+  const submitResult = await submitHeyGenVideo({ apiKey: heygenApiKey }, request, job.id);
+
+  await updateMediaAsset(supabase, mediaAsset.id, {
+    heygen_video_id: submitResult.videoId,
+    status: submitResult.status === "succeeded" ? "succeeded" : mediaAssetStatusFor(submitResult.status),
+    last_error_message: null,
+  });
+
+  return {
+    output: {
+      media_asset_id: mediaAsset.id,
+      heygen_video_id: submitResult.videoId,
+      provider_status: submitResult.status,
+      raw_provider_status: submitResult.rawStatus ?? null,
+      render_attempt_count: mediaAsset.render_attempt_count,
+    },
+    cost_cents: 0,
+    estimated_cost_cents: 0,
+    model_used: job.model_used ?? "heygen",
+    prompt_version: "heygen-video@v3",
+  };
+}
+
+function mediaPollDelayMs(): number {
+  const configured = Number(Deno.env.get("HEYGEN_POLL_DELAY_SECONDS") ?? "60");
+  return Number.isFinite(configured) && configured > 0 ? Math.round(configured * 1000) : 60_000;
+}
+
+async function runMediaPollStage(job: GenerationJobRow, supabase: RedexSupabaseClient): Promise<CostedAiResult<unknown>> {
+  requireHeyGenMediaStageEnabled();
+  const heygenApiKey = requireEnvValue("HEYGEN_API_KEY");
+  const outputs = outputPayload(job);
+  const mediaSubmit = recordOutput(outputs.media_submit, "media_submit");
+  const mediaAssetId = stringOutput(mediaSubmit, "media_asset_id", "media_submit");
+  const heygenVideoId = stringOutput(mediaSubmit, "heygen_video_id", "media_submit");
+  const detail = await getHeyGenVideo({ apiKey: heygenApiKey }, heygenVideoId);
+
+  if (detail.status === "failed" || detail.status === "cancelled") {
+    const message = detail.failureMessage ?? `HeyGen render ended with status ${detail.rawStatus ?? detail.status}.`;
+    await updateMediaAsset(supabase, mediaAssetId, {
+      status: mediaAssetStatusFor(detail.status),
+      last_error_message: message,
+      completed_at: new Date().toISOString(),
+    });
+    throw new HeyGenMediaError(message);
+  }
+
+  if (detail.status !== "succeeded") {
+    const output = {
+      media_asset_id: mediaAssetId,
+      heygen_video_id: heygenVideoId,
+      provider_status: detail.status,
+      raw_provider_status: detail.rawStatus ?? null,
+    };
+    await updateMediaAsset(supabase, mediaAssetId, {
+      status: mediaAssetStatusFor(detail.status),
+      last_error_message: null,
+    });
+    throw new MediaStagePendingError(
+      "HeyGen render is not ready yet; media_poll will be retried.",
+      output,
+      new Date(Date.now() + mediaPollDelayMs()).toISOString(),
+    );
+  }
+
+  if (!detail.videoUrl) {
+    throw new HeyGenMediaError("HeyGen completed render did not include data.video_url.");
+  }
+
+  const mediaBucket = requireEnvValue("REDEX_MEDIA_BUCKET");
+  const downloaded = await downloadHeyGenMedia(detail.videoUrl);
+  const storagePath = buildMediaStoragePath({ moduleVersionId: renderVideoLessonInput(job).moduleVersionId, mediaAssetId });
+  const { error: uploadError } = await supabase.storage
+    .from(mediaBucket)
+    .upload(storagePath, downloaded.body, { contentType: downloaded.contentType, upsert: true });
+
+  if (uploadError) {
+    throw new EdgeFunctionError("media_upload_failed", uploadError.message, 500);
+  }
+
+  const durationSeconds = detail.durationSeconds ?? renderVideoLessonInput(job).video.duration_seconds ?? null;
+  await updateMediaAsset(supabase, mediaAssetId, {
+    status: "succeeded",
+    storage_bucket: mediaBucket,
+    storage_path: storagePath,
+    mime_type: downloaded.contentType,
+    duration_seconds: durationSeconds === null ? null : Math.round(durationSeconds),
+    completed_at: new Date().toISOString(),
+    last_error_message: null,
+  });
+
+  return {
+    output: {
+      media_asset_id: mediaAssetId,
+      heygen_video_id: heygenVideoId,
+      provider_status: detail.status,
+      raw_provider_status: detail.rawStatus ?? null,
+      storage_bucket: mediaBucket,
+      storage_path: storagePath,
+      mime_type: downloaded.contentType,
+      duration_seconds: durationSeconds,
+      thumbnail_url: detail.thumbnailUrl ?? null,
+      subtitle_url: detail.subtitleUrl ?? null,
+    },
+    cost_cents: 0,
+    estimated_cost_cents: 0,
+    model_used: job.model_used ?? "heygen",
+    prompt_version: "heygen-video@v3",
+  };
+}
+
+async function runTranscriptIngestStage(job: GenerationJobRow, supabase: RedexSupabaseClient): Promise<CostedAiResult<unknown>> {
+  requireHeyGenMediaStageEnabled();
+  const input = renderVideoLessonInput(job);
+  const outputs = outputPayload(job);
+  const mediaPoll = recordOutput(outputs.media_poll, "media_poll");
+  const mediaAssetId = stringOutput(mediaPoll, "media_asset_id", "media_poll");
+  const storagePath = stringOutput(mediaPoll, "storage_path", "media_poll");
+  const transcriptResult = await ingestVideoTranscript({
+    supabase,
+    mediaAssetId,
+    storagePath,
+    lessonTitle: input.lessonTitle,
+    transcriptSegments: input.video.transcript_segments,
+  });
+
+  return {
+    output: transcriptResult,
+    cost_cents: 0,
+    estimated_cost_cents: 0,
+    model_used: job.model_used ?? "none",
+    prompt_version: "transcript-ingest@v1",
+  };
+}
+
 async function runAiStage(job: GenerationJobRow, stage: StageName, supabase: RedexSupabaseClient): Promise<CostedAiResult<unknown>> {
   const aiClient = createCourseFoundryAiClientServer();
   const input = baseInput(job);
@@ -780,6 +1154,12 @@ async function runAiStage(job: GenerationJobRow, stage: StageName, supabase: Red
         promptIds: Array.isArray(input.promptIds) ? input.promptIds.filter((value): value is string => typeof value === 'string') : [],
         learning_outcomes: Array.isArray(input.learning_outcomes) ? input.learning_outcomes as Array<{ id: string; text: string }> : undefined,
       });
+    case "media_submit":
+      return runMediaSubmitStage(job, supabase);
+    case "media_poll":
+      return runMediaPollStage(job, supabase);
+    case "transcript_ingest":
+      return runTranscriptIngestStage(job, supabase);
     case "assemble":
       return {
         output: finalOutput(job, outputs),
@@ -916,10 +1296,42 @@ Deno.serve(async (request) => {
         completed: stage === "assemble",
       });
     } catch (stageError) {
+      if (stageError instanceof MediaStagePendingError) {
+        stageMap[stage] = {
+          ...stageMap[stage],
+          status: "pending",
+          error: undefined,
+        };
+
+        await updateLeasedJob(supabase, job, {
+          status: "queued",
+          current_stage: stage,
+          stage_map: stageMap,
+          output_payload: { ...outputs, [stageOutputKey(stage)]: stageError.output },
+          actual_cost_cents: sumCosts(costBreakdown),
+          cost_breakdown: costBreakdown,
+          next_run_at: stageError.nextRunAt,
+          last_error_message: null,
+          last_error_stage: null,
+          last_failure_class: null,
+          ...clearLeaseFields(),
+        }, stage);
+
+        return jsonResponse({
+          status: "ok",
+          claimed: true,
+          job_id: job.id,
+          stage,
+          pending: true,
+          next_run_at: stageError.nextRunAt,
+          message: stageError.message,
+        });
+      }
+
       const message = errorMessage(stageError);
       const classification = failureClass(stageError);
       const maxAttempts = job.max_attempts ?? 3;
-      const shouldRetry = isRetryableFailure(stageError) && job.attempt_count < maxAttempts;
+      const shouldRetry = (isRetryableFailure(stageError) || (stage === "media_poll" && stageError instanceof HeyGenMediaError && stageError.retryable)) && job.attempt_count < maxAttempts;
       stageMap[stage] = {
         ...stageMap[stage],
         status: shouldRetry ? "pending" : "failed",
@@ -943,7 +1355,7 @@ Deno.serve(async (request) => {
 
       return jsonResponse({
         status: "error",
-        code: stageError instanceof ProviderNotConfiguredError ? "provider_not_configured" : shouldRetry ? "stage_retry_scheduled" : "stage_failed",
+        code: stageError instanceof ProviderNotConfiguredError || stageError instanceof HeyGenNotConfiguredError ? "provider_not_configured" : shouldRetry ? "stage_retry_scheduled" : "stage_failed",
         job_id: job.id,
         stage,
         retrying: shouldRetry,

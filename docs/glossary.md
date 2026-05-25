@@ -34,6 +34,9 @@ Top-level training container for related modules in the domain model (roadmap Re
 ### Course Foundry
 Short form for **Redex AI Course Foundry**: the admin-side workflow for generating, reviewing, and publishing training modules.
 
+### Drag-to-order lesson
+A procedural sequence-practice lesson where learners reorder shuffled steps, check correctness, retry, and complete only after the canonical order is restored. Implemented as `LessonType: 'drag_to_order'` with `OrderingLessonContent`.
+
 ### Certification ladder
 Slice 11.5 certification structure: Foundation Certified → Role Specialist L1 → Role Specialist L2 → Redex Operator Certified. Each tier is earned by competency evidence, not seat time.
 

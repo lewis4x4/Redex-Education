@@ -7,6 +7,7 @@ import type {
   Lesson,
   LessonGenerationStatus,
   LessonReviewItem,
+  OrderingStep,
   PublishBlocker,
   SelfCritiqueReport,
   SetupAnswers,
@@ -149,6 +150,33 @@ function resolveCourseIdForWrite(currentDraft: ModuleBasicsDraft | null, fallbac
   return slugifyModuleTitle(currentDraft?.title ?? fallbackTitle);
 }
 
+function hasValidOrderingSteps(steps: OrderingStep[] | undefined): steps is [OrderingStep, OrderingStep, ...OrderingStep[]] {
+  if (!steps || steps.length < 2) {
+    return false;
+  }
+
+  const stepIds = new Set<string>();
+
+  return steps.every((step) => {
+    const stepId = step.id.trim();
+    const hasRequiredFields = stepId.length > 0 && step.label.trim().length > 0;
+    const isDuplicate = stepIds.has(stepId);
+    stepIds.add(stepId);
+
+    return hasRequiredFields && !isDuplicate;
+  });
+}
+
+function invalidOrderingLessonReviewText(lesson: GeneratedModulePreview['lessons'][number]): string {
+  return [
+    lesson.body_markdown,
+    lesson.status_note,
+    '⚠️ This generated drag-to-order lesson needs review because it did not include at least two valid, uniquely identified ordering steps.',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
 function generatedLessonContent(lesson: GeneratedModulePreview['lessons'][number]): Lesson['content'] {
   if (lesson.lesson_type === 'quiz') {
     return { type: 'quiz', questions: lesson.quiz_questions ?? [] };
@@ -156,6 +184,33 @@ function generatedLessonContent(lesson: GeneratedModulePreview['lessons'][number
 
   if (lesson.lesson_type === 'acknowledgment') {
     return { type: 'acknowledgment', statement_markdown: lesson.acknowledgment_text ?? lesson.body_markdown ?? '' };
+  }
+
+  if (lesson.lesson_type === 'drag_to_order') {
+    if (hasValidOrderingSteps(lesson.ordering_steps)) {
+      return { type: 'drag_to_order', intro_markdown: lesson.body_markdown, steps: lesson.ordering_steps };
+    }
+
+    return { type: 'text', body_markdown: invalidOrderingLessonReviewText(lesson) };
+  }
+
+  if (lesson.lesson_type === 'video') {
+    return {
+      type: 'video',
+      video_url: lesson.video_url ?? '#',
+      duration_seconds: lesson.duration_seconds,
+      transcript_markdown: lesson.transcript_markdown ?? lesson.video_script_markdown ?? lesson.body_markdown,
+      poster_url: lesson.poster_url,
+      media_asset_id: lesson.media_asset_id,
+      media_provider: lesson.media_provider,
+      media_status: lesson.media_status,
+      download_url: lesson.download_url,
+      downloads: lesson.downloads,
+      provenance: lesson.provenance,
+      chapters: lesson.chapters ?? lesson.video_chapters,
+      transcript_segments: lesson.transcript_segments ?? lesson.video_transcript_segments,
+      checkpoints: lesson.checkpoints ?? lesson.video_checkpoints,
+    };
   }
 
   return { type: lesson.lesson_type, body_markdown: lesson.body_markdown ?? '' } as Lesson['content'];

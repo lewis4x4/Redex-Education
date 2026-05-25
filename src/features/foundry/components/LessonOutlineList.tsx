@@ -17,6 +17,8 @@ const LESSON_TYPE_LABELS: Record<LessonType, string> = {
   coach: 'Coach',
   assignment: 'Assignment',
   reflection_prompt: 'Reflection prompt',
+  hotspot_diagram: 'Hotspot diagram',
+  drag_to_order: 'Sequence practice',
 };
 
 function getSourceSectionCount(

@@ -1,100 +1,175 @@
-import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
 
-import { Button } from '@/components/ui/button';
-
-import type { Lesson } from '@/lib/education';
+import type {
+  AcknowledgmentCompletion,
+  ChecklistCompletion,
+  Lesson,
+  LessonContent,
+  OrderingCompletion,
+  ScenarioCompletion,
+  VideoCheckpointProgress,
+} from '@/lib/education';
+import { LessonScaffold } from './LessonScaffold';
 import { Quiz } from './Quiz';
+import { AcknowledgmentLesson } from './lessons/AcknowledgmentLesson';
+import { ChecklistLesson } from './lessons/ChecklistLesson';
+import { ScenarioLesson } from './lessons/ScenarioLesson';
+import { HotspotLesson } from './lessons/HotspotLesson';
+import { OrderingLesson } from './lessons/OrderingLesson';
+import { VideoLesson } from './lessons/VideoLesson';
 
 interface Props {
   lesson: Lesson;
+  lessonNumber?: number;
+  totalLessons?: number;
   onQuizComplete?: (score: number, passed: boolean, answers: Record<string, number>) => void;
-  onAcknowledge?: () => void;
+  onAcknowledge?: (completion: AcknowledgmentCompletion) => void;
+  onChecklistComplete?: (completion: ChecklistCompletion) => void;
+  onScenarioComplete?: (completion: ScenarioCompletion) => void;
+  onOrderingComplete?: (completion: OrderingCompletion) => void;
+  onVideoCheckpointProgress?: (progress: VideoCheckpointProgress) => void;
 }
 
-export function LessonContentRenderer({ lesson, onQuizComplete, onAcknowledge }: Props) {
-  const { content } = lesson;
-  const [acknowledgmentState, setAcknowledgmentState] = useState({ lessonId: lesson.id, checked: false });
-  const acknowledgmentChecked =
-    acknowledgmentState.lessonId === lesson.id ? acknowledgmentState.checked : false;
+function assertNever(value: never): never {
+  throw new Error(`Unhandled lesson content variant: ${JSON.stringify(value)}`);
+}
 
-  if (content.type === 'video') {
-    return (
-      <div className="max-w-3xl mx-auto">
-        <div className="aspect-video bg-black rounded-xl flex items-center justify-center text-white mb-6">
-          <div className="text-center">
-            <div className="text-2xl mb-2">▶ Video Player</div>
-            <div className="text-sm opacity-60">(Stub — {content.video_url})</div>
-          </div>
-        </div>
-        <p className="text-center text-slate-500">In a real build this would be a proper video player with chapters.</p>
-      </div>
-    );
+function comingSoonLabel(contentType: LessonContent['type']) {
+  return contentType.replace(/_/g, ' ');
+}
+
+function objectiveForLesson(lesson: Lesson): string {
+  switch (lesson.content.type) {
+    case 'text':
+      return 'Read the source-grounded explanation and identify the key action to take.';
+    case 'checklist':
+      return 'Work through each required step and confirm what must be done in order.';
+    case 'acknowledgment':
+      return 'Review the policy statement and record your acknowledgment when ready.';
+    case 'quiz':
+      return 'Check your understanding and confirm you can apply the lesson correctly.';
+    case 'scenario':
+      return 'Practice a realistic Redex decision and learn from the outcome.';
+    case 'video':
+      return 'Watch the segment and connect the visual example to the training objective.';
+    case 'coach':
+      return 'Use guided prompts to reason through the lesson in a Redex context.';
+    case 'assignment':
+      return 'Complete the practical deliverable using the lesson instructions.';
+    case 'reflection_prompt':
+      return 'Reflect on the prompt and connect it to your day-to-day work.';
+    case 'hotspot_diagram':
+      return 'Explore the diagram and identify what each highlighted area means.';
+    case 'drag_to_order':
+      return 'Put the procedure in the correct order so you can recall and apply it on the job.';
+    default:
+      return assertNever(lesson.content);
   }
+}
 
-  if (content.type === 'text') {
-    const markdownBody = content.body_markdown || 'Text lesson content would render here as rich markdown.';
-
-    return (
-      <div className="prose max-w-3xl mx-auto">
-        <h2>{lesson.title}</h2>
-        <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{markdownBody}</ReactMarkdown>
-      </div>
-    );
-  }
-
-  if (content.type === 'quiz') {
-    return <Quiz key={lesson.id} lesson={lesson} onComplete={onQuizComplete} />;
-  }
-
-  if (content.type === 'acknowledgment') {
-    const checkboxId = `${lesson.id}-acknowledgment-checkbox`;
-
-    return (
-      <div className="mx-auto max-w-3xl">
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-          <div className="mb-4 text-xs font-semibold uppercase tracking-[3px] text-redex-red">
-            REQUIRED ACKNOWLEDGMENT
-          </div>
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-900">{lesson.title}</h2>
-          {content.policy_ref && (
-            <p className="mt-2 text-sm font-medium text-slate-500">Policy reference: {content.policy_ref}</p>
-          )}
-          <div className="prose mt-5 max-w-none text-slate-700">
-            <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{content.statement_markdown}</ReactMarkdown>
-          </div>
-
-          <div className="mt-6 rounded-xl border border-slate-200 bg-redex-offwhite p-4">
-            <div className="flex items-start gap-3">
-              <input
-                id={checkboxId}
-                type="checkbox"
-                checked={acknowledgmentChecked}
-                onChange={(event) => setAcknowledgmentState({ lessonId: lesson.id, checked: event.target.checked })}
-                className="mt-1 h-4 w-4 rounded border-slate-300 text-redex-red focus:ring-redex-red"
-              />
-              <label htmlFor={checkboxId} className="text-sm font-medium leading-6 text-slate-800">
-                I have read and understood this acknowledgment
-              </label>
-            </div>
-            <Button
-              type="button"
-              className="mt-4 bg-redex-red hover:bg-redex-red-hover disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed"
-              disabled={!acknowledgmentChecked}
-              onClick={onAcknowledge}
-            >
-              Acknowledge
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+function ComingSoonLesson({ contentType }: { contentType: LessonContent['type'] }) {
   return (
-    <div className="text-center py-12 text-slate-500">
-      Renderer for <strong>{content.type}</strong> lesson type not yet implemented.
+    <div className="rounded-2xl border border-dashed border-redex-red/35 bg-white p-6 shadow-sm md:p-8">
+      <p className="text-xs font-semibold uppercase tracking-[3px] text-redex-red">Renderer coming soon</p>
+      <h3 className="mt-3 text-xl font-semibold capitalize tracking-tight text-slate-900">
+        {comingSoonLabel(contentType)} lesson support
+      </h3>
+      <p className="mt-3 text-sm leading-6 text-slate-600">
+        This lesson type is defined in the content model and will get a dedicated Phase 10 renderer. Until then,
+        this explicit state prevents a silent fallback or broken gray placeholder.
+      </p>
     </div>
   );
+}
+
+export function LessonContentRenderer({
+  lesson,
+  lessonNumber,
+  totalLessons,
+  onQuizComplete,
+  onAcknowledge,
+  onChecklistComplete,
+  onScenarioComplete,
+  onOrderingComplete,
+  onVideoCheckpointProgress,
+}: Props) {
+  const { content } = lesson;
+
+  switch (content.type) {
+    case 'video':
+      return (
+        <LessonScaffold lesson={lesson} lessonNumber={lessonNumber} totalLessons={totalLessons} objective={objectiveForLesson(lesson)}>
+          <VideoLesson key={lesson.id} lessonId={lesson.id} content={content} onCheckpointProgress={onVideoCheckpointProgress} />
+        </LessonScaffold>
+      );
+
+    case 'text': {
+      const markdownBody = content.body_markdown || 'Text lesson content would render here as rich markdown.';
+
+      return (
+        <LessonScaffold lesson={lesson} lessonNumber={lessonNumber} totalLessons={totalLessons} objective={objectiveForLesson(lesson)}>
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+            <div className="prose max-w-none text-slate-700">
+              <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{markdownBody}</ReactMarkdown>
+            </div>
+          </div>
+        </LessonScaffold>
+      );
+    }
+
+    case 'quiz':
+      return (
+        <LessonScaffold lesson={lesson} lessonNumber={lessonNumber} totalLessons={totalLessons} objective={objectiveForLesson(lesson)}>
+          <Quiz key={lesson.id} lesson={lesson} onComplete={onQuizComplete} />
+        </LessonScaffold>
+      );
+
+    case 'acknowledgment':
+      return (
+        <LessonScaffold lesson={lesson} lessonNumber={lessonNumber} totalLessons={totalLessons} objective={objectiveForLesson(lesson)}>
+          <AcknowledgmentLesson key={lesson.id} lessonId={lesson.id} content={content} onAcknowledge={onAcknowledge} />
+        </LessonScaffold>
+      );
+
+    case 'checklist':
+      return (
+        <LessonScaffold lesson={lesson} lessonNumber={lessonNumber} totalLessons={totalLessons} objective={objectiveForLesson(lesson)}>
+          <ChecklistLesson key={lesson.id} lessonId={lesson.id} content={content} onComplete={onChecklistComplete} />
+        </LessonScaffold>
+      );
+
+    case 'scenario':
+      return (
+        <LessonScaffold lesson={lesson} lessonNumber={lessonNumber} totalLessons={totalLessons} objective={objectiveForLesson(lesson)}>
+          <ScenarioLesson key={lesson.id} lessonId={lesson.id} content={content} onComplete={onScenarioComplete} />
+        </LessonScaffold>
+      );
+
+    case 'hotspot_diagram':
+      return (
+        <LessonScaffold lesson={lesson} lessonNumber={lessonNumber} totalLessons={totalLessons} objective={objectiveForLesson(lesson)}>
+          <HotspotLesson key={lesson.id} content={content} />
+        </LessonScaffold>
+      );
+
+    case 'drag_to_order':
+      return (
+        <LessonScaffold lesson={lesson} lessonNumber={lessonNumber} totalLessons={totalLessons} objective={objectiveForLesson(lesson)}>
+          <OrderingLesson key={lesson.id} lessonId={lesson.id} content={content} onComplete={onOrderingComplete} />
+        </LessonScaffold>
+      );
+
+    case 'coach':
+    case 'assignment':
+    case 'reflection_prompt':
+      return (
+        <LessonScaffold lesson={lesson} lessonNumber={lessonNumber} totalLessons={totalLessons} objective={objectiveForLesson(lesson)}>
+          <ComingSoonLesson contentType={content.type} />
+        </LessonScaffold>
+      );
+
+    default:
+      return assertNever(content);
+  }
 }

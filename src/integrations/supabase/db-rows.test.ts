@@ -17,6 +17,7 @@ import {
 import type {
   AssessmentAttemptRow,
   AssignmentRow,
+  MediaAssetRow,
   ModuleSourceBindingRow,
   ProfileRow,
   SourceFileRow,
@@ -141,7 +142,9 @@ const sourceFileRow: SourceFileRow = {
   topic: 'hr_basics',
   current_version_id: 'source-version-1',
   last_synced_at: ISO,
+  media_asset_id: null,
   processing_status: 'processed',
+  source_kind: 'drive',
   created_at: ISO,
   updated_at: ISO,
 }
@@ -166,10 +169,39 @@ const sourceSectionRow: SourceSectionRow = {
   level: 2,
   heading: 'Payroll',
   body: 'Payroll basics.',
+  derived_from_section_ids: [],
+  end_seconds: null,
   position_index: 0,
   slug: 'payroll',
+  start_seconds: null,
   has_placeholders: false,
   created_at: ISO,
+}
+
+const mediaAssetRow: MediaAssetRow = {
+  id: 'media-asset-1',
+  module_id: 'module-1',
+  module_version_id: 'module-version-1',
+  training_lesson_id: 'lesson-1',
+  lesson_index: 0,
+  lesson_title: 'Welcome video',
+  provider: 'heygen',
+  heygen_video_id: 'heygen-video-1',
+  avatar_id: 'brian',
+  status: 'succeeded',
+  storage_bucket: 'redex-media',
+  storage_path: 'module-1/lesson-1.mp4',
+  mime_type: 'video/mp4',
+  duration_seconds: 120,
+  cost_credits: 1.25,
+  transcript_source_file_id: 'source-file-1',
+  render_attempt_count: 1,
+  max_render_attempts: 2,
+  last_error_message: null,
+  stale_since: null,
+  created_at: ISO,
+  updated_at: ISO,
+  completed_at: ISO,
 }
 
 const moduleSourceBindingRow: ModuleSourceBindingRow = {
@@ -285,6 +317,40 @@ describe('db-rows mappers', () => {
 
   it.each(cases)('$name throws on missing required fields', ({ missingRequired }) => {
     expect(missingRequired).toThrow(/missing required field/)
+  })
+
+  it('captures Slice 10.6 media asset and transcript provenance row typings', () => {
+    const transcriptSourceFileRow: SourceFileRow = {
+      ...sourceFileRow,
+      drive_file_id: `synthetic:video-transcript:${mediaAssetRow.id}`,
+      authority: 'supporting',
+      media_asset_id: mediaAssetRow.id,
+      source_kind: 'synthetic_video_transcript',
+      title: 'Welcome video transcript',
+    }
+    const transcriptSectionRow: SourceSectionRow = {
+      ...sourceSectionRow,
+      derived_from_section_ids: ['source-section-authoritative-1'],
+      start_seconds: 60,
+      end_seconds: 120,
+      slug: 'video-000060-000120',
+    }
+
+    expect(mediaAssetRow).toMatchObject({
+      provider: 'heygen',
+      status: 'succeeded',
+      transcript_source_file_id: transcriptSourceFileRow.id,
+    })
+    expect(transcriptSourceFileRow).toMatchObject({
+      authority: 'supporting',
+      source_kind: 'synthetic_video_transcript',
+      media_asset_id: mediaAssetRow.id,
+    })
+    expect(transcriptSectionRow).toMatchObject({
+      derived_from_section_ids: ['source-section-authoritative-1'],
+      start_seconds: 60,
+      end_seconds: 120,
+    })
   })
 
   it('allows schema-valid empty source section heading and body', () => {

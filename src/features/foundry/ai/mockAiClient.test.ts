@@ -37,6 +37,82 @@ const sourceWithPlaceholders: SourceMaterial = {
   ],
 };
 
+describe('OrderingLessonContent AI schemas', () => {
+  const validGeneratedOrderingOutput = {
+    module_title: 'Sequence module',
+    lessons: [
+      {
+        lesson_index: 0,
+        module_index: 0,
+        title: 'Order the support procedure',
+        lesson_type: 'drag_to_order',
+        ordering_steps: [
+          { id: ' step-1 ', label: ' Receive the request ' },
+          { id: 'step-2', label: 'Verify account details' },
+        ],
+        status: 'draft',
+      },
+    ],
+    generated_at: '2026-05-25T03:00:00.000Z',
+    is_complete: true,
+  };
+
+  it('accepts generated ordering lessons only with at least two unique non-empty steps', () => {
+    const parsed = GenerateLessonsOutputSchema.parse(validGeneratedOrderingOutput);
+
+    expect(parsed.lessons[0]?.ordering_steps).toEqual([
+      { id: 'step-1', label: 'Receive the request' },
+      { id: 'step-2', label: 'Verify account details' },
+    ]);
+  });
+
+  it('rejects generated ordering lessons with missing, empty, blank, or duplicate steps', () => {
+    expect(
+      GenerateLessonsOutputSchema.safeParse({
+        ...validGeneratedOrderingOutput,
+        lessons: [{ ...validGeneratedOrderingOutput.lessons[0], ordering_steps: undefined }],
+      }).success,
+    ).toBe(false);
+
+    expect(
+      GenerateLessonsOutputSchema.safeParse({
+        ...validGeneratedOrderingOutput,
+        lessons: [{ ...validGeneratedOrderingOutput.lessons[0], ordering_steps: [] }],
+      }).success,
+    ).toBe(false);
+
+    expect(
+      GenerateLessonsOutputSchema.safeParse({
+        ...validGeneratedOrderingOutput,
+        lessons: [
+          {
+            ...validGeneratedOrderingOutput.lessons[0],
+            ordering_steps: [
+              { id: 'step-1', label: 'Receive the request' },
+              { id: 'step-1', label: 'Duplicate id' },
+            ],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+
+    expect(
+      GenerateLessonsOutputSchema.safeParse({
+        ...validGeneratedOrderingOutput,
+        lessons: [
+          {
+            ...validGeneratedOrderingOutput.lessons[0],
+            ordering_steps: [
+              { id: ' ', label: 'Receive the request' },
+              { id: 'step-2', label: ' ' },
+            ],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+});
+
 describe('mockAiClient', () => {
   it('analyzes source input and validates the output shape', async () => {
     const output = await mockAiClient.analyzeSource({ sources: sourceWithPlaceholders });

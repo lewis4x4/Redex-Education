@@ -7,6 +7,7 @@ import type {
   Lesson,
   LessonContent,
   LessonReviewItem,
+  OrderingStep,
   SourceFile,
 } from '@/types/training';
 
@@ -56,6 +57,51 @@ function analyzeSourceInput(input: AnalyzeSourceInput) {
   };
 }
 
+const MOCK_ORDERING_STEPS: OrderingStep[] = [
+  {
+    id: 'mock-ordering-step-1',
+    label: 'Confirm the source request',
+    detail_markdown: 'Read the source-backed instruction before taking action.',
+  },
+  {
+    id: 'mock-ordering-step-2',
+    label: 'Complete the required action',
+    detail_markdown: 'Apply the approved Redex process and document the result.',
+  },
+];
+
+function hasValidOrderingSteps(steps: OrderingStep[] | undefined): steps is [OrderingStep, OrderingStep, ...OrderingStep[]] {
+  if (!steps || steps.length < 2) {
+    return false;
+  }
+
+  const stepIds = new Set<string>();
+
+  return steps.every((step) => {
+    const stepId = step.id.trim();
+    const hasRequiredFields = stepId.length > 0 && step.label.trim().length > 0;
+    const isDuplicate = stepIds.has(stepId);
+    stepIds.add(stepId);
+
+    return hasRequiredFields && !isDuplicate;
+  });
+}
+
+function orderingStepsForMock(lesson: GeneratedLessonContent): OrderingStep[] {
+  return hasValidOrderingSteps(lesson.ordering_steps) ? lesson.ordering_steps : MOCK_ORDERING_STEPS;
+}
+
+function withMockOrderingSteps(lesson: GeneratedLessonContent): GeneratedLessonContent {
+  if (lesson.lesson_type !== 'drag_to_order' || hasValidOrderingSteps(lesson.ordering_steps)) {
+    return lesson;
+  }
+
+  return {
+    ...lesson,
+    ordering_steps: MOCK_ORDERING_STEPS,
+  };
+}
+
 function lessonContentFor(lesson: GeneratedLessonContent): LessonContent {
   switch (lesson.lesson_type) {
     case 'acknowledgment':
@@ -80,9 +126,40 @@ function lessonContentFor(lesson: GeneratedLessonContent): LessonContent {
     case 'scenario':
       return { type: 'scenario', intro_markdown: lesson.body_markdown ?? '', steps: [] };
     case 'video':
-      return { type: 'video', video_url: '#', transcript_markdown: lesson.body_markdown };
+      return {
+        type: 'video',
+        video_url: lesson.video_url ?? '#',
+        duration_seconds: lesson.duration_seconds,
+        transcript_markdown: lesson.transcript_markdown ?? lesson.video_script_markdown ?? lesson.body_markdown,
+        poster_url: lesson.poster_url,
+        media_asset_id: lesson.media_asset_id,
+        media_provider: lesson.media_provider,
+        media_status: lesson.media_status,
+        download_url: lesson.download_url,
+        downloads: lesson.downloads,
+        provenance: lesson.provenance,
+        chapters: lesson.chapters ?? lesson.video_chapters,
+        transcript_segments: lesson.transcript_segments ?? lesson.video_transcript_segments,
+        checkpoints: lesson.checkpoints ?? lesson.video_checkpoints,
+      };
     case 'text':
       return { type: 'text', body_markdown: lesson.body_markdown ?? '' };
+    case 'hotspot_diagram':
+      return {
+        type: 'hotspot_diagram',
+        intro_markdown: lesson.body_markdown,
+        image_ref: {
+          url: '#',
+          alt_text: 'Hotspot diagram placeholder',
+        },
+        hotspots: [],
+      };
+    case 'drag_to_order':
+      return {
+        type: 'drag_to_order',
+        intro_markdown: lesson.body_markdown,
+        steps: orderingStepsForMock(lesson),
+      };
   }
 }
 
@@ -149,6 +226,8 @@ export const mockAiClient: CourseFoundryAiClient = {
     const outcomeVerb = input.learning_outcomes?.[0]?.text.split(' ')[0]
     const generated = cloneJson(MOCK_GENERATED_MODULE)
 
+    generated.lessons = generated.lessons.map(withMockOrderingSteps);
+
     if (outcomeVerb) {
       generated.lessons = generated.lessons.map((lesson, index) =>
         index < 3 ? { ...lesson, title: `${lesson.title} — ${outcomeVerb}` } : lesson,
@@ -191,12 +270,14 @@ export const mockAiClient: CourseFoundryAiClient = {
       ...cloneJson(MOCK_GENERATED_MODULE),
       generated_at: new Date().toISOString(),
       lessons: MOCK_GENERATED_MODULE.lessons.map((lesson, index) =>
-        index === 0
-          ? {
-              ...lesson,
-              status_note: `Regenerated with fixes: ${selectedFixSummary}`,
-            }
-          : lesson,
+        withMockOrderingSteps(
+          index === 0
+            ? {
+                ...lesson,
+                status_note: `Regenerated with fixes: ${selectedFixSummary}`,
+              }
+            : lesson,
+        ),
       ),
     };
 

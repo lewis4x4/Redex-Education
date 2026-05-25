@@ -1,6 +1,17 @@
-import { useMemo, useState } from 'react';
-import type { Module, Lesson, ProgressStatus, QuizLessonContent } from '@/lib/education';
+import { useCallback, useMemo, useState } from 'react';
+import type {
+  AcknowledgmentCompletion,
+  ChecklistCompletion,
+  Module,
+  OrderingCompletion,
+  ScenarioCompletion,
+  Lesson,
+  ProgressStatus,
+  QuizLessonContent,
+  VideoCheckpointProgress,
+} from '@/lib/education';
 import { LessonContentRenderer } from './LessonContentRenderer';
+import { getAnswerableRequiredVideoCheckpoints } from './video/videoCheckpointRules';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, CheckCircle2, Clock, ArrowLeft, ArrowRight, Lock } from 'lucide-react';
 
@@ -16,6 +27,10 @@ interface ModulePlayerProps {
   onCompleteModule?: () => void;
   onExit?: () => void;
   completedLessonIds?: string[];
+  onAcknowledgmentComplete?: (completion: AcknowledgmentCompletion) => void;
+  onChecklistComplete?: (completion: ChecklistCompletion) => void;
+  onScenarioComplete?: (completion: ScenarioCompletion) => void;
+  onOrderingComplete?: (completion: OrderingCompletion) => void;
 }
 
 function getInitialLessonIndex(lessons: Lesson[], initialLessonId?: string) {
@@ -25,6 +40,39 @@ function getInitialLessonIndex(lessons: Lesson[], initialLessonId?: string) {
 
   const initialIndex = lessons.findIndex((lesson) => lesson.id === initialLessonId);
   return initialIndex > -1 ? initialIndex : 0;
+}
+
+function hasRequiredVideoCheckpoints(content: Lesson['content']): boolean {
+  return content.type === 'video' && getAnswerableRequiredVideoCheckpoints(content).length > 0;
+}
+
+function areStringArraysEqual(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function isSameVideoCheckpointProgress(left: VideoCheckpointProgress, right: VideoCheckpointProgress): boolean {
+  return (
+    left.all_required_answered === right.all_required_answered &&
+    areStringArraysEqual(left.answered_checkpoint_ids, right.answered_checkpoint_ids) &&
+    areStringArraysEqual(left.required_checkpoint_ids, right.required_checkpoint_ids) &&
+    left.completions.length === right.completions.length
+  );
+}
+
+function hasCompletableOrderingContent(content: Lesson['content']): boolean {
+  if (content.type !== 'drag_to_order' || content.steps.length === 0) {
+    return false;
+  }
+
+  const stepIds = new Set<string>();
+
+  return content.steps.every((step) => {
+    const hasRequiredFields = step.id.trim().length > 0 && step.label.trim().length > 0;
+    const isDuplicate = stepIds.has(step.id);
+    stepIds.add(step.id);
+
+    return hasRequiredFields && !isDuplicate;
+  });
 }
 
 function getLearningOutcomes(module: Module): string[] {
@@ -43,11 +91,30 @@ export function ModulePlayer({
   onCompleteModule,
   onExit,
   completedLessonIds = [],
+  onAcknowledgmentComplete,
+  onChecklistComplete,
+  onScenarioComplete,
+  onOrderingComplete,
 }: ModulePlayerProps) {
   const initialIndex = useMemo(() => getInitialLessonIndex(lessons, initialLessonId), [lessons, initialLessonId]);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [quizResults, setQuizResults] = useState<Record<string, { score: number; passed: boolean }>>({});
   const [optimisticCompletedLessonIds, setOptimisticCompletedLessonIds] = useState<string[]>([]);
+  const [videoCheckpointProgressByLessonId, setVideoCheckpointProgressByLessonId] = useState<Record<string, VideoCheckpointProgress>>({});
+  const handleVideoCheckpointProgress = useCallback((checkpointProgress: VideoCheckpointProgress) => {
+    setVideoCheckpointProgressByLessonId((previous) => {
+      const existingProgress = previous[checkpointProgress.lesson_id];
+
+      if (existingProgress && isSameVideoCheckpointProgress(existingProgress, checkpointProgress)) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        [checkpointProgress.lesson_id]: checkpointProgress,
+      };
+    });
+  }, []);
 
   const lessonIds = useMemo(() => new Set(lessons.map((lesson) => lesson.id)), [lessons]);
   const completedLessons = useMemo(
@@ -105,7 +172,6 @@ export function ModulePlayer({
   }
 
   const isLastLesson = currentIndex === lessons.length - 1;
-  const isQuizLesson = currentLesson.content.type === 'quiz';
   const quizContent: QuizLessonContent | null =
     currentLesson.content.type === 'quiz' ? (currentLesson.content as QuizLessonContent) : null;
   const quizPassingThreshold =
@@ -114,7 +180,27 @@ export function ModulePlayer({
       : 80;
   const currentQuizResult = quizResults[currentLesson.id];
   const quizHasPassed = currentQuizResult?.passed === true;
-  const isQuizLocked = isQuizLesson && !quizHasPassed && !completedLessons.has(currentLesson.id);
+  const currentLessonCompleted = completedLessons.has(currentLesson.id);
+  const hasRequiredVideoCheckpointGate = hasRequiredVideoCheckpoints(currentLesson.content);
+  const currentVideoCheckpointProgress = videoCheckpointProgressByLessonId[currentLesson.id];
+  const isVideoCheckpointLocked =
+    currentLesson.content.type === 'video' &&
+    hasRequiredVideoCheckpointGate &&
+    !currentLessonCompleted &&
+    currentVideoCheckpointProgress?.all_required_answered !== true;
+
+  const requiresInlineCompletion =
+    currentLesson.content.type === 'quiz' ||
+    currentLesson.content.type === 'acknowledgment' ||
+    currentLesson.content.type === 'checklist' ||
+    currentLesson.content.type === 'scenario' ||
+    hasCompletableOrderingContent(currentLesson.content) ||
+    hasRequiredVideoCheckpointGate;
+
+  const isInlineCompletionLocked =
+    requiresInlineCompletion &&
+    !currentLessonCompleted &&
+    (currentLesson.content.type === 'quiz' ? !quizHasPassed : currentLesson.content.type === 'video' ? isVideoCheckpointLocked : true);
 
   const handleDashboardExit = () => {
     if (isModuleComplete) {
@@ -306,7 +392,15 @@ export function ModulePlayer({
           <div className="flex-1 overflow-auto bg-redex-offwhite p-4 sm:p-6 md:p-8">
             <LessonContentRenderer
               lesson={currentLesson}
-              onAcknowledge={() => {
+              lessonNumber={currentIndex + 1}
+              totalLessons={lessons.length}
+              onAcknowledge={(completion) => {
+                onAcknowledgmentComplete?.(completion);
+                markLessonCompleted(currentLesson.id);
+                advanceAfterCompletion();
+              }}
+              onChecklistComplete={(completion) => {
+                onChecklistComplete?.(completion);
                 markLessonCompleted(currentLesson.id);
                 advanceAfterCompletion();
               }}
@@ -323,14 +417,37 @@ export function ModulePlayer({
                   advanceAfterCompletion();
                 }
               }}
+              onScenarioComplete={(completion) => {
+                onScenarioComplete?.(completion);
+                markLessonCompleted(currentLesson.id);
+                advanceAfterCompletion();
+              }}
+              onOrderingComplete={(completion) => {
+                onOrderingComplete?.(completion);
+                markLessonCompleted(currentLesson.id);
+                advanceAfterCompletion();
+              }}
+              onVideoCheckpointProgress={handleVideoCheckpointProgress}
             />
           </div>
         )}
 
-        {!isModuleComplete && isQuizLocked && (
+        {!isModuleComplete && isInlineCompletionLocked && (
           <div className="border-t bg-amber-50 px-4 py-2.5 text-sm text-amber-700 flex items-center gap-2 sm:px-6">
             <Lock className="h-4 w-4" aria-hidden="true" />
-            <span>Pass the quiz above with {quizPassingThreshold}% or higher to unlock lesson completion and continue.</span>
+            {currentLesson.content.type === 'quiz' ? (
+              <span>Pass the quiz above with {quizPassingThreshold}% or higher to continue.</span>
+            ) : currentLesson.content.type === 'acknowledgment' ? (
+              <span>Complete the acknowledgment above to continue.</span>
+            ) : currentLesson.content.type === 'checklist' ? (
+              <span>Complete the checklist above to continue.</span>
+            ) : currentLesson.content.type === 'drag_to_order' ? (
+              <span>Complete the sequence above to continue.</span>
+            ) : currentLesson.content.type === 'video' ? (
+              <span>Answer the video checkpoints above to continue.</span>
+            ) : (
+              <span>Complete the scenario above to continue.</span>
+            )}
           </div>
         )}
 
@@ -340,8 +457,20 @@ export function ModulePlayer({
               <ArrowLeft className="w-4 h-4 mr-2" /> Previous
             </Button>
 
-            <Button onClick={handleMarkComplete} disabled={isQuizLocked} variant="brand" className="disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed">
-              {isQuizLocked ? 'Pass Quiz to Continue' : isLastLesson ? 'Complete Module' : 'Mark Complete & Continue'}
+            <Button onClick={handleMarkComplete} disabled={isInlineCompletionLocked} variant="brand" className="disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed">
+              {isInlineCompletionLocked
+                ? currentLesson.content.type === 'quiz'
+                  ? 'Pass Quiz to Continue'
+                  : currentLesson.content.type === 'scenario'
+                    ? 'Complete Scenario to Continue'
+                    : currentLesson.content.type === 'drag_to_order'
+                      ? 'Complete Sequence to Continue'
+                      : currentLesson.content.type === 'video'
+                        ? 'Answer Checkpoints to Continue'
+                        : 'Complete Above to Continue'
+                : isLastLesson
+                  ? 'Complete Module'
+                  : 'Mark Complete & Continue'}
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </div>

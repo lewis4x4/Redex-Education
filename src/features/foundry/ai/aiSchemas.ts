@@ -20,6 +20,8 @@ const LessonTypeSchema = z.enum([
   'coach',
   'assignment',
   'reflection_prompt',
+  'hotspot_diagram',
+  'drag_to_order',
 ]);
 
 const CriticalitySchema = z.enum(['required', 'recommended', 'optional', 'bonus']);
@@ -70,11 +72,86 @@ export const GenerateOutlineOutputSchema = z.object({
   missing_source_notes: z.array(z.string()).optional(),
 }) satisfies z.ZodType<GenerateOutlineOutput>;
 
+const nonEmptyTrimmedString = z.string().trim().min(1);
+
+const OrderingStepSchema = z.object({
+  id: nonEmptyTrimmedString,
+  label: nonEmptyTrimmedString,
+  detail_markdown: z.string().optional(),
+  source_section_id: z.string().optional(),
+});
+
+const OrderingStepsSchema = z.array(OrderingStepSchema).min(2).superRefine((steps, context) => {
+  const seenStepIds = new Set<string>();
+
+  steps.forEach((step, index) => {
+    if (seenStepIds.has(step.id)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Ordering step ids must be unique.',
+        path: [index, 'id'],
+      });
+      return;
+    }
+
+    seenStepIds.add(step.id);
+  });
+});
+
 const QuizQuestionSchema = z.object({
   id: z.string(),
   question: z.string(),
   options: z.array(z.string()),
   correct_index: z.number().int().nonnegative().optional(),
+});
+
+const VideoDownloadSchema = z.object({
+  url: z.string(),
+  label: z.string().optional(),
+  mime_type: z.string().optional(),
+  size_bytes: z.number().int().nonnegative().optional(),
+  expires_at: z.string().optional(),
+});
+
+const VideoProvenanceSchema = z.object({
+  generated_from: z.enum(['foundry', 'manual_upload', 'external_url']).optional(),
+  source_file_ids: z.array(z.string()).optional(),
+  source_section_ids: z.array(z.string()).optional(),
+  media_asset_id: z.string().optional(),
+  provider_asset_id: z.string().optional(),
+  approved_by: z.string().optional(),
+  generated_at: z.string().optional(),
+  notes_markdown: z.string().optional(),
+});
+
+const VideoChapterSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  start_seconds: z.number().nonnegative(),
+  end_seconds: z.number().nonnegative().optional(),
+  source_section_ids: z.array(z.string()).optional(),
+});
+
+const VideoTranscriptSegmentSchema = z.object({
+  id: z.string(),
+  start_seconds: z.number().nonnegative(),
+  end_seconds: z.number().nonnegative(),
+  text_markdown: z.string(),
+  derived_from_section_ids: z.array(z.string()),
+});
+
+const VideoCheckpointSchema = z.object({
+  id: z.string(),
+  at_seconds: z.number().nonnegative(),
+  question: z.string(),
+  options: z.array(z.string()).optional(),
+  correct_index: z.number().int().nonnegative().optional(),
+  feedback_correct_markdown: z.string().optional(),
+  feedback_incorrect_markdown: z.string().optional(),
+  source_section_ids: z.array(z.string()).optional(),
+  segment_start_seconds: z.number().nonnegative().optional(),
+  required: z.boolean().optional(),
+  must_answer_correctly: z.boolean().optional(),
 });
 
 const GeneratedLessonContentSchema = z.object({
@@ -85,6 +162,27 @@ const GeneratedLessonContentSchema = z.object({
   body_markdown: z.string().optional(),
   quiz_questions: z.array(QuizQuestionSchema).optional(),
   acknowledgment_text: z.string().optional(),
+  ordering_steps: OrderingStepsSchema.optional(),
+  video_script_markdown: z.string().optional(),
+  video_url: z.string().optional(),
+  duration_seconds: z.number().optional(),
+  transcript_markdown: z.string().optional(),
+  poster_url: z.string().optional(),
+  media_asset_id: z.string().optional(),
+  media_provider: z.enum(['heygen', 'manual', 'external']).optional(),
+  media_status: z
+    .enum(['pending', 'processing', 'ready', 'failed', 'stale'])
+    .optional(),
+  download_url: z.string().optional(),
+  downloads: z.array(VideoDownloadSchema).optional(),
+  provenance: VideoProvenanceSchema.optional(),
+  chapters: z.array(VideoChapterSchema).optional(),
+  transcript_segments: z.array(VideoTranscriptSegmentSchema).optional(),
+  checkpoints: z.array(VideoCheckpointSchema).optional(),
+  video_chapters: z.array(VideoChapterSchema).optional(),
+  video_transcript_segments: z.array(VideoTranscriptSegmentSchema).optional(),
+  video_checkpoints: z.array(VideoCheckpointSchema).optional(),
+  derived_from_section_ids: z.array(z.string()).optional(),
   status: LessonGenerationStatusSchema,
   status_note: z.string().optional(),
   source_refs: z
@@ -95,6 +193,14 @@ const GeneratedLessonContentSchema = z.object({
       }),
     )
     .optional(),
+}).superRefine((lesson, context) => {
+  if (lesson.lesson_type === 'drag_to_order' && lesson.ordering_steps === undefined) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'drag_to_order generated lessons require valid ordering_steps.',
+      path: ['ordering_steps'],
+    });
+  }
 });
 
 export const GenerateLessonsOutputSchema = z.object({
@@ -212,6 +318,15 @@ const VideoLessonContentSchema = z.object({
   duration_seconds: z.number().optional(),
   transcript_markdown: z.string().optional(),
   poster_url: z.string().optional(),
+  media_asset_id: z.string().optional(),
+  media_provider: z.enum(['heygen', 'manual', 'external']).optional(),
+  media_status: z.enum(['pending', 'processing', 'ready', 'failed', 'stale']).optional(),
+  download_url: z.string().optional(),
+  downloads: z.array(VideoDownloadSchema).optional(),
+  provenance: VideoProvenanceSchema.optional(),
+  chapters: z.array(VideoChapterSchema).optional(),
+  transcript_segments: z.array(VideoTranscriptSegmentSchema).optional(),
+  checkpoints: z.array(VideoCheckpointSchema).optional(),
 });
 const CoachLessonContentSchema = z.object({
   type: z.literal('coach'),
@@ -238,6 +353,31 @@ const ReflectionPromptLessonContentSchema = z.object({
   type: z.literal('reflection_prompt'),
   prompt: z.string(),
 });
+const HotspotLessonContentSchema = z.object({
+  type: z.literal('hotspot_diagram'),
+  intro_markdown: z.string().optional(),
+  image_ref: z.object({
+    url: z.string(),
+    alt_text: z.string(),
+    caption: z.string().optional(),
+    source_image_id: z.string().optional(),
+  }),
+  hotspots: z.array(
+    z.object({
+      id: z.string(),
+      x: z.number(),
+      y: z.number(),
+      title: z.string(),
+      details_markdown: z.string(),
+      source_section_id: z.string().optional(),
+    }),
+  ),
+});
+const OrderingLessonContentSchema = z.object({
+  type: z.literal('drag_to_order'),
+  intro_markdown: z.string().optional(),
+  steps: OrderingStepsSchema,
+});
 
 const LessonContentSchema = z.discriminatedUnion('type', [
   TextLessonContentSchema,
@@ -249,6 +389,8 @@ const LessonContentSchema = z.discriminatedUnion('type', [
   CoachLessonContentSchema,
   AssignmentLessonContentSchema,
   ReflectionPromptLessonContentSchema,
+  HotspotLessonContentSchema,
+  OrderingLessonContentSchema,
 ]);
 
 const LessonSchema = z.object({

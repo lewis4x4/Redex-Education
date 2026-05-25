@@ -19,7 +19,12 @@ if (maybeVitestDescribe?.skip) {
 }
 
 if (typeof Deno !== "undefined") {
-  const { createCourseFoundryAiClientServer, ProviderNotConfiguredError } = await import("./courseFoundryAiClientServer.ts");
+  const {
+    COURSE_FOUNDRY_SERVER_PROMPT_REGISTRY,
+    VIDEO_SEGMENT_RULE,
+    createCourseFoundryAiClientServer,
+    ProviderNotConfiguredError,
+  } = await import("./courseFoundryAiClientServer.ts");
 
   Deno.test("server AI client calls Anthropic and validates costed output", async () => {
     const originalFetch = globalThis.fetch;
@@ -129,6 +134,67 @@ if (typeof Deno !== "undefined") {
       Deno.env.delete("AI_PROVIDER_API_KEY");
       Deno.env.delete("AI_MODEL");
     }
+  });
+
+  Deno.test("server AI client rejects invalid generated drag-to-order lessons", async () => {
+    const originalFetch = globalThis.fetch;
+    Deno.env.set("AI_PROVIDER", "openai");
+    Deno.env.set("AI_PROVIDER_API_KEY", "test-key");
+    Deno.env.set("AI_MODEL", "openai-test");
+    globalThis.fetch = (() => {
+      return Promise.resolve(new Response(JSON.stringify({
+        output_text: JSON.stringify({
+          module_title: "HR Basics",
+          lessons: [
+            {
+              lesson_index: 0,
+              module_index: 0,
+              title: "Order the procedure",
+              lesson_type: "drag_to_order",
+              status: "draft",
+              ordering_steps: [
+                { id: "step-1", label: "First" },
+                { id: "step-1", label: "Duplicate" },
+              ],
+            },
+          ],
+          generated_at: "2026-05-25T03:00:00.000Z",
+          is_complete: true,
+        }),
+        usage: { input_tokens: 1000, output_tokens: 500 },
+      }), { status: 200 }));
+    }) as typeof fetch;
+
+    try {
+      await createCourseFoundryAiClientServer().generateLessons({
+        outline: { modules: [{ lessons: [{ lesson_type: "drag_to_order" }] }] },
+        sources: { text: "source" },
+      });
+      throw new Error("Expected invalid drag-to-order output to fail validation");
+    } catch (error) {
+      assert(String((error as Error).message).includes("Ordering step ids must be unique"), "validation should reject duplicate ordering step ids");
+    } finally {
+      globalThis.fetch = originalFetch;
+      Deno.env.delete("AI_PROVIDER");
+      Deno.env.delete("AI_PROVIDER_API_KEY");
+      Deno.env.delete("AI_MODEL");
+    }
+  });
+
+  Deno.test("server video prompts include the explicit video segment rule", () => {
+    const videoPrompt = COURSE_FOUNDRY_SERVER_PROMPT_REGISTRY["lesson_generation.video"];
+    const videoScriptPrompt = COURSE_FOUNDRY_SERVER_PROMPT_REGISTRY["lesson_generation.video_script"];
+
+    assert(videoPrompt, "lesson_generation.video prompt should exist");
+    assert(videoScriptPrompt, "lesson_generation.video_script prompt should exist");
+    assert(
+      videoPrompt.system.includes(VIDEO_SEGMENT_RULE),
+      "lesson_generation.video should include VIDEO_SEGMENT_RULE",
+    );
+    assert(
+      videoScriptPrompt.system.includes(VIDEO_SEGMENT_RULE),
+      "lesson_generation.video_script should include VIDEO_SEGMENT_RULE",
+    );
   });
 
   Deno.test("server AI client throws clearly when provider key is missing", async () => {

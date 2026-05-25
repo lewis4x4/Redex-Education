@@ -453,6 +453,106 @@ export type Database = {
           },
         ]
       }
+      media_assets: {
+        Row: {
+          avatar_id: string | null
+          completed_at: string | null
+          cost_credits: number
+          created_at: string
+          duration_seconds: number | null
+          heygen_video_id: string | null
+          id: string
+          last_error_message: string | null
+          lesson_index: number | null
+          lesson_title: string | null
+          max_render_attempts: number
+          mime_type: string | null
+          module_id: string
+          module_version_id: string | null
+          provider: string
+          render_attempt_count: number
+          stale_since: string | null
+          status: string
+          storage_bucket: string | null
+          storage_path: string | null
+          training_lesson_id: string | null
+          transcript_source_file_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_id?: string | null
+          completed_at?: string | null
+          cost_credits?: number
+          created_at?: string
+          duration_seconds?: number | null
+          heygen_video_id?: string | null
+          id?: string
+          last_error_message?: string | null
+          lesson_index?: number | null
+          lesson_title?: string | null
+          max_render_attempts?: number
+          mime_type?: string | null
+          module_id: string
+          module_version_id?: string | null
+          provider: string
+          render_attempt_count?: number
+          stale_since?: string | null
+          status?: string
+          storage_bucket?: string | null
+          storage_path?: string | null
+          training_lesson_id?: string | null
+          transcript_source_file_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_id?: string | null
+          completed_at?: string | null
+          cost_credits?: number
+          created_at?: string
+          duration_seconds?: number | null
+          heygen_video_id?: string | null
+          id?: string
+          last_error_message?: string | null
+          lesson_index?: number | null
+          lesson_title?: string | null
+          max_render_attempts?: number
+          mime_type?: string | null
+          module_id?: string
+          module_version_id?: string | null
+          provider?: string
+          render_attempt_count?: number
+          stale_since?: string | null
+          status?: string
+          storage_bucket?: string | null
+          storage_path?: string | null
+          training_lesson_id?: string | null
+          transcript_source_file_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_assets_module_version_id_fkey"
+            columns: ["module_version_id"]
+            isOneToOne: false
+            referencedRelation: "module_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_assets_training_lesson_id_fkey"
+            columns: ["training_lesson_id"]
+            isOneToOne: false
+            referencedRelation: "training_lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_assets_transcript_source_file_id_fkey"
+            columns: ["transcript_source_file_id"]
+            isOneToOne: false
+            referencedRelation: "source_files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       module_source_bindings: {
         Row: {
           binding_kind: string
@@ -784,8 +884,10 @@ export type Database = {
           drive_path: string | null
           id: string
           last_synced_at: string | null
+          media_asset_id: string | null
           mime_type: string
           processing_status: Database["redex"]["Enums"]["source_file_processing_status"]
+          source_kind: string
           title: string
           topic: string | null
           updated_at: string
@@ -799,8 +901,10 @@ export type Database = {
           drive_path?: string | null
           id?: string
           last_synced_at?: string | null
+          media_asset_id?: string | null
           mime_type: string
           processing_status?: Database["redex"]["Enums"]["source_file_processing_status"]
+          source_kind?: string
           title: string
           topic?: string | null
           updated_at?: string
@@ -814,8 +918,10 @@ export type Database = {
           drive_path?: string | null
           id?: string
           last_synced_at?: string | null
+          media_asset_id?: string | null
           mime_type?: string
           processing_status?: Database["redex"]["Enums"]["source_file_processing_status"]
+          source_kind?: string
           title?: string
           topic?: string | null
           updated_at?: string
@@ -828,40 +934,56 @@ export type Database = {
             referencedRelation: "source_file_versions"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "source_files_media_asset_id_fkey"
+            columns: ["media_asset_id"]
+            isOneToOne: false
+            referencedRelation: "media_assets"
+            referencedColumns: ["id"]
+          },
         ]
       }
       source_sections: {
         Row: {
           body: string
           created_at: string
+          derived_from_section_ids: string[]
+          end_seconds: number | null
           has_placeholders: boolean
           heading: string
           id: string
           level: number
           position_index: number
           slug: string
+          start_seconds: number | null
           source_file_version_id: string
         }
         Insert: {
           body?: string
           created_at?: string
+          derived_from_section_ids?: string[]
+          end_seconds?: number | null
           has_placeholders?: boolean
           heading?: string
           id?: string
           level: number
           position_index: number
           slug: string
+          start_seconds?: number | null
           source_file_version_id: string
         }
         Update: {
           body?: string
           created_at?: string
+          derived_from_section_ids?: string[]
+          end_seconds?: number | null
           has_placeholders?: boolean
           heading?: string
           id?: string
           level?: number
           position_index?: number
           slug?: string
+          start_seconds?: number | null
           source_file_version_id?: string
         }
         Relationships: [

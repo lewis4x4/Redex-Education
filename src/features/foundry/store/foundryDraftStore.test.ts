@@ -1038,6 +1038,7 @@ describe('useFoundryDraftStore Supabase dispatch', () => {
     createModuleDraft = vi.fn(),
     upsertModuleDraft = vi.fn().mockResolvedValue({ id: 'module-version-1', module_id: 'module-1', version_number: 1 }),
     fetchDraftByModuleVersionId = vi.fn().mockResolvedValue(null),
+    saveGeneratedLessons = vi.fn().mockResolvedValue([]),
   ) {
     vi.resetModules()
     Object.defineProperty(globalThis, 'localStorage', {
@@ -1050,7 +1051,7 @@ describe('useFoundryDraftStore Supabase dispatch', () => {
       saveSourceMaterial: vi.fn().mockResolvedValue({}),
       saveSetupAnswers: vi.fn().mockResolvedValue(undefined),
       saveGeneratedOutline: vi.fn().mockResolvedValue([]),
-      saveGeneratedLessons: vi.fn().mockResolvedValue([]),
+      saveGeneratedLessons,
       publishModuleVersion: vi.fn().mockResolvedValue({}),
     }))
     vi.doMock('@/lib/education/moduleVersions', () => ({
@@ -1072,7 +1073,7 @@ describe('useFoundryDraftStore Supabase dispatch', () => {
       useFoundryDraftStore.getState().resetFoundryDraft()
     })
 
-    return { useFoundryDraftStore, createModuleDraft, upsertModuleDraft, fetchDraftByModuleVersionId }
+    return { useFoundryDraftStore, createModuleDraft, upsertModuleDraft, fetchDraftByModuleVersionId, saveGeneratedLessons }
   }
 
   const basics = {
@@ -1217,6 +1218,72 @@ describe('useFoundryDraftStore Supabase dispatch', () => {
 
     expect(useFoundryDraftStore.getState().lastWriteError).toEqual(
       expect.objectContaining({ action: 'persistDraftStage', message: 'upsert failed' }),
+    )
+  })
+
+  it('preserves generated video transcript segments and checkpoints in domain mapping', async () => {
+    const saveGeneratedLessons = vi.fn().mockResolvedValue([])
+    const { useFoundryDraftStore } = await loadStore(
+      'supabase',
+      vi.fn().mockResolvedValue({ id: 'course-1' }),
+      vi.fn().mockResolvedValue({ id: 'module-version-1', module_id: 'module-1', version_number: 1 }),
+      vi.fn().mockResolvedValue(null),
+      saveGeneratedLessons,
+    )
+
+    const preview = {
+      module_title: 'Video module',
+      lessons: [
+        {
+          lesson_index: 0,
+          module_index: 0,
+          title: 'Video lesson',
+          lesson_type: 'video' as const,
+          status: 'draft' as const,
+          video_url: 'https://example.com/video.mp4',
+          video_transcript_segments: [
+            {
+              id: 'segment-1',
+              start_seconds: 0,
+              end_seconds: 30,
+              text_markdown: 'Segment text',
+              derived_from_section_ids: ['section-1'],
+            },
+          ],
+          video_checkpoints: [
+            {
+              id: 'checkpoint-1',
+              at_seconds: 30,
+              question: 'What is step one?',
+              options: ['A', 'B'],
+              correct_index: 0,
+            },
+          ],
+        },
+      ],
+      generated_at: '2026-05-25T00:00:00.000Z',
+      is_complete: true,
+    }
+
+    act(() => {
+      useFoundryDraftStore.getState().setGeneratedModule(preview)
+    })
+
+    await vi.waitFor(() => {
+      expect(saveGeneratedLessons).toHaveBeenCalledTimes(1)
+    })
+
+    const savedLessons = saveGeneratedLessons.mock.calls[0]?.[0]?.lessons
+    expect(savedLessons).toHaveLength(1)
+    expect(savedLessons?.[0]?.content).toEqual(
+      expect.objectContaining({
+        type: 'video',
+        video_url: 'https://example.com/video.mp4',
+        transcript_segments: [
+          expect.objectContaining({ id: 'segment-1', text_markdown: 'Segment text' }),
+        ],
+        checkpoints: [expect.objectContaining({ id: 'checkpoint-1', question: 'What is step one?' })],
+      }),
     )
   })
 })

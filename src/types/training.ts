@@ -50,6 +50,8 @@ export type Role = 'admin' | 'foundry_author' | 'manager' | 'learner';
  *   - coach             — Redex Coach interactive prompt (placeholder)
  *   - assignment        — open-ended deliverable with optional rubric
  *   - reflection_prompt — open-text reflection
+ *   - hotspot_diagram   — interactive image hotspots with explainer panels
+ *   - drag_to_order     — procedural sequence practice with reorder/check feedback
  */
 export type LessonType =
   | 'text'
@@ -60,7 +62,9 @@ export type LessonType =
   | 'video'
   | 'coach'
   | 'assignment'
-  | 'reflection_prompt';
+  | 'reflection_prompt'
+  | 'hotspot_diagram'
+  | 'drag_to_order';
 
 export type Criticality = 'required' | 'recommended' | 'optional' | 'bonus';
 
@@ -300,7 +304,9 @@ export type LessonContent =
   | VideoLessonContent
   | CoachLessonContent
   | AssignmentLessonContent
-  | ReflectionPromptLessonContent;
+  | ReflectionPromptLessonContent
+  | HotspotLessonContent
+  | OrderingLessonContent;
 
 export interface TextLessonContent {
   type: 'text';
@@ -329,6 +335,21 @@ export interface AcknowledgmentLessonContent {
   required_signature?: 'click' | 'name';
   /** Optional policy/document reference shown alongside the statement. */
   policy_ref?: string;
+}
+
+export interface AcknowledgmentCompletion {
+  lesson_id: UUID;
+  signature_method: 'click' | 'name';
+  acknowledged_at: ISODateTime;
+  policy_ref?: string;
+  signature_text?: string;
+}
+
+export interface ChecklistCompletion {
+  lesson_id: UUID;
+  checked_item_ids: UUID[];
+  completed_at: ISODateTime;
+  require_all: boolean;
 }
 
 export interface QuizLessonContent {
@@ -366,6 +387,86 @@ export interface ScenarioChoice {
   label: string;
   is_correct?: boolean;
   feedback_markdown?: string;
+  next_step_id?: UUID | 'outcome';
+}
+
+export interface ScenarioCompletion {
+  lesson_id: UUID;
+  completed_at: ISODateTime;
+  selected_choice_ids: Record<UUID, UUID>;
+  visited_step_ids: UUID[];
+}
+
+export type VideoMediaProvider = 'heygen' | 'manual' | 'external';
+
+export type VideoMediaStatus = 'pending' | 'processing' | 'ready' | 'failed' | 'stale';
+
+export interface VideoChapter {
+  id: UUID;
+  title: string;
+  start_seconds: number;
+  end_seconds?: number;
+  source_section_ids?: UUID[];
+}
+
+export interface VideoTranscriptSegment {
+  id: UUID;
+  start_seconds: number;
+  end_seconds: number;
+  text_markdown: string;
+  derived_from_section_ids: UUID[];
+}
+
+export interface VideoCheckpoint {
+  id: UUID;
+  at_seconds: number;
+  question: string;
+  options?: string[];
+  correct_index?: number;
+  feedback_correct_markdown?: string;
+  feedback_incorrect_markdown?: string;
+  source_section_ids?: UUID[];
+  segment_start_seconds?: number;
+  /** Defaults to true. Only required checkpoints gate learner completion. */
+  required?: boolean;
+  /** Defaults to false. Use true only for safety-critical checks. */
+  must_answer_correctly?: boolean;
+}
+
+export interface VideoCheckpointCompletion {
+  checkpoint_id: UUID;
+  answered_at: ISODateTime;
+  selected_option_index?: number;
+  response_text?: string;
+  correct?: boolean;
+  rewatched?: boolean;
+}
+
+export interface VideoCheckpointProgress {
+  lesson_id: UUID;
+  answered_checkpoint_ids: UUID[];
+  required_checkpoint_ids: UUID[];
+  all_required_answered: boolean;
+  completions: VideoCheckpointCompletion[];
+}
+
+export interface VideoDownload {
+  url: string;
+  label?: string;
+  mime_type?: string;
+  size_bytes?: number;
+  expires_at?: ISODateTime;
+}
+
+export interface VideoProvenance {
+  generated_from?: 'foundry' | 'manual_upload' | 'external_url';
+  source_file_ids?: UUID[];
+  source_section_ids?: UUID[];
+  media_asset_id?: UUID;
+  provider_asset_id?: string;
+  approved_by?: UUID;
+  generated_at?: ISODateTime;
+  notes_markdown?: string;
 }
 
 export interface VideoLessonContent {
@@ -373,8 +474,16 @@ export interface VideoLessonContent {
   video_url: string;
   duration_seconds?: number;
   transcript_markdown?: string;
-  /** Placeholder for future captions/chapters payload. */
   poster_url?: string;
+  media_asset_id?: UUID;
+  media_provider?: VideoMediaProvider;
+  media_status?: VideoMediaStatus;
+  download_url?: string;
+  downloads?: VideoDownload[];
+  provenance?: VideoProvenance;
+  chapters?: VideoChapter[];
+  transcript_segments?: VideoTranscriptSegment[];
+  checkpoints?: VideoCheckpoint[];
 }
 
 /**
@@ -410,6 +519,50 @@ export interface AssignmentRubricCriterion {
 export interface ReflectionPromptLessonContent {
   type: 'reflection_prompt';
   prompt: string;
+}
+
+export interface HotspotLessonContent {
+  type: 'hotspot_diagram';
+  intro_markdown?: string;
+  image_ref: HotspotImageRef;
+  hotspots: HotspotPoint[];
+}
+
+export interface HotspotImageRef {
+  url: string;
+  alt_text: string;
+  caption?: string;
+  source_image_id?: UUID;
+}
+
+export interface HotspotPoint {
+  id: UUID;
+  x: number;
+  y: number;
+  title: string;
+  details_markdown: string;
+  source_section_id?: UUID;
+}
+
+export interface OrderingLessonContent {
+  type: 'drag_to_order';
+  intro_markdown?: string;
+  /** Correct order is the array order. */
+  steps: OrderingStep[];
+}
+
+export interface OrderingStep {
+  id: UUID;
+  label: string;
+  detail_markdown?: string;
+  source_section_id?: UUID;
+}
+
+export interface OrderingCompletion {
+  lesson_id: UUID;
+  completed_at: ISODateTime;
+  ordered_step_ids: UUID[];
+  attempt_count: number;
 }
 
 export interface ResourceLink {
@@ -621,6 +774,25 @@ export interface GeneratedLessonContent {
   body_markdown?: string;
   quiz_questions?: QuizQuestion[];
   acknowledgment_text?: string;
+  ordering_steps?: OrderingStep[];
+  video_script_markdown?: string;
+  video_url?: string;
+  duration_seconds?: number;
+  transcript_markdown?: string;
+  poster_url?: string;
+  media_asset_id?: UUID;
+  media_provider?: VideoMediaProvider;
+  media_status?: VideoMediaStatus;
+  download_url?: string;
+  downloads?: VideoDownload[];
+  provenance?: VideoProvenance;
+  chapters?: VideoChapter[];
+  transcript_segments?: VideoTranscriptSegment[];
+  checkpoints?: VideoCheckpoint[];
+  video_chapters?: VideoChapter[];
+  video_transcript_segments?: VideoTranscriptSegment[];
+  video_checkpoints?: VideoCheckpoint[];
+  derived_from_section_ids?: UUID[];
   status: LessonGenerationStatus;
   status_note?: string;
   source_refs?: { drive_file_id: string; section_count: number }[];

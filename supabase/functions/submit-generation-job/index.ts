@@ -1,4 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  EdgeFunctionError,
+  idempotencyKeyFor,
+  maxAttemptsForOperation,
+  operationFrom,
+  type ParsedSubmitGenerationJobRequest,
+  type SubmitGenerationJobRequest,
+  validateSubmitInputPayload,
+} from "./validation.ts";
 
 let ALLOWED_ORIGINS: string[] = [];
 
@@ -23,7 +32,9 @@ function configureAllowedOrigins(functionName: string): Response | null {
     .filter(Boolean);
 
   if (ALLOWED_ORIGINS.length === 0) {
-    console.error(`[${functionName}] REDEX_ALLOWED_ORIGINS must include at least one origin`);
+    console.error(
+      `[${functionName}] REDEX_ALLOWED_ORIGINS must include at least one origin`,
+    );
     return new Response(
       JSON.stringify({
         status: "error",
@@ -53,16 +64,6 @@ function resolveCorsHeaders(request: Request): Record<string, string> {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     Vary: "Origin",
   };
-}
-
-class EdgeFunctionError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-    public status = 400,
-  ) {
-    super(message);
-  }
 }
 
 function jsonResponse(request: Request, body: unknown, status = 200): Response {
@@ -107,16 +108,6 @@ function getRequiredEnv(name: string): string {
   return value;
 }
 
-type JobType = "full" | "section";
-
-interface SubmitGenerationJobRequest {
-  moduleId?: string;
-  jobType?: JobType;
-  targetSectionId?: string | null;
-  inputPayload?: unknown;
-  promptVersion?: string;
-}
-
 interface ProfileRoleRow {
   role: string;
 }
@@ -128,45 +119,9 @@ interface GenerationJobSummary {
   current_stage?: string | null;
 }
 
-function bytesToHex(bytes: ArrayBuffer): string {
-  return Array.from(new Uint8Array(bytes))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-async function sha256Hex(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(value),
-  );
-
-  return bytesToHex(digest);
-}
-
-function operationFrom(inputPayload: unknown): string {
-  if (typeof inputPayload === "object" && inputPayload !== null && !Array.isArray(inputPayload)) {
-    const operation = (inputPayload as Record<string, unknown>).operation;
-    return typeof operation === "string" ? operation : "fullPipeline";
-  }
-
-  return "fullPipeline";
-}
-
-async function idempotencyKeyFor(body: Awaited<ReturnType<typeof parseRequestBody>>): Promise<string> {
-  const operation = operationFrom(body.inputPayload);
-  const inputHash = await sha256Hex(JSON.stringify(body.inputPayload));
-
-  return [
-    body.moduleId,
-    body.jobType,
-    body.targetSectionId ?? "full",
-    operation,
-    body.promptVersion ?? "unknown",
-    inputHash,
-  ].join(":");
-}
-
-async function parseRequestBody(request: Request): Promise<Required<Pick<SubmitGenerationJobRequest, "moduleId" | "jobType" | "inputPayload">> & Pick<SubmitGenerationJobRequest, "targetSectionId" | "promptVersion">> {
+async function parseRequestBody(
+  request: Request,
+): Promise<ParsedSubmitGenerationJobRequest> {
   let body: SubmitGenerationJobRequest;
 
   try {
@@ -180,23 +135,41 @@ async function parseRequestBody(request: Request): Promise<Required<Pick<SubmitG
   }
 
   if (!body.moduleId || typeof body.moduleId !== "string") {
-    throw new EdgeFunctionError("invalid_request", "moduleId is required.", 400);
+    throw new EdgeFunctionError(
+      "invalid_request",
+      "moduleId is required.",
+      400,
+    );
   }
 
   if (body.jobType !== "full" && body.jobType !== "section") {
-    throw new EdgeFunctionError("invalid_request", "jobType must be 'full' or 'section'.", 400);
-  }
-
-  if (body.jobType === "section" && !body.targetSectionId) {
     throw new EdgeFunctionError(
       "invalid_request",
-      "targetSectionId is required for section generation jobs.",
+      "jobType must be 'full' or 'section'.",
       400,
     );
   }
 
   if (body.inputPayload === undefined || body.inputPayload === null) {
-    throw new EdgeFunctionError("invalid_request", "inputPayload is required.", 400);
+    throw new EdgeFunctionError(
+      "invalid_request",
+      "inputPayload is required.",
+      400,
+    );
+  }
+
+  validateSubmitInputPayload(body.inputPayload);
+  const operation = operationFrom(body.inputPayload);
+
+  if (
+    body.jobType === "section" && !body.targetSectionId &&
+    operation !== "renderVideoLesson"
+  ) {
+    throw new EdgeFunctionError(
+      "invalid_request",
+      "targetSectionId is required for section generation jobs.",
+      400,
+    );
   }
 
   return {
@@ -213,7 +186,11 @@ function bearerToken(request: Request): string {
   const token = authorization.replace(/^Bearer\s+/iu, "").trim();
 
   if (!token) {
-    throw new EdgeFunctionError("auth_failed", "A valid Supabase JWT is required.", 401);
+    throw new EdgeFunctionError(
+      "auth_failed",
+      "A valid Supabase JWT is required.",
+      401,
+    );
   }
 
   return token;
@@ -248,8 +225,12 @@ Deno.serve(async (request) => {
     const supabaseUrl = getRequiredEnv("SUPABASE_URL");
     const serviceRoleKey = getRequiredEnv("SUPABASE_SERVICE_ROLE_KEY");
     const jwt = bearerToken(request);
-    const supabase = createClient(supabaseUrl, serviceRoleKey, { db: { schema: "redex" } });
-    const { data: userData, error: userError } = await supabase.auth.getUser(jwt);
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      db: { schema: "redex" },
+    });
+    const { data: userData, error: userError } = await supabase.auth.getUser(
+      jwt,
+    );
 
     if (userError || !userData.user) {
       throw new EdgeFunctionError(
@@ -265,7 +246,10 @@ Deno.serve(async (request) => {
       .eq("id", userData.user.id)
       .single<ProfileRoleRow>();
 
-    if (profileError || !profile || !["admin", "foundry_author"].includes(profile.role)) {
+    if (
+      profileError || !profile ||
+      !["admin", "foundry_author"].includes(profile.role)
+    ) {
       throw new EdgeFunctionError(
         "forbidden",
         "Only Foundry authors can submit generation jobs.",
@@ -284,7 +268,11 @@ Deno.serve(async (request) => {
       .limit(1);
 
     if (duplicateError) {
-      throw new EdgeFunctionError("db_read_failed", duplicateError.message, 500);
+      throw new EdgeFunctionError(
+        "db_read_failed",
+        duplicateError.message,
+        500,
+      );
     }
 
     const existing = (duplicates?.[0] ?? null) as GenerationJobSummary | null;
@@ -300,19 +288,26 @@ Deno.serve(async (request) => {
       });
     }
 
+    const maxAttempts = maxAttemptsForOperation(operation);
+    const insertPayload: Record<string, unknown> = {
+      module_id: body.moduleId,
+      job_type: body.jobType,
+      target_section_id: body.targetSectionId,
+      status: "queued",
+      operation,
+      idempotency_key: idempotencyKey,
+      input_payload: body.inputPayload,
+      prompt_version: body.promptVersion ?? null,
+      submitted_by: userData.user.id,
+    };
+
+    if (maxAttempts !== null) {
+      insertPayload.max_attempts = maxAttempts;
+    }
+
     const { data: inserted, error: insertError } = await supabase
       .from("generation_jobs")
-      .insert({
-        module_id: body.moduleId,
-        job_type: body.jobType,
-        target_section_id: body.targetSectionId,
-        status: "queued",
-        operation,
-        idempotency_key: idempotencyKey,
-        input_payload: body.inputPayload,
-        prompt_version: body.promptVersion ?? null,
-        submitted_by: userData.user.id,
-      })
+      .insert(insertPayload)
       .select("id,status,stage_map,current_stage")
       .single<GenerationJobSummary>();
 

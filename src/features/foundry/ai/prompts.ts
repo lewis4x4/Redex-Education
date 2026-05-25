@@ -163,12 +163,12 @@ const PROMPT_HISTORY = {
     }),
   ],
   'lesson_generation.video': [
-    prompt('lesson_generation.video', 'v1', {
+    prompt('lesson_generation.video', 'v1.1', {
       description:
-        'Generate a source-grounded video lesson with script segments, notes, and transcript provenance.',
+        'Generate a source-grounded video lesson with chapters, transcript segments, checkpoints, and transcript provenance.',
       system: lessonSystem(
         VIDEO_SEGMENT_RULE,
-        'Generate VideoLessonContent with script segments, visual notes when useful, source citations, and checkpoint questions. Every segment must include derived_from_section_ids for transcript-into-corpus provenance and must be omitted or flagged if it cannot be tied to approved source sections.',
+        'Generate VideoLessonContent with chapters, transcript_segments, checkpoints, and source citations. transcript_segments must include start_seconds, end_seconds, text_markdown, and derived_from_section_ids. checkpoints should align to segment boundaries and include required/must_answer_correctly only when warranted. Include media/download/provenance fields when known; otherwise omit them.',
       ),
       userTemplate: lessonTemplate,
       requiredVariables: lessonVariables,
@@ -221,12 +221,12 @@ const PROMPT_HISTORY = {
     }),
   ],
   'lesson_generation.video_script': [
-    prompt('lesson_generation.video_script', 'v1', {
+    prompt('lesson_generation.video_script', 'v1.1', {
       description:
-        'Generate a video script with semantic segment boundaries, per-segment checkpoints, and transcript-to-corpus provenance.',
+        'Generate a video script with chapters, semantic transcript segments, segment-boundary checkpoints, and transcript provenance.',
       system: lessonSystem(
         VIDEO_SEGMENT_RULE,
-        'Generate VideoLessonContent with script segments, visual notes when useful, source citations, and checkpoint questions. Every segment must include derived_from_section_ids for transcript-into-corpus provenance and must be omitted or flagged if it cannot be tied to approved source sections.',
+        'Generate VideoLessonContent with chapters, transcript_segments, checkpoints, and source citations. transcript_segments must include start_seconds, end_seconds, text_markdown, and derived_from_section_ids. checkpoints should align to segment boundaries and include required/must_answer_correctly only when warranted. Include media/download/provenance fields when known; otherwise omit them.',
       ),
       userTemplate: lessonTemplate,
       requiredVariables: lessonVariables,
@@ -258,13 +258,13 @@ const PROMPT_HISTORY = {
       description:
         'Generate source-grounded ordered procedure steps for a drag-to-order lesson; Phase 10.5 schema is represented by OrderingLessonContent.',
       system: lessonSystem(
-        'Generate OrderingLessonContent for Phase 10.5, even if the downstream schema is still a stub. Each step must be atomic, source-cited, and accompanied by feedback explaining why the sequence matters. If order is ambiguous or incomplete, flag it instead of inventing steps.',
+        'Generate OrderingLessonContent for Phase 10.5. Return ordered steps[] where each step has id, label, optional detail_markdown, and optional source_section_id. Each step must be atomic and source-cited. If order is ambiguous or incomplete, flag it instead of inventing steps.',
       ),
       userTemplate: lessonTemplate,
       requiredVariables: lessonVariables,
       outputSchemaName: 'OrderingLessonContent',
       requiresCitations: true,
-      enforcedRules: ['Phase 10.5 schema may be stubbed', 'No inferred procedure steps'],
+      enforcedRules: ['OrderingLessonContent schema required', 'No inferred procedure steps'],
     }),
   ],
   'lesson_generation.practical': [

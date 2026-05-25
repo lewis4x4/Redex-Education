@@ -39,6 +39,8 @@ const PROMPT_KEY_BY_LESSON_TYPE: Record<LessonType, PromptKey> = {
   coach: 'lesson_generation.coach',
   assignment: 'lesson_generation.assignment',
   reflection_prompt: 'lesson_generation.reflection_prompt',
+  hotspot_diagram: 'lesson_generation.hotspot_diagram',
+  drag_to_order: 'lesson_generation.drag_to_order',
 };
 
 function toLessonReviewItem(lesson: GeneratedLessonContent): LessonReviewItem {

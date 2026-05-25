@@ -25,9 +25,12 @@ type PromptKey =
   | "lesson_generation.acknowledgment"
   | "lesson_generation.scenario"
   | "lesson_generation.video"
+  | "lesson_generation.video_script"
   | "lesson_generation.coach"
   | "lesson_generation.assignment"
   | "lesson_generation.reflection_prompt"
+  | "lesson_generation.hotspot_diagram"
+  | "lesson_generation.drag_to_order"
   | "assessment_generation"
   | "self_critique"
   | "regenerate_with_fixes"
@@ -35,7 +38,7 @@ type PromptKey =
   | "entailment_check";
 
 interface PromptDefinition {
-  id: { key: PromptKey; version: "v1" };
+  id: { key: PromptKey; version: string };
   system: string;
   user: string;
 }
@@ -108,6 +111,7 @@ export interface EntailmentCheckOutput {
 
 const JSON_OUTPUT_RULE = "Return only valid JSON matching the requested schema. Do not wrap the JSON in markdown fences.";
 const REDEX_POLICY_GUARDRAIL = "You generate Redex Education training drafts only from supplied Redex source material. Do not invent Redex policy.";
+export const VIDEO_SEGMENT_RULE = "Treat each video segment as one semantic idea and target approximately 60-120 seconds per segment unless source density requires shorter clips.";
 
 const PROMPTS: Record<PromptKey, PromptDefinition> = {
   source_analysis: {
@@ -146,8 +150,13 @@ const PROMPTS: Record<PromptKey, PromptDefinition> = {
     user: "Generate lessons and return GenerateLessonsOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
   },
   "lesson_generation.video": {
-    id: { key: "lesson_generation.video", version: "v1" },
-    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nGenerate source-grounded video lesson drafts.`,
+    id: { key: "lesson_generation.video", version: "v1.1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\n${VIDEO_SEGMENT_RULE}\n\nGenerate source-grounded VideoLessonContent with chapters, transcript_segments, checkpoints, and source citations. transcript_segments must include start_seconds, end_seconds, text_markdown, and derived_from_section_ids. checkpoints should align to segment boundaries and include required/must_answer_correctly only when warranted. Include media/download/provenance fields when known; otherwise omit them.`,
+    user: "Generate lessons and return GenerateLessonsOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
+  },
+  "lesson_generation.video_script": {
+    id: { key: "lesson_generation.video_script", version: "v1.1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\n${VIDEO_SEGMENT_RULE}\n\nGenerate source-grounded VideoLessonContent with chapters, transcript_segments, checkpoints, and source citations. transcript_segments must include start_seconds, end_seconds, text_markdown, and derived_from_section_ids. checkpoints should align to segment boundaries and include required/must_answer_correctly only when warranted. Include media/download/provenance fields when known; otherwise omit them.`,
     user: "Generate lessons and return GenerateLessonsOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
   },
   "lesson_generation.coach": {
@@ -163,6 +172,16 @@ const PROMPTS: Record<PromptKey, PromptDefinition> = {
   "lesson_generation.reflection_prompt": {
     id: { key: "lesson_generation.reflection_prompt", version: "v1" },
     system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nGenerate source-grounded reflection prompt lesson drafts.`,
+    user: "Generate lessons and return GenerateLessonsOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
+  },
+  "lesson_generation.hotspot_diagram": {
+    id: { key: "lesson_generation.hotspot_diagram", version: "v1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nGenerate source-grounded hotspot diagram lesson drafts.`,
+    user: "Generate lessons and return GenerateLessonsOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
+  },
+  "lesson_generation.drag_to_order": {
+    id: { key: "lesson_generation.drag_to_order", version: "v1" },
+    system: `${REDEX_POLICY_GUARDRAIL}\n\n${JSON_OUTPUT_RULE}\n\nThe author has stated the following learning outcomes. Every generated lesson and assessment must directly serve these outcomes. Each outcome should be measurable in the assessment.\n\nGenerate source-grounded OrderingLessonContent with ordered steps[]. Each step must be atomic and source-supported. If order is ambiguous or incomplete, flag it instead of inventing steps.`,
     user: "Generate lessons and return GenerateLessonsOutput.\n\nLearning outcomes:\n{{learning_outcomes}}\n\nInput JSON:\n{{input}}",
   },
   assessment_generation: {
@@ -192,6 +211,8 @@ const PROMPTS: Record<PromptKey, PromptDefinition> = {
   }
 };
 
+export const COURSE_FOUNDRY_SERVER_PROMPT_REGISTRY: Readonly<Record<PromptKey, PromptDefinition>> = PROMPTS;
+
 const LessonTypeSchema = z.enum([
   "text",
   "checklist",
@@ -202,6 +223,8 @@ const LessonTypeSchema = z.enum([
   "coach",
   "assignment",
   "reflection_prompt",
+  "hotspot_diagram",
+  "drag_to_order",
 ]);
 const CriticalitySchema = z.enum(["required", "recommended", "optional", "bonus"]);
 const LessonGenerationStatusSchema = z.enum([
@@ -249,11 +272,79 @@ export const GenerateOutlineOutputSchema = z.object({
   missing_source_notes: z.array(z.string()).optional(),
 });
 
+const nonEmptyTrimmedString = z.string().trim().min(1);
+const OrderingStepSchema = z.object({
+  id: nonEmptyTrimmedString,
+  label: nonEmptyTrimmedString,
+  detail_markdown: z.string().optional(),
+  source_section_id: z.string().optional(),
+});
+const OrderingStepsSchema = z.array(OrderingStepSchema).min(2).superRefine((steps, context) => {
+  const seenStepIds = new Set<string>();
+
+  steps.forEach((step, index) => {
+    if (seenStepIds.has(step.id)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Ordering step ids must be unique.",
+        path: [index, "id"],
+      });
+      return;
+    }
+
+    seenStepIds.add(step.id);
+  });
+});
+
 const QuizQuestionSchema = z.object({
   id: z.string(),
   question: z.string(),
   options: z.array(z.string()),
   correct_index: z.number().int().nonnegative().optional(),
+});
+const VideoDownloadSchema = z.object({
+  url: z.string(),
+  label: z.string().optional(),
+  mime_type: z.string().optional(),
+  size_bytes: z.number().int().nonnegative().optional(),
+  expires_at: z.string().optional(),
+});
+const VideoProvenanceSchema = z.object({
+  generated_from: z.enum(["foundry", "manual_upload", "external_url"]).optional(),
+  source_file_ids: z.array(z.string()).optional(),
+  source_section_ids: z.array(z.string()).optional(),
+  media_asset_id: z.string().optional(),
+  provider_asset_id: z.string().optional(),
+  approved_by: z.string().optional(),
+  generated_at: z.string().optional(),
+  notes_markdown: z.string().optional(),
+});
+const VideoChapterSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  start_seconds: z.number().nonnegative(),
+  end_seconds: z.number().nonnegative().optional(),
+  source_section_ids: z.array(z.string()).optional(),
+});
+const VideoTranscriptSegmentSchema = z.object({
+  id: z.string(),
+  start_seconds: z.number().nonnegative(),
+  end_seconds: z.number().nonnegative(),
+  text_markdown: z.string(),
+  derived_from_section_ids: z.array(z.string()),
+});
+const VideoCheckpointSchema = z.object({
+  id: z.string(),
+  at_seconds: z.number().nonnegative(),
+  question: z.string(),
+  options: z.array(z.string()).optional(),
+  correct_index: z.number().int().nonnegative().optional(),
+  feedback_correct_markdown: z.string().optional(),
+  feedback_incorrect_markdown: z.string().optional(),
+  source_section_ids: z.array(z.string()).optional(),
+  segment_start_seconds: z.number().nonnegative().optional(),
+  required: z.boolean().optional(),
+  must_answer_correctly: z.boolean().optional(),
 });
 const GeneratedLessonContentSchema = z.object({
   lesson_index: z.number().int().nonnegative(),
@@ -263,12 +354,39 @@ const GeneratedLessonContentSchema = z.object({
   body_markdown: z.string().optional(),
   quiz_questions: z.array(QuizQuestionSchema).optional(),
   acknowledgment_text: z.string().optional(),
+  ordering_steps: OrderingStepsSchema.optional(),
+  video_script_markdown: z.string().optional(),
+  video_url: z.string().optional(),
+  duration_seconds: z.number().optional(),
+  transcript_markdown: z.string().optional(),
+  poster_url: z.string().optional(),
+  media_asset_id: z.string().optional(),
+  media_provider: z.enum(["heygen", "manual", "external"]).optional(),
+  media_status: z.enum(["pending", "processing", "ready", "failed", "stale"]).optional(),
+  download_url: z.string().optional(),
+  downloads: z.array(VideoDownloadSchema).optional(),
+  provenance: VideoProvenanceSchema.optional(),
+  chapters: z.array(VideoChapterSchema).optional(),
+  transcript_segments: z.array(VideoTranscriptSegmentSchema).optional(),
+  checkpoints: z.array(VideoCheckpointSchema).optional(),
+  video_chapters: z.array(VideoChapterSchema).optional(),
+  video_transcript_segments: z.array(VideoTranscriptSegmentSchema).optional(),
+  video_checkpoints: z.array(VideoCheckpointSchema).optional(),
+  derived_from_section_ids: z.array(z.string()).optional(),
   status: LessonGenerationStatusSchema,
   status_note: z.string().optional(),
   source_refs: z.array(z.object({
     drive_file_id: z.string(),
     section_count: z.number().int().nonnegative(),
   })).optional(),
+}).superRefine((lesson, context) => {
+  if (lesson.lesson_type === "drag_to_order" && lesson.ordering_steps === undefined) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "drag_to_order generated lessons require valid ordering_steps.",
+      path: ["ordering_steps"],
+    });
+  }
 });
 export const GenerateLessonsOutputSchema = z.object({
   module_title: z.string(),
@@ -306,10 +424,48 @@ const ChecklistLessonContentSchema = z.object({ type: z.literal("checklist"), in
 const AcknowledgmentLessonContentSchema = z.object({ type: z.literal("acknowledgment"), statement_markdown: z.string(), required_signature: z.enum(["click", "name"]).optional(), policy_ref: z.string().optional() });
 const QuizLessonContentSchema = z.object({ type: z.literal("quiz"), questions: z.array(QuizQuestionSchema), passing_threshold: z.number().optional(), allow_retakes: z.boolean().optional() });
 const ScenarioLessonContentSchema = z.object({ type: z.literal("scenario"), intro_markdown: z.string(), steps: z.array(z.object({ id: z.string(), prompt_markdown: z.string(), choices: z.array(z.object({ id: z.string(), label: z.string(), is_correct: z.boolean().optional(), feedback_markdown: z.string().optional() })) })), outcome_summary_markdown: z.string().optional() });
-const VideoLessonContentSchema = z.object({ type: z.literal("video"), video_url: z.string(), duration_seconds: z.number().optional(), transcript_markdown: z.string().optional(), poster_url: z.string().optional() });
+const VideoLessonContentSchema = z.object({
+  type: z.literal("video"),
+  video_url: z.string(),
+  duration_seconds: z.number().optional(),
+  transcript_markdown: z.string().optional(),
+  poster_url: z.string().optional(),
+  media_asset_id: z.string().optional(),
+  media_provider: z.enum(["heygen", "manual", "external"]).optional(),
+  media_status: z.enum(["pending", "processing", "ready", "failed", "stale"]).optional(),
+  download_url: z.string().optional(),
+  downloads: z.array(VideoDownloadSchema).optional(),
+  provenance: VideoProvenanceSchema.optional(),
+  chapters: z.array(VideoChapterSchema).optional(),
+  transcript_segments: z.array(VideoTranscriptSegmentSchema).optional(),
+  checkpoints: z.array(VideoCheckpointSchema).optional(),
+});
 const CoachLessonContentSchema = z.object({ type: z.literal("coach"), intro_markdown: z.string(), prompts: z.array(z.string()).optional(), coach_id: z.string().optional() });
 const AssignmentLessonContentSchema = z.object({ type: z.literal("assignment"), instructions: z.string(), rubric: z.object({ criteria: z.array(z.object({ label: z.string(), description: z.string().optional(), weight: z.number().optional() })) }).optional() });
 const ReflectionPromptLessonContentSchema = z.object({ type: z.literal("reflection_prompt"), prompt: z.string() });
+const HotspotLessonContentSchema = z.object({
+  type: z.literal("hotspot_diagram"),
+  intro_markdown: z.string().optional(),
+  image_ref: z.object({
+    url: z.string(),
+    alt_text: z.string(),
+    caption: z.string().optional(),
+    source_image_id: z.string().optional(),
+  }),
+  hotspots: z.array(z.object({
+    id: z.string(),
+    x: z.number(),
+    y: z.number(),
+    title: z.string(),
+    details_markdown: z.string(),
+    source_section_id: z.string().optional(),
+  })),
+});
+const OrderingLessonContentSchema = z.object({
+  type: z.literal("drag_to_order"),
+  intro_markdown: z.string().optional(),
+  steps: OrderingStepsSchema,
+});
 const LessonContentSchema = z.discriminatedUnion("type", [
   TextLessonContentSchema,
   ChecklistLessonContentSchema,
@@ -320,6 +476,8 @@ const LessonContentSchema = z.discriminatedUnion("type", [
   CoachLessonContentSchema,
   AssignmentLessonContentSchema,
   ReflectionPromptLessonContentSchema,
+  HotspotLessonContentSchema,
+  OrderingLessonContentSchema,
 ]);
 const LessonSchema = z.object({
   id: z.string(),
@@ -580,6 +738,8 @@ const PROMPT_KEY_BY_LESSON_TYPE: Record<string, PromptKey> = {
   coach: "lesson_generation.coach",
   assignment: "lesson_generation.assignment",
   reflection_prompt: "lesson_generation.reflection_prompt",
+  hotspot_diagram: "lesson_generation.hotspot_diagram",
+  drag_to_order: "lesson_generation.drag_to_order",
 };
 
 export function createCourseFoundryAiClientServer(): CourseFoundryAiClientServer {

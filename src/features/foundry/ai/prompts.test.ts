@@ -18,11 +18,11 @@ const EXPECTED_PROMPT_VERSIONS = {
   'lesson_generation.scenario': 'v1',
   'lesson_generation.acknowledgment': 'v1',
   'lesson_generation.quiz': 'v1',
-  'lesson_generation.video': 'v1',
+  'lesson_generation.video': 'v1.1',
   'lesson_generation.coach': 'v1',
   'lesson_generation.assignment': 'v1',
   'lesson_generation.reflection_prompt': 'v1',
-  'lesson_generation.video_script': 'v1',
+  'lesson_generation.video_script': 'v1.1',
   'lesson_generation.hotspot_diagram': 'v1',
   'lesson_generation.drag_to_order': 'v1',
   'lesson_generation.practical': 'v1',
@@ -66,6 +66,17 @@ describe('PROMPT_REGISTRY', () => {
 
   it('includes the video segment rule in the video script prompt', () => {
     expect(getPrompt('lesson_generation.video_script').system).toContain(VIDEO_SEGMENT_RULE)
+  })
+
+  it('requires video prompts to include transcript segment and checkpoint provenance contract', () => {
+    const videoPrompt = getPrompt('lesson_generation.video')
+    const videoScriptPrompt = getPrompt('lesson_generation.video_script')
+
+    for (const prompt of [videoPrompt, videoScriptPrompt]) {
+      expect(prompt.system).toContain('transcript_segments')
+      expect(prompt.system).toContain('checkpoints')
+      expect(prompt.system).toContain('derived_from_section_ids')
+    }
   })
 
   it('returns the latest version when no version is provided', () => {
