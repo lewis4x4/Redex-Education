@@ -98,6 +98,43 @@ if (typeof Deno !== "undefined") {
     }
   });
 
+  Deno.test("server AI client gives outline generation enough output budget", async () => {
+    const originalFetch = globalThis.fetch;
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    Deno.env.set("AI_PROVIDER", "anthropic");
+    Deno.env.set("AI_PROVIDER_API_KEY", "test-key");
+    Deno.env.set("AI_MODEL", "claude-test");
+    globalThis.fetch = ((url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init });
+      return Promise.resolve(new Response(JSON.stringify({
+        content: [{ type: "text", text: JSON.stringify({
+          course_title: "Wire Gauge & Type",
+          description: "Draft",
+          learning_objectives: ["Explain wire gauge basics"],
+          modules: [{ title: "Wire Gauge & Type", lessons: [{ title: "What wire gauge means", lesson_type: "text", estimated_minutes: 4 }] }],
+        }) }],
+        usage: { input_tokens: 2000, output_tokens: 1000 },
+      }), { status: 200 }));
+    }) as typeof fetch;
+
+    try {
+      await createCourseFoundryAiClientServer().generateOutline({
+        basics: { title: "Wire Gauge & Type" },
+        sources: { text: "long DOCX source" },
+        setupAnswers: {},
+      });
+
+      const body = JSON.parse(String(calls[0]?.init?.body ?? "{}"));
+      assertEquals(body.max_tokens, 8192);
+    } finally {
+      globalThis.fetch = originalFetch;
+      Deno.env.delete("AI_PROVIDER");
+      Deno.env.delete("AI_PROVIDER_API_KEY");
+      Deno.env.delete("AI_MODEL");
+      Deno.env.delete("AI_MAX_TOKENS");
+    }
+  });
+
   Deno.test("server AI client switches to OpenAI", async () => {
     const originalFetch = globalThis.fetch;
     const calls: Array<{ url: string; init?: RequestInit }> = [];

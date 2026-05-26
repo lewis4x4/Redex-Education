@@ -688,6 +688,29 @@ function modelFor(provider: AiProvider): string {
   return Deno.env.get("AI_MODEL") ?? (provider === "openai" ? "gpt-5" : "claude-sonnet-4-5");
 }
 
+function configuredMaxOutputTokens(): number {
+  const configured = Number(Deno.env.get("AI_MAX_TOKENS") ?? 4096);
+
+  return Number.isFinite(configured) && configured > 0 ? configured : 4096;
+}
+
+function maxOutputTokensFor(promptKey: PromptKey): number {
+  if (promptKey === "entailment_check") {
+    return 256;
+  }
+
+  const minimumByPrompt: Partial<Record<PromptKey, number>> = {
+    outline_generation: 8192,
+    "lesson_generation.text": 8192,
+    assessment_generation: 8192,
+    self_critique: 8192,
+    regenerate_with_fixes: 8192,
+    regenerate_section: 8192,
+  };
+
+  return Math.max(configuredMaxOutputTokens(), minimumByPrompt[promptKey] ?? 4096);
+}
+
 function apiKeyFor(provider: AiProvider): string {
   const key = Deno.env.get("AI_PROVIDER_API_KEY");
 
@@ -764,7 +787,7 @@ async function callAnthropic(prompt: PromptDefinition, input: unknown): Promise<
     },
     body: JSON.stringify({
       model,
-      max_tokens: prompt.id.key === "entailment_check" ? 256 : Number(Deno.env.get("AI_MAX_TOKENS") ?? 4096),
+      max_tokens: maxOutputTokensFor(prompt.id.key),
       temperature: prompt.id.key === "entailment_check" ? 0 : undefined,
       system: prompt.system,
       messages: [{ role: "user", content: userPrompt }],
@@ -818,6 +841,7 @@ async function callOpenAi(prompt: PromptDefinition, input: unknown): Promise<{ t
         { role: "user", content: userPrompt },
       ],
       text: { format: { type: "json_object" } },
+      max_output_tokens: maxOutputTokensFor(prompt.id.key),
       temperature: prompt.id.key === "entailment_check" ? 0 : undefined,
     }),
   });
