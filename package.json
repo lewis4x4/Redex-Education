@@ -13,7 +13,7 @@
     "typecheck": "tsc -b --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:edge": "deno test --allow-env --allow-net=esm.sh --allow-read=supabase/functions supabase/functions/_shared/courseFoundryAiClientServer.test.ts supabase/functions/_shared/driveWrite.test.ts supabase/functions/_shared/sourceBindingsWriter.test.ts supabase/functions/generation-worker/index.test.ts supabase/functions/submit-generation-job/index.test.ts supabase/functions/drive-sync/index.test.ts supabase/functions/submit-module-intake-proposal/index.test.ts supabase/functions/process-drive-sync-jobs/index.test.ts",
+    "test:edge": "deno test --allow-env --allow-net=esm.sh --allow-read=supabase/functions supabase/functions/_shared/courseFoundryAiClientServer.test.ts supabase/functions/_shared/docxText.test.ts supabase/functions/_shared/driveWrite.test.ts supabase/functions/_shared/sourceBindingsWriter.test.ts supabase/functions/generation-worker/index.test.ts supabase/functions/submit-generation-job/index.test.ts supabase/functions/drive-sync/index.test.ts supabase/functions/submit-module-intake-proposal/index.test.ts supabase/functions/process-drive-sync-jobs/index.test.ts",
     "eval": "vitest run src/features/foundry/ai/evals --reporter=verbose",
     "rls:smoke": "node ./scripts/rls-smoke.mjs",
     "test:watch": "vitest",

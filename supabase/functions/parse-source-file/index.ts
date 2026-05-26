@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getDriveAccessToken } from "../_shared/google-jwt.ts";
+import { extractDocxText } from "../_shared/docxText.ts";
 import {
   parseFrontmatter,
   parseMarkdownSections,
@@ -10,6 +11,7 @@ import {
 } from "../_shared/parsers.ts";
 
 const DRIVE_API_BASE_URL = "https://www.googleapis.com/drive/v3";
+const DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 // CORS: defaults to `*` (parity with previous behavior) but can be locked down
 // in production by setting REDEX_ALLOWED_ORIGINS (comma-separated). Authentication
@@ -320,6 +322,17 @@ function isMarkdownFile(
     (mimeType === "text/plain" && /\.md(?:own)?$/i.test(name));
 }
 
+
+function isDocxFile(
+  metadata: DriveFileMetadata,
+  sourceFile: SourceFileRow,
+): boolean {
+  const mimeType = metadata.mimeType || sourceFile.mime_type;
+  const name = metadata.name || sourceFile.title;
+
+  return mimeType === DOCX_MIME_TYPE || /\.docx$/i.test(name);
+}
+
 function stableHeadRevisionId(metadata: DriveFileMetadata): string {
   return metadata.headRevisionId ?? metadata.modifiedTime ??
     `drive-file-${metadata.id}`;
@@ -536,6 +549,11 @@ Deno.serve(async (request) => {
         );
       }
 
+      const rawText = isDocxFile(metadata, sourceFile)
+        ? await extractDocxText(contentBytes)
+        : null;
+      const sections = rawText ? parseMarkdownSections(rawText) : [];
+
       const { data: version, error: versionError } = await supabase
         .from("source_file_versions")
         .upsert({
@@ -544,8 +562,8 @@ Deno.serve(async (request) => {
           content_hash: contentHash,
           size_bytes: sizeBytes,
           modified_time: modifiedTime,
-          raw_text: null,
-          raw_text_preview: null,
+          raw_text: rawText,
+          raw_text_preview: rawText?.slice(0, 500) ?? null,
           parse_status: "processed",
         }, { onConflict: "source_file_id,head_revision_id" })
         .select("id")
@@ -573,6 +591,26 @@ Deno.serve(async (request) => {
           500,
         );
       }
+
+      if (sections.length > 0) {
+        const { error: sectionsError } = await supabase
+          .from("source_sections")
+          .insert(
+            sections.map((section) =>
+              sectionToRow(section, sourceFileVersionId)
+            ),
+          );
+
+        if (sectionsError) {
+          throw new EdgeFunctionError(
+            "db_write_failed",
+            sectionsError.message,
+            500,
+          );
+        }
+      }
+
+      sectionsCount = sections.length;
     }
 
     const { error: updateSourceError } = await supabase
